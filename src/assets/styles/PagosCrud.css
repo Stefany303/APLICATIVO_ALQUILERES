@@ -1,0 +1,144 @@
+/* Contenedor de filtros */
+.filter-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centra el contenedor en el eje horizontal */
+    margin: 0 auto; /* Centra el contenedor dentro de su contenedor padre */
+    padding: 12px 16px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 800px; /* Limita el ancho del contenedor para que no ocupe todo el espacio */
+    margin-top: 20px; /* Espacio superior */
+    position: relative;
+}
+
+/* Fila de filtros (Inmueble y Piso) */
+.filter-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px; /* Reduce el espacio entre los filtros de Inmueble y Piso */
+    margin-bottom: 8px; /* Espacio reducido entre filas */
+}
+
+/* Estilo para los campos de entrada de los filtros */
+.filter-container input,
+.filter-container select {
+    margin: 4px 0; /* Reduce el margen superior e inferior */
+    padding: 8px; /* Reduce el padding interno */
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    flex: 1;
+    min-width: 140px;
+    max-width: 200px; /* Limita el ancho máximo */
+    background-color: #f8f8f8;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+/* Foco en los campos */
+.filter-container input:focus,
+.filter-container select:focus {
+    border-color: #2196F3;
+    box-shadow: 0 0 5px rgba(33, 150, 243, 0.4);
+}
+
+/* Botones (Filtrar y Exportar) */
+.filter-actions {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px; /* Reduce el espacio entre los botones */
+    margin-top: 8px; /* Espacio reducido entre las filas de botones */
+}
+
+/* Estilo para los botones */
+.filter-container button {
+    padding: 8px 12px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s ease;
+    margin: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 14px;
+}
+
+.filter-container button:hover {
+    background-color: #1976D2;
+    transform: translateY(-2px);
+}
+
+/* Estilo para el botón de exportar a Excel */
+.filter-container .export-button {
+    padding: 8px 12px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    margin: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 14px;
+}
+
+.filter-container .export-button:hover {
+    background-color: #388E3C;
+    transform: translateY(-2px);
+}
+
+/* Estilo para el icono de Excel dentro del botón */
+.filter-container .export-button img {
+    margin-right: 8px;
+    width: 22px;
+    height: 22px;
+}
+
+/* Estilo responsivo */
+@media (max-width: 1024px) {
+    .filter-container {
+        padding: 8px 12px;
+        max-width: 750px; /* Ajuste dinámico del ancho */
+    }
+
+    .filter-row {
+        flex-direction: column; /* Agrupa los filtros de Inmueble y Piso en una columna */
+    }
+
+    .filter-container input,
+    .filter-container select,
+    .filter-container button {
+        min-width: 100%; /* Los elementos ocupan todo el ancho disponible */
+        max-width: 100%;
+    }
+
+    .filter-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .filter-container {
+        padding: 8px 12px;
+        max-width: 100%; /* Utiliza el 100% del ancho disponible en pantallas muy pequeñas */
+    }
+
+    .filter-row {
+        flex-direction: column; /* Agrupa los filtros de Inmueble y Piso en una columna */
+    }
+
+    .filter-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

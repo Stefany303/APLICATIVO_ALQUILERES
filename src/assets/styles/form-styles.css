@@ -1,0 +1,151 @@
+/* Contenedor principal */
+.form {
+  max-width: 700px;
+  margin: 40px auto;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 15px;
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.3s ease-in-out;
+  z-index: 10; /* Asegura que se muestre encima de otros elementos */
+}
+
+/* Hover sobre el contenedor */
+.form:hover {
+  box-shadow: 0px 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Título */
+.form-title {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 30px;
+  color: #333;
+}
+
+/* Contenedor de dos columnas */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Campo de descripción que ocupa toda la fila */
+.form-row-full {
+  grid-column: span 2;
+}
+
+/* Campos de formulario */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Etiquetas */
+.form-label {
+  font-weight: 600;
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+/* Inputs y selects */
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 15px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background: #f5f5f5;
+  transition: border-color 0.3s, background 0.3s ease-in-out;
+  color: #333;
+  box-sizing: border-box;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  border-color: #6200ea;
+  background: #ffffff;
+  outline: none;
+}
+
+/* Ajuste del tamaño de los selects */
+.form-select {
+  appearance: none;
+  background: url('data:image/svg+xml;utf8,<svg fill="%23333" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M5.516 7.548a.75.75 0 0 1 1.06 0L10 10.97l3.424-3.423a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 0-1.06z"/></svg>') no-repeat right 12px center;
+  background-size: 18px;
+  cursor: pointer;
+}
+
+/* Estilo para textarea */
+.form-textarea {
+  resize: vertical;
+  height: 120px;
+}
+
+/* Botón de envío */
+.form-button {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: linear-gradient(to right, #6200ea, #3700b3);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.2s, box-shadow 0.3s ease-in-out;
+  box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+.form-button:hover {
+  background: linear-gradient(to right, #3700b3, #6200ea);
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.form-button:active {
+  transform: scale(0.98);
+}
+
+/* Responsivo: cuando la pantalla es pequeña, las columnas se apilan */
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Ajustes para asegurar que el formulario se acomode bien junto al navbar */
+@media (max-width: 1024px) {
+  .form {
+    max-width: 90%; /* Ajusta el tamaño del formulario cuando la pantalla se hace más pequeña */
+  }
+}
+
+@media (min-width: 1024px) {
+  .form {
+    max-width: 700px; /* Si la pantalla es grande, mantiene el tamaño máximo */
+  }
+}
+
+/* Asegura que el formulario no se solape con el navbar cuando se hace responsivo */
+body {
+  margin-top: 0;
+  padding-top: 0; 
+}
+
+.navbar-hidden {
+  display: none; /* Si el navbar se oculta, asegúrate de que no ocupa espacio */
+}
+
+.form-wrapper {
+  margin-left: 70px; /* Ajusta según la altura del navbar para que el formulario se acomode */
+  padding-bottom: 20px;
+}

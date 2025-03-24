@@ -1,0 +1,231 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Navbar.css */
+.navbar {
+  background-color: #0e6a7f;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  transition: width 0.3s; /* Transición suave al cambiar de ancho */
+  padding: 2.5rem;
+  overflow: hidden; /* Para evitar que los elementos sobresalgan cuando el navbar está colapsado */
+  z-index: 20; /* Asegúrate de que el navbar esté sobre otros elementos */
+}
+
+.navbar.expanded {
+  width: 250px; /* Ancho cuando el menú está expandido */
+}
+
+.navbar-collapsed {
+  width: 80px; /* Ancho del menú cuando está colapsado */
+}
+
+.navbar-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0; /* Eliminar márgenes para evitar problemas de diseño */
+}
+
+.navbar-item {
+  position: relative;
+}
+
+.navbar-link {
+  display: block;
+  color: white;
+  text-align: center;
+  padding: 14px 20px;
+  text-decoration: none;
+  border-bottom: 1px solid #555; /* Añadir una línea de separación en la parte inferior */
+  cursor: pointer;
+  white-space: nowrap; /* Asegura que el texto no se rompa */
+}
+
+.navbar-item:hover .sub-menu,
+.navbar-item .sub-menu.open {
+  display: block; /* Mostrar el submenú cuando está activo */
+}
+
+.navbar-link:hover {
+  background-color: #ddd;
+  color: #333;
+}
+
+.navbar-link.selected {
+  background-color: #61dafb; /* Color de fondo para la opción seleccionada */
+  color: #282c34; /* Color del texto para la opción seleccionada */
+}
+
+.navbar-menu {
+  padding-bottom: 1.5rem;
+}
+
+.submenu-link.selected {
+  background-color: #ffcc00; /* Color de fondo para la opción del submenú seleccionada */
+  color: #282c34; /* Color del texto para la opción del submenú seleccionada */
+}
+
+.sub-menu {
+  display: none; /* Ocultar el submenú por defecto */
+  background-color: #0e6a7f;
+  min-width: 100%; /* Asegura que el submenú tenga el mismo ancho que el elemento padre */
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  margin: 0; /* Sin márgenes para ocupar espacio correctamente */
+  padding: 0; /* Sin padding adicional */
+}
+
+.sub-menu li {
+  list-style-type: none; /* Eliminar viñetas de la lista del submenú */
+  padding: 0.5rem 0.5rem;
+}
+
+.expanded {
+  width: 250px; /* Width of the expanded menu */
+}
+
+/* Estilos para pantallas pequeñas */
+@media (max-width: 768px) {
+  /* Navbar principal cuando está colapsado */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    background-color: #0e6a7f;
+    z-index: 20;
+    padding: 1rem;
+  }
+  
+  /* Botón para activar el menú (solo en pantallas pequeñas) */
+  .menu-toggle {
+    display: block;
+    color: #ffffff;
+    font-size: 18px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    padding: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  /* Cambiar color de fondo del botón cuando se hace hover */
+  .menu-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Menú colapsado, se oculta por defecto */
+  .navbar-list {
+    display: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Menú expandido, se muestra cuando se hace clic en el botón */
+  .navbar-header.expanded .navbar-list {
+    display: block;
+    
+    top: 60px; /* Desplazar el menú hacia abajo para no sobreponerlo al navbar */
+    left: 0;
+    width: 100%;
+    background-color: #0e6a7f;
+    margin-left: 2.5rem;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Enlaces del menú */
+  .navbar-link {
+    padding: 14px;
+    text-align: center;
+    font-size: 16px;
+    color: #ffffff;
+    text-decoration: none;
+    border-bottom: 1px solid #056c77;
+    display: block;
+  }
+
+  /* Color de fondo cuando se hace hover sobre los enlaces */
+  .navbar-link:hover {
+    background-color: #027e8d;
+    color: #f1f1f1;
+  }
+
+  /* Submenú (desplegable hacia abajo) */
+  .navbar-item:hover .sub-menu,
+  .navbar-item .sub-menu.open {
+    display: block;
+    margin-top: 0.5rem;
+    opacity: 1;
+    visibility: visible;
+    position: relative;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #027e8d;
+  }
+
+  /* Estilo para los elementos dentro del submenú */
+  .sub-menu li .navbar-link {
+    padding: 12px 24px;
+  }
+
+  /* El submenú se oculta por defecto */
+  .sub-menu {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 100%;
+    width: 100%;
+    background-color: #027e8d;
+    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+
+  /* Se hace visible el submenú cuando está abierto */
+  .sub-menu.open {
+    display: block;
+    opacity: 1;
+    visibility: visible;
+  }
+}

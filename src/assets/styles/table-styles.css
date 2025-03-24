@@ -1,0 +1,87 @@
+/* Contenedor principal de la tabla */
+.table-container {
+    max-width: 1000px; /* Ajusta el ancho máximo según tus necesidades */
+    margin: 40px auto; /* Centra el contenedor vertical y horizontalmente */
+    padding: 20px; /* Espacio alrededor del contenedor */
+    background: #ffffff; /* Fondo blanco */
+    border-radius: 15px; /* Bordes redondeados */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* Sombra para profundidad */
+  }
+  
+  /* Título de la tabla */
+  .table-title {
+    text-align: center; /* Centra el texto */
+    font-size: 28px; /* Tamaño de la fuente */
+    font-weight: 600; /* Peso de la fuente */
+    margin-bottom: 20px; /* Espacio debajo del título */
+  }
+  
+  /* Estilos generales de la tabla */
+  .table {
+    width: 100%; /* Ancho completo */
+    border-collapse: collapse; /* Combina bordes de celdas adyacentes */
+  }
+  
+  /* Estilos de los encabezados de la tabla */
+  .table th {
+    background-color: #0e6a7f; /* Color de fondo de los encabezados */
+    color: white; /* Color del texto de los encabezados */
+    padding: 12px; /* Espacio interior de las celdas */
+    text-align: left; /* Alineación del texto a la izquierda */
+  }
+  
+  /* Estilos de las celdas de la tabla */
+  .table td {
+    padding: 12px; /* Espacio interior de las celdas */
+    border: 1px solid #ddd; /* Borde ligero alrededor de las celdas */
+  }
+  
+  /* Estilos para filas alternas */
+  .table tr:nth-child(even) {
+    background-color: #f9f9f9; /* Color de fondo para filas pares */
+  }
+  
+  /* Estilos para el hover en filas */
+  .table tr:hover {
+    background-color: #f1f1f1; /* Color de fondo al pasar el mouse */
+  }
+  
+  /* Estilos para los botones de acción */
+  .table-action-button {
+    padding: 10px 15px; /* Espacio interno del botón */
+    border: none; /* Sin borde */
+    border-radius: 5px; /* Bordes redondeados */
+    cursor: pointer; /* Cambia el cursor al pasar por encima */
+    transition: background-color 0.3s, transform 0.2s; /* Transiciones suaves */
+  }
+  
+  /* Estilo para el botón de ver */
+  .table-action-button.view {
+    background-color: #4caf50; /* Color verde */
+    color: white; /* Color del texto */
+  }
+  
+  /* Estilo para el botón de editar */
+  .table-action-button.edit {
+    background-color: #2196F3; /* Color azul */
+    color: white; /* Color del texto */
+  }
+  
+  /* Estilo para el botón de eliminar */
+  .table-action-button.delete {
+    background-color: #f44336; /* Color rojo */
+    color: white; /* Color del texto */
+  }
+  
+  /* Estilo hover para los botones */
+  .table-action-button:hover {
+    opacity: 0.8; /* Reduce la opacidad al pasar el mouse */
+  }
+  
+  /* Responsivo: ajusta la tabla en pantallas pequeñas */
+  @media (max-width: 768px) {
+    .table {
+      font-size: 14px; /* Ajusta el tamaño de la fuente */
+    }
+  }
+  

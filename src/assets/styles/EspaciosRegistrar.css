@@ -1,0 +1,68 @@
+/* Estilos para el cuadro de espacios */
+.espacios-container {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.espacios-box {
+    border: 1px solid #ccc; /* Borde del cuadro */
+    border-radius: 10px; /* Bordes redondeados */
+    padding: 20px; /* Espaciado interno */
+    max-height: 300px; /* Altura máxima del cuadro */
+    overflow-y: auto; /* Permitir scroll vertical si el contenido es mayor */
+    background-color: #ffffff; /* Color de fondo */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Sombra suave */
+}
+
+.espacio-row {
+    display: flex; /* Usar flexbox para organizar los elementos */
+    align-items: center; /* Alinear los elementos verticalmente al centro */
+    margin-bottom: 15px; /* Espacio entre las filas */
+}
+
+.espacio-row label {
+    margin-right: 10px; /* Espacio a la derecha de la etiqueta */
+    font-weight: 600; /* Negrita en la etiqueta */
+    flex-basis: 15%; /* Ancho de la etiqueta */
+}
+
+.espacio-row input {
+    padding: 10px; /* Espaciado interno para los inputs */
+    border: 1px solid #ccc; /* Borde de los inputs */
+    border-radius: 5px; /* Bordes redondeados para los inputs */
+    transition: border-color 0.3s; /* Transición en el color del borde */
+    flex-basis: 50%; /* Ancho del input */
+}
+
+.espacio-row input:focus {
+    border-color: #6200ea; /* Color del borde cuando el input está en foco */
+    outline: none; /* Sin borde de enfoque predeterminado */
+}
+
+.espacio-row button {
+    padding: 10px 15px; /* Espaciado interno para el botón */
+    border: none; /* Sin borde */
+    border-radius: 5px; /* Bordes redondeados para el botón */
+    background-color: #4CAF50; /* Color de fondo del botón (verde) */
+    color: white; /* Color del texto del botón */
+    cursor: pointer; /* Cambiar cursor al pasar por encima */
+    transition: background-color 0.3s; /* Transición en el color de fondo */
+}
+
+.espacio-row button:hover {
+    background-color: #45a049; /* Color de fondo del botón al pasar el cursor */
+}
+
+.form-button {
+    background-color: #007bff; /* Color de fondo del botón guardar */
+    color: white; /* Color del texto del botón guardar */
+    padding: 10px 20px; /* Espaciado interno para el botón guardar */
+    border: none; /* Sin borde */
+    border-radius: 5px; /* Bordes redondeados para el botón guardar */
+    cursor: pointer; /* Cambiar cursor al pasar por encima */
+    transition: background-color 0.3s; /* Transición en el color de fondo */
+}
+
+.form-button:hover {
+    background-color: #0056b3; /* Color de fondo del botón guardar al pasar el cursor */
+}

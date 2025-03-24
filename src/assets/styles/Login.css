@@ -1,0 +1,73 @@
+/* Contenedor del login */
+.login-container {
+    max-width: 400px; /* Ancho máximo del contenedor */
+    margin: 100px auto; /* Centrado vertical y horizontal */
+    padding: 20px; /* Espaciado interno */
+    background: #ffffff; /* Fondo blanco */
+    border-radius: 10px; /* Bordes redondeados */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Sombra suave */
+  }
+  
+  /* Título del login */
+  .login-title {
+    text-align: center; /* Centrado */
+    font-size: 26px; /* Tamaño de fuente */
+    margin-bottom: 20px; /* Espacio debajo */
+    color: #333; /* Color del texto */
+  }
+  
+  /* Estilos generales del formulario */
+  .login-form {
+    display: flex; /* Usar flexbox */
+    flex-direction: column; /* Dirección de los elementos */
+  }
+  
+  /* Estilos de los grupos de formulario */
+  .form-group {
+    margin-bottom: 15px; /* Espacio entre grupos */
+  }
+  
+  /* Estilos de las etiquetas del formulario */
+  .form-label {
+    margin-bottom: 5px; /* Espacio debajo de la etiqueta */
+    font-weight: bold; /* Negrita */
+  }
+  
+  /* Estilos de los inputs */
+  .form-input {
+    padding: 10px; /* Espacio interno */
+    border: 1px solid #ddd; /* Borde ligero */
+    border-radius: 5px; /* Bordes redondeados */
+    width: 100%; /* Ancho completo */
+    transition: border-color 0.3s; /* Transición suave para el borde */
+  }
+  
+  /* Efecto al enfocar el input */
+  .form-input:focus {
+    border-color: #2196F3; /* Color azul al enfocar */
+    outline: none; /* Sin contorno */
+  }
+  
+  /* Estilos del botón */
+  .login-button {
+    padding: 10px 15px; /* Espacio interno */
+    border: none; /* Sin borde */
+    border-radius: 5px; /* Bordes redondeados */
+    background-color: #2196F3; /* Color azul */
+    color: white; /* Color del texto */
+    cursor: pointer; /* Cambia el cursor al pasar */
+    transition: background-color 0.3s; /* Transición suave */
+  }
+  
+  /* Estilo hover para el botón */
+  .login-button:hover {
+    background-color: #1976D2; /* Color más oscuro al pasar el mouse */
+  }
+  
+  /* Estilos para el mensaje de error */
+  .error-message {
+    color: #f44336; /* Color rojo */
+    margin-top: 10px; /* Espacio superior */
+    font-weight: bold; /* Negrita */
+  }
+  
