@@ -10,7 +10,7 @@ const contratoService = {
       }
 
       console.log('Token usado:', token);
-      const response = await api.get(`${API_URL}/contratos/info`);
+      const response = await api.get(`${API_URL}/contratos/detalles`);
       console.log('Respuesta del backend:', response.data);
       return response.data;
     } catch (error) {
@@ -20,6 +20,21 @@ const contratoService = {
         status: error.response?.status
       });
       throw error;
+    }
+  },
+
+  // Obtener contratos con información detallada por inquilino (dni o nombre)
+  obtenerContratosPorInquilino: async (dni = null, nombre = null) => {
+    try {
+      const params = {};
+      if (dni) params.dni = dni;
+      if (nombre) params.nombre = nombre;
+
+      const response = await api.get(`${API_URL}/contratos/inquilinos/detalles`, { params });
+      return response.data; // Devuelve los datos obtenidos
+    } catch (error) {
+      console.error('Error al obtener los contratos:', error);
+      throw error; // Lanza el error para manejarlo en el componente
     }
   },
 

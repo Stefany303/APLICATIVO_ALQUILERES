@@ -3,18 +3,22 @@ import React, { useState, useEffect } from "react";
 import Header from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
 import { DatePicker } from "antd";
-import { FiChevronRight } from "react-icons/fi";
+import { FiChevronRight, FiSearch } from "react-icons/fi";
 import Select from "react-select";
 import { imagesend } from "../../components/imagepath";
 import { Link } from 'react-router-dom';
 import espacioService from '../../services/espacioService';
 import inmuebleService from '../../services/inmuebleService';
 import personaService from '../../services/personaService';
+import pisoService from '../../services/pisoService';
+import pagoService from '../../services/pagoService';
 
 const ContabilidadPagos = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
+    inmueble_id: '',
+    piso_id: '',
     espacioId: '',
     inquilinoId: '',
     monto: '',
@@ -24,49 +28,38 @@ const ContabilidadPagos = () => {
     observaciones: ''
   });
 
-  const [espacios, setEspacios] = useState([]);
-  const [inquilinos, setInquilinos] = useState([]);
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchType, setSearchType] = useState('dni'); // 'dni' o 'nombre'
+  const [inmuebles, setInmuebles] = useState([]);
+  const [pagos, setPagos] = useState([]);
+  const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
+  const [loading2, setLoading2] = useState(false);
 
   const metodosPago = [
-    { value: 'EFECTIVO', label: 'Efectivo' },
-    { value: 'TRANSFERENCIA', label: 'Transferencia Bancaria' },
-    { value: 'CHEQUE', label: 'Cheque' },
-    { value: 'TARJETA', label: 'Tarjeta de Crédito/Débito' }
+    { value: 'efectivo', label: 'Efectivo' },
+    { value: 'transferencia', label: 'Transferencia Bancaria' },
+    { value: 'paypal', label: 'Paypal' },
+    { value: 'tarjeta', label: 'Tarjeta de Crédito/Débito' },
+    { value: 'yape', label: 'Yape' },
+    { value: 'plin', label: 'Plin' },
   ];
 
   const estadosPago = [
-    { value: 'PENDIENTE', label: 'Pendiente' },
-    { value: 'PAGADO', label: 'Pagado' },
-    { value: 'VENCIDO', label: 'Vencido' }
+    { value: 'pendiente', label: 'Pendiente' },
+    { value: 'pagado', label: 'Pagado' },
+    { value: 'vencido', label: 'Vencido' }
   ];
+
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Obtener espacios
-        const inmuebles = await inmuebleService.obtenerInmuebles();
-        const espaciosData = [];
-        for (const inmueble of inmuebles) {
-          const pisos = inmueble.pisos || [];
-          for (const piso of pisos) {
-            const espaciosPiso = await espacioService.obtenerEspaciosPorPiso(inmueble.id, piso.id);
-            espaciosData.push(...espaciosPiso.map(espacio => ({
-              value: espacio.id,
-              label: `${inmueble.nombre} - Piso ${piso.numero} - ${espacio.nombre}`
-            })));
-          }
-        }
-        setEspacios(espaciosData);
-
-        // Obtener inquilinos
-        const personas = await personaService.obtenerPersonas();
-        const inquilinosData = personas.map(persona => ({
-          value: persona.id,
-          label: `${persona.nombre} ${persona.apellido}`
-        }));
-        setInquilinos(inquilinosData);
+        
+        // Obtener inmuebles para referencia
+        const inmueblesData = await inmuebleService.obtenerInmuebles();
+        setInmuebles(inmueblesData);
+        
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Error al cargar los datos');
@@ -77,6 +70,50 @@ const ContabilidadPagos = () => {
 
     fetchData();
   }, []);
+
+  const buscarInquilino = async () => {
+    if (!searchTerm) {
+      alert('Por favor ingrese un término de búsqueda');
+      return;
+    }
+
+    try {
+      setLoading2(true);
+      let resultados;
+      
+      if (searchType === 'dni') {
+        resultados = await pagoService.obtenerPagosPorInquilino(searchTerm, null);
+      } else {
+        resultados = await pagoService.obtenerPagosPorInquilino(null, searchTerm);
+      }
+      
+      setPagos(resultados);
+      
+      if (resultados.length === 0) {
+        alert('No se encontraron pagos para este inquilino');
+      }
+    } catch (error) {
+      console.error('Error al buscar pagos del inquilino:', error);
+      alert('Error al buscar los pagos del inquilino');
+    } finally {
+      setLoading2(false);
+    }
+  };
+
+  const seleccionarPago = (pago) => {
+    setPagoSeleccionado(pago);
+    
+    setFormData({
+      inmueble_id: '',
+      espacioId: pago.contrato_id || '',
+      inquilinoId: pago.inquilino_id || '',
+      monto: pago.monto,
+      fechaPago: '',
+      metodoPago: pago.metodo_pago,
+      estado: pago.estado,
+      observaciones: ''
+    });
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -102,14 +139,50 @@ const ContabilidadPagos = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!pagoSeleccionado) {
+      alert('Debe seleccionar un pago primero');
+      return;
+    }
+    
     try {
-      // TODO: Implementar la llamada a la API para guardar el pago
-      console.log('Datos del pago:', formData);
-      // Mostrar mensaje de éxito
-      alert('Pago registrado exitosamente');
+      // Crear objeto con datos del pago
+      const pagoData = {
+        contrato_id: pagoSeleccionado.contrato_id,
+        inquilino_id: pagoSeleccionado.inquilino_id,
+        monto: formData.monto,
+        metodo_pago: formData.metodoPago,
+        tipo_pago: pagoSeleccionado.tipo_pago || 'alquiler',
+        estado: formData.estado,
+        fecha_pago: formData.fechaPago,
+        observaciones: formData.observaciones
+      };
+      
+      console.log('Datos a enviar:', pagoData);
+      
+      // Actualizar el pago usando el servicio
+      await pagoService.actualizarPago(pagoSeleccionado.id, pagoData);
+      
+      alert('Pago actualizado exitosamente');
+      
+      // Reset form and search
+      setFormData({
+        inmueble_id: '',
+        piso_id: '',
+        espacioId: '',
+        inquilinoId: '',
+        monto: '',
+        fechaPago: '',
+        metodoPago: '',
+        estado: '',
+        observaciones: ''
+      });
+      setSearchTerm('');
+      setPagos([]);
+      setPagoSeleccionado(null);
     } catch (error) {
-      console.error('Error al registrar el pago:', error);
-      alert('Error al registrar el pago');
+      console.error('Error:', error);
+      alert('Error al actualizar el pago');
     }
   };
 
@@ -176,7 +249,7 @@ const ContabilidadPagos = () => {
                   </li>
                   <li className="breadcrumb-item">
                     <i className="feather-chevron-right">
-                      <FiChevronRight icon="chevron-right" />
+                      <FiChevronRight />
                     </i>
                   </li>
                   <li className="breadcrumb-item active">Registrar Pago</li>
@@ -184,149 +257,245 @@ const ContabilidadPagos = () => {
               </div>
             </div>
           </div>
+          
           <div className="row">
             <div className="col-sm-12">
               <div className="card">
                 <div className="card-body">
-                  <form onSubmit={handleSubmit}>
-                    <div className="row">
+                  <div className="row">
+                    <div className="col-12">
+                      <div className="form-heading">
+                        <h4>Buscar Inquilino</h4>
+                      </div>
+                    </div>
+                    
+                    <div className="col-12 col-md-4">
+                      <div className="form-group">
+                        <label>Buscar por</label>
+                        <select 
+                          className="form-select"
+                          value={searchType}
+                          onChange={(e) => setSearchType(e.target.value)}
+                        >
+                          <option value="dni">DNI</option>
+                          <option value="nombre">Nombre</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="col-12 col-md-6">
+                      <div className="form-group">
+                        <label>Término de búsqueda</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          placeholder={searchType === 'dni' ? "Ingrese DNI del inquilino" : "Ingrese nombre del inquilino"}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="col-12 col-md-2">
+                      <div className="form-group">
+                        <label>&nbsp;</label>
+                        <button 
+                          type="button" 
+                          className="btn btn-primary w-100"
+                          onClick={buscarInquilino}
+                          disabled={loading2}
+                        >
+                          {loading2 ? (
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          ) : (
+                            <FiSearch className="me-2" />
+                          )}
+                          Buscar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {pagos.length > 0 && (
+                    <div className="row mt-4">
                       <div className="col-12">
                         <div className="form-heading">
-                          <h4>Registrar Pago de Alquiler</h4>
+                          <h4>Pagos Encontrados</h4>
                         </div>
-                      </div>
-                      <div className="col-12 col-md-6 col-xl-6">
-                        <div className="form-group local-forms">
-                          <label>
-                            Espacio
-                            <span className="login-danger">*</span>
-                          </label>
-                          <Select
-                            name="espacioId"
-                            options={espacios}
-                            onChange={handleSelectChange}
-                            styles={customStyles}
-                            placeholder="Seleccionar espacio"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-12 col-md-6 col-xl-6">
-                        <div className="form-group local-forms">
-                          <label>
-                            Inquilino
-                            <span className="login-danger">*</span>
-                          </label>
-                          <Select
-                            name="inquilinoId"
-                            options={inquilinos}
-                            onChange={handleSelectChange}
-                            styles={customStyles}
-                            placeholder="Seleccionar inquilino"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-12 col-md-6 col-xl-6">
-                        <div className="form-group local-forms cal-icon">
-                          <label>
-                            Fecha de Pago
-                            <span className="login-danger">*</span>
-                          </label>
-                          <DatePicker
-                            className="form-control datetimepicker"
-                            onChange={handleDateChange}
-                            format="DD/MM/YYYY"
-                            placeholder="Seleccionar fecha"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-12 col-md-6 col-xl-6">
-                        <div className="form-group local-forms">
-                          <label>
-                            Monto
-                            <span className="login-danger">*</span>
-                          </label>
-                          <input
-                            className="form-control"
-                            type="number"
-                            name="monto"
-                            value={formData.monto}
-                            onChange={handleChange}
-                            placeholder="Ingrese el monto"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-12 col-md-6 col-xl-6">
-                        <div className="form-group local-forms">
-                          <label>
-                            Método de Pago
-                            <span className="login-danger">*</span>
-                          </label>
-                          <Select
-                            name="metodoPago"
-                            options={metodosPago}
-                            onChange={handleSelectChange}
-                            styles={customStyles}
-                            placeholder="Seleccionar método de pago"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-12 col-md-6 col-xl-6">
-                        <div className="form-group local-forms">
-                          <label>
-                            Estado
-                            <span className="login-danger">*</span>
-                          </label>
-                          <Select
-                            name="estado"
-                            options={estadosPago}
-                            onChange={handleSelectChange}
-                            styles={customStyles}
-                            placeholder="Seleccionar estado"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-12 col-sm-12">
-                        <div className="form-group local-forms">
-                          <label>
-                            Observaciones
-                          </label>
-                          <textarea
-                            className="form-control"
-                            rows={3}
-                            name="observaciones"
-                            value={formData.observaciones}
-                            onChange={handleChange}
-                            placeholder="Ingrese observaciones adicionales"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-12">
-                        <div className="doctor-submit text-end">
-                          <button
-                            type="submit"
-                            className="btn btn-primary submit-form me-2"
-                          >
-                            Registrar Pago
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-primary cancel-form"
-                            onClick={() => setFormData({
-                              espacioId: '',
-                              inquilinoId: '',
-                              monto: '',
-                              fechaPago: '',
-                              metodoPago: '',
-                              estado: '',
-                              observaciones: ''
-                            })}
-                          >
-                            Cancelar
-                          </button>
+                        <div className="table-responsive">
+                          <table className="table table-bordered table-hover">
+                            <thead>
+                              <tr>
+                                <th>Inquilino</th>
+                                <th>DNI</th>
+                                <th>Monto</th>
+                                <th>Fecha de Pago</th>
+                                <th>Método de Pago</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {pagos.map((pago, index) => (
+                                <tr key={index}>
+                                  <td>{`${pago.inquilino_nombre} ${pago.inquilino_apellido}`}</td>
+                                  <td>{pago.inquilino_dni}</td>
+                                  <td>{pago.monto}</td>
+                                  <td>{new Date(pago.fecha_pago).toLocaleDateString()}</td>
+                                  <td>{pago.metodo_pago}</td>
+                                  <td>{pago.estado}</td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-primary"
+                                      onClick={() => seleccionarPago(pago)}
+                                    >
+                                      Seleccionar
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     </div>
-                  </form>
+                  )}
+                  
+                  {pagoSeleccionado && (
+                    <form onSubmit={handleSubmit}>
+                      <div className="row mt-4">
+                        <div className="col-12">
+                          <div className="form-heading">
+                            <h4>Editar Pago de Alquiler</h4>
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <div className="form-group local-forms">
+                            <label>Inquilino</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              readOnly
+                              value={`${pagoSeleccionado.inquilino_nombre} ${pagoSeleccionado.inquilino_apellido}`}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <div className="form-group local-forms">
+                            <label>DNI</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              readOnly
+                              value={pagoSeleccionado.inquilino_dni}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <div className="form-group local-forms">
+                            <label>Monto <span className="login-danger">*</span></label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="monto"
+                              value={formData.monto}
+                              onChange={handleChange}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <div className="form-group local-forms">
+                            <label>Fecha de Pago <span className="login-danger">*</span></label>
+                            <DatePicker
+                              className="form-control datetimepicker"
+                              placeholder="DD-MM-YYYY"
+                              onChange={handleDateChange}
+                              format="DD-MM-YYYY"
+                              style={{ borderColor: "rgba(46, 55, 164, 0.1)" }}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <div className="form-group local-forms">
+                            <label>Método de Pago <span className="login-danger">*</span></label>
+                            <Select
+                              name="metodoPago"
+                              options={metodosPago}
+                              onChange={handleSelectChange}
+                              styles={customStyles}
+                              placeholder="Seleccionar método de pago"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <div className="form-group local-forms">
+                            <label>Estado <span className="login-danger">*</span></label>
+                            <Select
+                              name="estado"
+                              options={estadosPago}
+                              onChange={handleSelectChange}
+                              styles={customStyles}
+                              placeholder="Seleccionar estado"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-12">
+                          <div className="form-group local-forms">
+                            <label>Observaciones</label>
+                            <textarea
+                              className="form-control"
+                              name="observaciones"
+                              value={formData.observaciones}
+                              onChange={handleChange}
+                              rows="3"
+                            ></textarea>
+                          </div>
+                        </div>
+
+                        <div className="col-12">
+                          <div className="doctor-submit text-end">
+                            <button type="submit" className="btn btn-primary submit-form me-2">
+                              Actualizar Pago
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary cancel-form"
+                              onClick={() => {
+                                setFormData({
+                                  inmueble_id: '',
+                                  piso_id: '',
+                                  espacioId: '',
+                                  inquilinoId: '',
+                                  monto: '',
+                                  fechaPago: '',
+                                  metodoPago: '',
+                                  estado: '',
+                                  observaciones: ''
+                                });
+                                setPagoSeleccionado(null);
+                                setPagos([]);
+                                setSearchTerm('');
+                              }}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </div>
             </div>

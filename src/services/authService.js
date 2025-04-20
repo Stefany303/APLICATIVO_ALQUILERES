@@ -2,9 +2,9 @@ import api from './api';
 
 // Verificar si estamos en desarrollo o producción
 const isDevelopment = process.env.NODE_ENV === 'development';
-const API_URL = isDevelopment 
-  ? 'http://localhost:3000/api'  // URL para desarrollo (puerto 3000)
-  : process.env.REACT_APP_API_URL || 'http://localhost:3000/api';  // URL para producción
+const API_URL = isDevelopment
+    ? 'http://localhost:3000/api'  // URL para desarrollo (puerto 3000)
+    : process.env.REACT_APP_API_URL || 'http://localhost:3000/api';  // URL para producción
 
 // Configurar axios para manejar errores de conexión
 api.defaults.timeout = 10000; // 10 segundos de timeout
@@ -37,36 +37,36 @@ const removeAuthToken = () => {
 
 // Configurar interceptor para agregar el token a todas las peticiones
 api.interceptors.request.use(
-  (config) => {
-    const token = getAuthToken();
-    if (token) {
-      console.log('Agregando token a la petición:', token);
-      config.headers.Authorization = token;
-    } else {
-      console.warn('No se pudo agregar token a la petición');
+    (config) => {
+      const token = getAuthToken();
+      if (token) {
+        console.log('Agregando token a la petición:', token);
+        config.headers.Authorization = token;
+      } else {
+        console.warn('No se pudo agregar token a la petición');
+      }
+      return config;
+    },
+    (error) => {
+      console.error('Error en el interceptor de peticiones:', error);
+      return Promise.reject(error);
     }
-    return config;
-  },
-  (error) => {
-    console.error('Error en el interceptor de peticiones:', error);
-    return Promise.reject(error);
-  }
 );
 
 // Configurar interceptor para manejar respuestas
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      console.warn('Token inválido o expirado');
-      removeAuthToken();
-      // Aquí podrías redirigir al usuario a la página de login
-      window.location.href = '/login';
+    (response) => {
+      return response;
+    },
+    (error) => {
+      if (error.response && error.response.status === 401) {
+        console.warn('Token inválido o expirado');
+        removeAuthToken();
+        // Aquí podrías redirigir al usuario a la página de login
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-  }
 );
 
 export { API_URL, getAuthToken, setAuthToken, removeAuthToken }; 

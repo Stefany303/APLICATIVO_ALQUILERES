@@ -17,7 +17,7 @@ const espacioService = {
   obtenerEspacios: async () => {
     try {
       console.log('Obteniendo todos los espacios...'); // Debug
-      const response = await axios.get(`${API_URL}/espacios/obtenerespacios`);
+      const response = await axios.get(`${API_URL}/espacios`);
       console.log('Respuesta de obtenerEspacios:', response.data); // Debug
       if (response.data && Array.isArray(response.data)) {
         return response.data.map(transformarEspacio);
@@ -57,6 +57,19 @@ const espacioService = {
       return response.data;
     } catch (error) {
       console.error('Error al obtener espacios por piso:', error);
+      throw error;
+    }
+  },
+
+  // Obtener un espacio por su ID
+  obtenerEspacioPorId: async (espacioId) => {
+    try {
+      console.log('Obteniendo espacio con ID:', espacioId);
+      const response = await axios.get(`${API_URL}/espacios/${espacioId}`);
+      console.log('Datos del espacio:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al obtener el espacio por ID:', error);
       throw error;
     }
   },

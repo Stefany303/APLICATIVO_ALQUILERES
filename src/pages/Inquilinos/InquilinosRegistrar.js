@@ -8,6 +8,7 @@ import inquilinoService from '../../services/inquilinoService';
 import inmuebleService from '../../services/inmuebleService';
 import contratoService from '../../services/contratoService';
 import espacioService from '../../services/espacioService';
+import pagoService from '../../services/pagoService';
 import { useAuth } from "../../utils/AuthContext";
 
 const InquilinosRegistrar = () => {
@@ -18,6 +19,10 @@ const InquilinosRegistrar = () => {
   const [inmuebles, setInmuebles] = useState([]);
   const [pisos, setPisos] = useState([]);
   const [espacios, setEspacios] = useState([]);
+  
+  // Obtener la fecha actual en formato YYYY-MM-DD para prellenar la fecha de inicio
+  const fechaActual = new Date().toISOString().split('T')[0];
+  
   const [formData, setFormData] = useState({
     nombre: '',
     apellido: '',
@@ -29,7 +34,7 @@ const InquilinosRegistrar = () => {
     inmuebleId: '',
     pisoId: '',
     espacioId: '',
-    fechaInicio: '',
+    fechaInicio: fechaActual, // Prellenar con la fecha actual
     fechaFin: '',
     montoMensual: '',
     deposito: '',
@@ -205,6 +210,57 @@ const InquilinosRegistrar = () => {
     setStep(1);
   };
 
+  // Función para calcular las fechas de pago mensuales entre fecha de inicio y fin
+  const calcularFechasPago = (fechaInicio, fechaFin) => {
+    const fechas = [];
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+    
+    // Obtener día del mes de la fecha de inicio
+    const diaDelMes = inicio.getDate();
+    
+    // Clonar la fecha de inicio para no modificarla
+    let fechaActual = new Date(inicio);
+    
+    // Generar fechas hasta un mes antes de la fecha final
+    while (fechaActual < fin) {
+      fechas.push(new Date(fechaActual));
+      
+      // Avanzar al siguiente mes
+      fechaActual.setMonth(fechaActual.getMonth() + 1);
+      
+      // Ajustar al mismo día del mes (considerando meses con menos días)
+      const ultimoDiaDelMes = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0).getDate();
+      fechaActual.setDate(Math.min(diaDelMes, ultimoDiaDelMes));
+    }
+    
+    return fechas;
+  };
+
+  // Función para generar los pagos mensuales
+  const generarPagosMensuales = async (contratoId, montoMensual, fechaInicio, fechaFin) => {
+    const fechasPago = calcularFechasPago(fechaInicio, fechaFin);
+    
+    // Crear pagos para cada fecha
+    const promises = fechasPago.map((fecha, i) => {
+      const pagoData = {
+        contrato_id: parseInt(contratoId),
+        monto: parseFloat(montoMensual),
+        fecha_pago: fecha.toISOString().split('T')[0],
+        metodo_pago: "EFECTIVO",
+        tipo_pago: "ALQUILER",
+        estado: "PENDIENTE",
+        observacion: `Pago automático ${i + 1} de ${fechasPago.length}`,
+        fecha_registro: new Date().toISOString().split('T')[0],
+        usuario_id: user?.id || null
+      };
+      
+      return pagoService.crearPago(pagoData);
+    });
+    
+    await Promise.all(promises);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -222,12 +278,7 @@ const InquilinosRegistrar = () => {
       // Validar fechas
       const fechaInicio = new Date(formData.fechaInicio);
       const fechaFin = new Date(formData.fechaFin);
-      const hoy = new Date();
-
-      if (fechaInicio < hoy) {
-        throw new Error('La fecha de inicio no puede ser anterior a hoy');
-      }
-
+      
       if (fechaFin <= fechaInicio) {
         throw new Error('La fecha de fin debe ser posterior a la fecha de inicio');
       }
@@ -256,13 +307,20 @@ const InquilinosRegistrar = () => {
         observaciones: formData.observaciones
       };
 
-      console.log('Datos a enviar:', inquilinoData);
-
       // Crear el inquilino y el contrato
       const resultado = await inquilinoService.crearInquilino(inquilinoData);
-      console.log('Resultado:', resultado);
+      
+      // Generar pagos mensuales si se ha creado el contrato
+      if (resultado && resultado.contrato && resultado.contrato.id) {
+        await generarPagosMensuales(
+          resultado.contrato.id,
+          montoMensual,
+          formData.fechaInicio,
+          formData.fechaFin
+        );
+      }
 
-      message.success('Inquilino y contrato registrados exitosamente');
+      message.success('Inquilino registrado exitosamente');
       navigate('/inquilinos-registros');
     } catch (error) {
       console.error('Error al registrar inquilino:', error);
