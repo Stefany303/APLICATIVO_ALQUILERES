@@ -1,21 +1,33 @@
 import React, { useEffect, useState } from "react";
 import '../../assets/styles/table-styles.css'; // Asegúrate de que la ruta sea correcta
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import Sidebar from "../../components/Sidebar";
 import { blogimg10, imagesend, pdficon, pdficon3, pdficon4, plusicon, refreshicon, searchnormal, blogimg12,
   blogimg2, blogimg4, blogimg6, blogimg8} from '../../components/imagepath';
 import { FiChevronRight } from "react-icons/fi";
 import {onShowSizeChange,itemRender}from  '../../components/Pagination';
-import { Table } from 'antd';
+import { Table, Button, Space, Modal, message, Tag, Card, Row, Col, Statistic } from 'antd';
 import Select from "react-select";
 import { DatePicker} from "antd";
+import inquilinoService from '../../services/inquilinoService';
+import contratoService from '../../services/contratoService';
+
+import { EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+
 const InquilinosRegistros = () => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [inquilinos, setInquilinos] = useState([]);
   const [contratos, setContratos] = useState([]);
   const [filteredInquilinos, setFilteredInquilinos] = useState([]);
   const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedInquilino, setSelectedInquilino] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [loadingContratos, setLoadingContratos] = useState(false);
+  const navigate = useNavigate();
+
   const datasource = [
     {
      
@@ -47,23 +59,30 @@ const InquilinosRegistros = () => {
   };
 
   const fetchInquilinos = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("URL_DE_TU_API/inquilinos"); // Cambia esto por tu API
-      const data = await response.json();
+      const data = await inquilinoService.getInquilinos();
       setInquilinos(data);
       setFilteredInquilinos(data); // Inicializar los inquilinos filtrados
     } catch (error) {
-      console.error("Error al obtener inquilinos:", error);
+      setError(error.message);
+      message.error('Error al cargar los inquilinos');
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchContratos = async () => {
+    setLoadingContratos(true);
     try {
-      const response = await fetch("URL_DE_TU_API/contratos"); // Cambia esto por tu API
-      const data = await response.json();
+      const data = await contratoService.obtenerContratos();
+      console.log('Contratos recibidos:', data);
       setContratos(data);
     } catch (error) {
-      console.error("Error al obtener contratos:", error);
+      console.error('Error al cargar los contratos:', error);
+      message.error('Error al cargar los contratos');
+    } finally {
+      setLoadingContratos(false);
     }
   };
 
@@ -84,94 +103,139 @@ const InquilinosRegistros = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("¿Estás seguro de que deseas eliminar este inquilino?")) {
-      try {
-        const response = await fetch(`URL_DE_TU_API/inquilinos/${id}`, {
-          method: "DELETE",
-        });
-        if (response.ok) {
-          alert("Inquilino eliminado exitosamente!");
-          fetchInquilinos(); // Refresca la lista de inquilinos
-        } else {
-          throw new Error("Error al eliminar el inquilino");
-        }
-      } catch (error) {
-        console.error("Error al eliminar inquilino:", error);
-        alert("Error al eliminar el inquilino");
-      }
+    try {
+      await inquilinoService.deleteInquilino(id);
+      message.success('Inquilino eliminado exitosamente');
+      fetchInquilinos();
+    } catch (error) {
+      message.error('Error al eliminar el inquilino');
     }
   };
 
-  const handleView = (inquilino) => {
-    // Lógica para ver detalles del inmueble
-    console.log("Ver Inquilino con ID:", inquilino);
-    // Aquí puedes redirigir a otra página o mostrar un modal con los detalles
+  const handleViewDetails = (inquilino) => {
+    setSelectedInquilino(inquilino);
+    setModalVisible(true);
   };
 
-  
+  const getContratoInquilino = (inquilinoId) => {
+    const contrato = contratos.find(contrato => contrato.inquilino_id === inquilinoId);
+    console.log('Buscando contrato para inquilino:', inquilinoId);
+    console.log('Contrato encontrado:', contrato);
+    return contrato;
+  };
+
   const columns = [
     {
-      title: "ID",
-      dataIndex: "id",
-      sorter: (a, b) => a.id - b.id,
+      title: 'Nombre',
+      dataIndex: 'nombre',
+      key: 'nombre',
+      render: (text, record) => `${record.nombre} ${record.apellido}`,
     },
     {
-      title: "Nombre",
-      dataIndex: "nombre",
-      sorter: (a, b) => a.nombre.localeCompare(b.nombre),
+      title: 'Documento',
+      dataIndex: 'dni',
+      key: 'dni',
     },
     {
-      title: "Apellido",
-      dataIndex: "apellido",
-      sorter: (a, b) => a.apellido.localeCompare(b.apellido),
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
     },
     {
-      title: "Email",
-      dataIndex: "email",
-      sorter: (a, b) => a.email.localeCompare(b.email),
+      title: 'Teléfono',
+      dataIndex: 'telefono',
+      key: 'telefono',
     },
     {
-      title: "Teléfono",
-      dataIndex: "telefono",
+      title: 'Contrato',
+      key: 'contrato',
+      render: (_, record) => {
+        const contrato = getContratoInquilino(record.id);
+        return contrato ? (
+          <Tag color={contrato.estado === 'activo' ? 'green' : 'red'}>
+            {contrato.estado === 'activo' ? 'Activo' : 'Inactivo'}
+          </Tag>
+        ) : (
+          <Tag color="default">Sin contrato</Tag>
+        );
+      },
     },
     {
-      title: "Contrato",
-      dataIndex: "contrato",
-      render: (contrato) => (contrato ? "Sí" : "No"),
-    },
-    {
-      title: "Acciones",
-      dataIndex: "acciones",
-      render: (text, record) => (
-        <div className="text-end">
-          <div className="dropdown dropdown-action">
-            <Link
-              to="#"
-              className="action-icon dropdown-toggle"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              <i className="fas fa-ellipsis-v" />
-            </Link>
-            <div className="dropdown-menu dropdown-menu-end">
-              <Link className="dropdown-item" to="#" onClick={() => handleView(record.id)}>
-                <i className="far fa-eye me-2" />
-                Ver
-              </Link>
-              <Link className="dropdown-item" to="#" onClick={() => handleEdit(record.id)}>
-                <i className="far fa-edit me-2" />
-                Editar
-              </Link>
-              <Link className="dropdown-item" to="#" onClick={() => handleDelete(record.id)}>
-                <i className="fa fa-trash-alt me-2" />
-                Eliminar
-              </Link>
-            </div>
-          </div>
-        </div>
+      title: 'Acciones',
+      key: 'acciones',
+      render: (_, record) => (
+        <Space size="middle">
+          <Button 
+            type="primary" 
+            icon={<EyeOutlined />} 
+            onClick={() => handleViewDetails(record)}
+          >
+            Ver
+          </Button>
+          <Button 
+            type="primary" 
+            icon={<EditOutlined />} 
+            onClick={() => navigate(`/inquilinos-editar/${record.id}`)}
+          >
+            Editar
+          </Button>
+          <Button 
+            danger 
+            icon={<DeleteOutlined />} 
+            onClick={() => handleDelete(record.id)}
+          >
+            Eliminar
+          </Button>
+        </Space>
       ),
     },
   ];
+
+  const renderContratoInfo = (inquilino) => {
+    const contrato = getContratoInquilino(inquilino.id);
+    if (!contrato) return null;
+
+    return (
+      <Card title="Información del Contrato" style={{ marginTop: 16 }}>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Statistic title="Fecha Inicio" value={new Date(contrato.fecha_inicio).toLocaleDateString()} />
+          </Col>
+          <Col span={8}>
+            <Statistic title="Fecha Fin" value={new Date(contrato.fecha_fin).toLocaleDateString()} />
+          </Col>
+          <Col span={8}>
+            <Statistic 
+              title="Monto Mensual" 
+              value={`$${contrato.monto_alquiler.toFixed(2)}`}
+              precision={2}
+            />
+          </Col>
+        </Row>
+        <Row gutter={16} style={{ marginTop: 16 }}>
+          <Col span={8}>
+            <Statistic 
+              title="Depósito" 
+              value={`$${contrato.monto_garantia.toFixed(2)}`}
+              precision={2}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic title="Estado" value={contrato.estado} />
+          </Col>
+          <Col span={8}>
+            <Statistic title="Fecha de Pago" value={new Date(contrato.fecha_pago).toLocaleDateString()} />
+          </Col>
+        </Row>
+        {contrato.descripcion && (
+          <div style={{ marginTop: 16 }}>
+            <h4>Observaciones:</h4>
+            <p>{contrato.descripcion}</p>
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   return (
     <>
@@ -296,8 +360,8 @@ const InquilinosRegistros = () => {
                            itemRender: itemRender,
                         }}
                         columns={columns}
-                        dataSource={datasource}
-
+                        dataSource={inquilinos}
+                        loading={loading}
                         rowSelection={rowSelection}
                         rowKey={(record) => record.id}
                         style={{
@@ -313,7 +377,32 @@ const InquilinosRegistros = () => {
     
     </div>
 
-   
+    <Modal
+      title="Detalles del Inquilino"
+      open={modalVisible}
+      onCancel={() => setModalVisible(false)}
+      footer={null}
+      width={800}
+    >
+      {selectedInquilino && (
+        <>
+          <Card title="Información Personal">
+            <Row gutter={16}>
+              <Col span={12}>
+                <p><strong>Nombre:</strong> {selectedInquilino.nombre} {selectedInquilino.apellido}</p>
+                <p><strong>Documento:</strong> {selectedInquilino.dni}</p>
+                <p><strong>Email:</strong> {selectedInquilino.email}</p>
+              </Col>
+              <Col span={12}>
+                <p><strong>Teléfono:</strong> {selectedInquilino.telefono}</p>
+                <p><strong>Dirección:</strong> {selectedInquilino.direccion}</p>
+              </Col>
+            </Row>
+          </Card>
+          {renderContratoInfo(selectedInquilino)}
+        </>
+      )}
+    </Modal>
 </>
     
     </>

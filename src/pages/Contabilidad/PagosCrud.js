@@ -1,155 +1,209 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
-import '../../assets/styles/table-styles.css';
-import '../../assets/styles/PagosCrud.css';
-import { FaFileExcel } from 'react-icons/fa'
-const PagosCrud = () => {
-  const [pagos, setPagos] = useState([]);
-  const [contratos, setContratos] = useState([]);
-  const [formData, setFormData] = useState({
-    contrato_id: "",
-    monto: "",
-    metodo_pago: "",
-    tipo_pago: "",
-    estado: "pendiente",
-  });
+import Header from "../../components/Header";
+import Sidebar from "../../components/Sidebar";
+import { Link } from 'react-router-dom';
+import { FiChevronRight, FiEdit2, FiTrash2, FiEye } from "react-icons/fi";
+import pagoService from '../../services/pagoService';
 
-  const [filtros, setFiltros] = useState({
-    fechaInicio: "",
-    fechaFin: "",
-    inmueble: "",
-    piso: "",
-  });
+const PagosCrud = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pagos, setPagos] = useState([]);
+  const [filtroEstado, setFiltroEstado] = useState('TODOS');
+  const [filtroFecha, setFiltroFecha] = useState('');
 
   useEffect(() => {
-    fetchPagos();
-    fetchContratos();
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const pagosData = await pagoService.obtenerPagos();
+        setPagos(pagosData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('Error al cargar los pagos');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const fetchPagos = async () => {
-    try {
-      const response = await axios.get("/api/pagos", { params: filtros });
-      setPagos(response.data);
-    } catch (error) {
-      console.error("Error al obtener pagos", error);
-    }
+  const handleFiltroEstado = (e) => {
+    setFiltroEstado(e.target.value);
   };
 
-  const fetchContratos = async () => {
-    try {
-      const response = await axios.get("/api/contratos");
-      setContratos(response.data);
-    } catch (error) {
-      console.error("Error al obtener contratos", error);
-    }
+  const handleFiltroFecha = (e) => {
+    setFiltroFecha(e.target.value);
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleFiltroChange = (e) => {
-    setFiltros({ ...filtros, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post("/api/pagos", formData);
-      fetchPagos();
-      setFormData({ contrato_id: "", monto: "", metodo_pago: "", tipo_pago: "", estado: "pendiente" });
-    } catch (error) {
-      console.error("Error al registrar pago", error);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("¿Seguro que quieres eliminar este pago?")) {
+  const handleEliminarPago = async (id) => {
+    if (window.confirm('¿Está seguro que desea eliminar este pago?')) {
       try {
-        await axios.delete(`/api/pagos/${id}`);
-        fetchPagos();
+        await pagoService.eliminarPago(id);
+        setPagos(pagos.filter(pago => pago.id !== id));
+        alert('Pago eliminado exitosamente');
       } catch (error) {
-        console.error("Error al eliminar pago", error);
+        console.error('Error al eliminar el pago:', error);
+        alert('Error al eliminar el pago');
       }
     }
   };
 
-  const exportToExcel = () => {
-    // Implementar la lógica de exportación a Excel aquí
-    console.log("Exportar a Excel");
-  };
+  const pagosFiltrados = pagos.filter(pago => {
+    const cumpleEstado = filtroEstado === 'TODOS' || pago.estado === filtroEstado;
+    const cumpleFecha = !filtroFecha || pago.fechaPago.includes(filtroFecha);
+    return cumpleEstado && cumpleFecha;
+  });
+
+  if (loading) {
+    return (
+      <div className="page-wrapper">
+        <div className="content">
+          <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Cargando...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-wrapper">
+        <div className="content">
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container">
-      <h2>Gestión de Pagos</h2>
-      
-      
-      <div className="filter-container">
-  <div className="filter-row">
-    <select name="inmueble" value={filtros.inmueble} onChange={handleFiltroChange}>
-      <option value="">Seleccione Inmueble</option>
-      <option value="inmueble1">Inmueble 1</option>
-      <option value="inmueble2">Inmueble 2</option>
-      {/* Más opciones según sea necesario */}
-    </select>
-    
-    <select name="piso" value={filtros.piso} onChange={handleFiltroChange}>
-      <option value="">Seleccione Piso</option>
-      <option value="piso1">Piso 1</option>
-      <option value="piso2">Piso 2</option>
-      {/* Más opciones según sea necesario */}
-    </select>
-  </div>
-
-  <div className="filter-row">
-    <input type="date" name="fechaInicio" value={filtros.fechaInicio} onChange={handleFiltroChange} />
-    <input type="date" name="fechaFin" value={filtros.fechaFin} onChange={handleFiltroChange} />
-  </div>
-
-  <div className="filter-actions">
-    <button onClick={fetchPagos}>Filtrar</button>
-    <button className="export-button" onClick={exportToExcel}>
-    <FaFileExcel style={{ marginRight: '8px', width: '20px', height: '20px' }} />
-      Exportar a Excel
-    </button>
-  </div>
-</div>
-
-
-
-      <div className="table-container">
-        <h3 className="table-title">Pagos Registrados</h3>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Contrato</th>
-              <th>Monto</th>
-              <th>Método</th>
-              <th>Tipo</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagos.map((pago) => (
-              <tr key={pago.id}>
-                <td>{pago.id}</td>
-                <td>{pago.contrato_id}</td>
-                <td>{pago.monto}</td>
-                <td>{pago.metodo_pago}</td>
-                <td>{pago.tipo_pago}</td>
-                <td>{pago.estado}</td>
-                <td>
-                  <button className="table-action-button edit">Editar</button>
-                  <button className="table-action-button delete" onClick={() => handleDelete(pago.id)}>Eliminar</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <>
+      <Header />
+      <Sidebar id='menu-item6' id1='menu-items6' activeClassName='contabilidad-pagos'/>
+      <div className="page-wrapper">
+        <div className="content">
+          <div className="page-header">
+            <div className="row">
+              <div className="col-sm-12">
+                <ul className="breadcrumb">
+                  <li className="breadcrumb-item">
+                    <Link to="#">Contabilidad</Link>
+                  </li>
+                  <li className="breadcrumb-item">
+                    <i className="feather-chevron-right">
+                      <FiChevronRight icon="chevron-right" />
+                    </i>
+                  </li>
+                  <li className="breadcrumb-item active">Gestión de Pagos</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-sm-12">
+              <div className="card">
+                <div className="card-body">
+                  <div className="row">
+                    <div className="col-12">
+                      <div className="form-heading">
+                        <h4>Gestión de Pagos</h4>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-6 col-xl-3">
+                      <div className="form-group local-forms">
+                        <label>Filtrar por Estado</label>
+                        <select
+                          className="form-control"
+                          value={filtroEstado}
+                          onChange={handleFiltroEstado}
+                        >
+                          <option value="TODOS">Todos</option>
+                          <option value="PENDIENTE">Pendiente</option>
+                          <option value="PAGADO">Pagado</option>
+                          <option value="VENCIDO">Vencido</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-6 col-xl-3">
+                      <div className="form-group local-forms">
+                        <label>Filtrar por Fecha</label>
+                        <input
+                          type="month"
+                          className="form-control"
+                          value={filtroFecha}
+                          onChange={handleFiltroFecha}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="table-responsive">
+                    <table className="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Espacio</th>
+                          <th>Inquilino</th>
+                          <th>Monto</th>
+                          <th>Fecha de Pago</th>
+                          <th>Método de Pago</th>
+                          <th>Estado</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagosFiltrados.map((pago) => (
+                          <tr key={pago.id}>
+                            <td>{pago.id}</td>
+                            <td>{pago.espacioNombre}</td>
+                            <td>{pago.inquilinoNombre}</td>
+                            <td>${pago.monto.toFixed(2)}</td>
+                            <td>{pago.fechaPago}</td>
+                            <td>{pago.metodoPago}</td>
+                            <td>
+                              <span className={`badge bg-${pago.estado === 'PAGADO' ? 'success' : pago.estado === 'PENDIENTE' ? 'warning' : 'danger'}`}>
+                                {pago.estado}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="actions">
+                                <Link
+                                  to={`/contabilidad/pagos/ver/${pago.id}`}
+                                  className="btn btn-sm bg-success-light me-2"
+                                >
+                                  <FiEye className="feather-eye" />
+                                </Link>
+                                <Link
+                                  to={`/contabilidad/pagos/editar/${pago.id}`}
+                                  className="btn btn-sm bg-primary-light me-2"
+                                >
+                                  <FiEdit2 className="feather-edit" />
+                                </Link>
+                                <button
+                                  className="btn btn-sm bg-danger-light"
+                                  onClick={() => handleEliminarPago(pago.id)}
+                                >
+                                  <FiTrash2 className="feather-trash" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

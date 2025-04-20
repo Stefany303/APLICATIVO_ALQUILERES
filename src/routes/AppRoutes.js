@@ -68,6 +68,9 @@ const AppRoutes = () => {
             <Route path="/contabilidad-pagos" element={<ContabilidadPagos />} />
             <Route path="/contabilidad-gastos" element={<ContabilidadGastos />} />
             <Route path="/cuenta-configuracion" element={<CuentaConfiguracion />} />
+            <Route path="/pagos-crud" element={<PagosCrud />} />
+            <Route path="/gastos-crud" element={<GastosCrud />} />
+            
           </Route>
 
           {/* Redirección por defecto */}

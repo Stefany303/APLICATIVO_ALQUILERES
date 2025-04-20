@@ -55,6 +55,7 @@ const Header = () => {
       // maximizeBtn.removeEventListener('click', handleClick);
     };
   }, []);
+
   return (
     <div className="main-wrapper">
       <div className="header">
@@ -159,33 +160,31 @@ const Header = () => {
               <span className="pulse" />{" "}
             </Link>
           </li>
-          <li className="nav-item dropdown has-arrow user-profile-list">
+          <li className="nav-item dropdown has-arrow">
             <Link
               to="#"
-              className="dropdown-toggle nav-link user-link"
+              className="dropdown-toggle nav-link"
               data-bs-toggle="dropdown"
             >
-              <div className="user-names">
-                <h5>{user ? user.nombre : "Usuario"} </h5>
-                <span>{user.rol}</span>
-              </div>
               <span className="user-img">
-                <img src={user06} alt="Admin" />
+                <img src={user06} alt="" />
+                <span className="status online" />
               </span>
+              <span>{user?.nombre || 'Usuario'}</span>
             </Link>
             <div className="dropdown-menu">
-              <Link className="dropdown-item" to="/profile">
-                Mi perfil
-              </Link>
-              <Link className="dropdown-item" to="/edit-profile">
-                Editar Perfil
-              </Link>
-              <Link className="dropdown-item" to="/settings">
-                Configuración
-              </Link>
-              <Link className="dropdown-item" to="/login" onClick={logout}>
-                Salida
-              </Link>
+              <div className="user-header">
+                <div className="avatar avatar-sm">
+                  <img src={user06} alt="" className="avatar-img rounded-circle" />
+                </div>
+                <div className="user-text">
+                  <h6>{user?.nombre || 'Usuario'}</h6>
+                  <p className="text-muted mb-0">{user?.rol || 'Usuario'}</p>
+                </div>
+              </div>
+              <Link className="dropdown-item" to="/perfil">Mi Perfil</Link>
+              <Link className="dropdown-item" to="/configuracion">Configuración</Link>
+              <Link className="dropdown-item" onClick={logout} to="#">Cerrar Sesión</Link>
             </div>
           </li>
           <li className="nav-item ">

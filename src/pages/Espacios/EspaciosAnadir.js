@@ -9,6 +9,8 @@ import tipoespacioService from "../../services/tipoespacioService";
 import { useAuth } from "../../utils/AuthContext";
 import espacioService from '../../services/espacioService';
 import pisoService from '../../services/pisoService';
+import { message } from 'antd';
+
 const EspaciosAnadir = () => {
   const { user, estaAutenticado } = useAuth(); // Obtén el usuario y el estado de autenticación
   const navigate = useNavigate();
@@ -26,7 +28,8 @@ const EspaciosAnadir = () => {
     capacidad: '',
     baño: 'propio', // valor predeterminado
   });
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // Verifica si el usuario está autenticado
@@ -77,66 +80,6 @@ const EspaciosAnadir = () => {
       obtenerPisos();
     }
   }, [inmuebleSeleccionado]);
-  // const handleInmuebleChange = (e) => {
-  //   const inmuebleId = e.target.value;
-  //   setInmuebleSeleccionado(inmuebleId);
-  
-  //   // Buscar el inmueble seleccionado
-  //   const inmueble = inmuebles.find((i) => i.id === parseInt(inmuebleId));
-  
-  //   // Si lo encuentra, genera los pisos dinámicamente
-  //   if (inmueble) {
-  //     const nuevosPisos = Array.from({ length: inmueble.cantidad_pisos }, (_, index) => ({
-  //       id: index + 1,
-  //       nombre: `Piso ${index + 1}`,
-  //     }));
-  //     setPisos(nuevosPisos);
-  //   } else {
-  //     setPisos([]); // Si no hay selección, limpia los pisos
-  //   }
-  // };
-  
-  // useEffect(() => {
-  //   // Obtener todos los inmuebles al montar el componente
-  //   const fetchInmuebles = async () => {
-  //     try {
-  //       const response =  await inmuebleService.obtenerInmuebles(); // Cambia esto por la URL de tu API
-  //       setInmuebles(response.data);
-  //     } catch (error) {
-  //       console.error("Error al obtener los datos de inmuebles:", error);
-  //     }
-  //   };
-
-  //   const fetchTipoEspacios = async () => {
-  //     try {
-  //       const response = await axios.get('URL_DE_TU_API/tipoEspacios'); // Cambia esto por la URL de tu API
-  //       setTipoEspacios(response.data);
-  //     } catch (error) {
-  //       console.error("Error al obtener los datos de tipo de espacios:", error);
-  //     }
-  //   };
-
-  //   fetchInmuebles();
-  //   fetchTipoEspacios();
-  // }, []);
-
-  // // Efecto para obtener pisos solo cuando se selecciona un inmueble
-  // useEffect(() => {
-  //   const fetchPisos = async () => {
-  //     if (formData.inmueble_id) {
-  //       try {
-  //         const response = await axios.get(`URL_DE_TU_API/pisos?inmueble_id=${formData.inmueble_id}`); // Cambia esto por la URL de tu API
-  //         setPisos(response.data);
-  //       } catch (error) {
-  //         console.error("Error al obtener los datos de pisos:", error);
-  //       }
-  //     } else {
-  //       setPisos([]); // Reinicia la lista de pisos si no hay inmueble seleccionado
-  //     }
-  //   };
-
-  //   fetchPisos();
-  // }, [formData.inmueble_id]); // Ejecutar cuando cambia el inmueble_id
 
   const handleChange = async(e) => {
     const { name, value } = e.target;
@@ -156,52 +99,52 @@ const EspaciosAnadir = () => {
     } catch (error) {
       console.error("Error al obtener los pisos:", error);
     }
-    // if (inmueble) {
-    //   const nuevosPisos = Array.from({ length: inmueble.cantidad_pisos }, (_, index) => ({
-    //     id: index + 1,
-    //     nombre: `Piso ${index + 1}`,
-    //   }));
-    //   setPisos(nuevosPisos);
-    // } else {
-    //   setPisos([]); // Si no hay selección, limpia los pisos
-    // }
   }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      console.log(formData);
-      const response = await espacioService.crearEspacio(formData.inmueble_id,formData.piso_id,formData); // Cambia esto por la URL de tu API
-      alert("Espacio añadido con éxito.");
-      // Aquí podrías redirigir o limpiar el formulario si lo deseas
-      setFormData({
-        inmueble_id: '',
-        piso_id: '',
-        tipoEspacio_id: '',
-        nombre: '',
-        descripcion: '',
-        precio: '',
-        capacidad: '',
-        baño: 'propio',
-      });
-      setPisos([]); // Reinicia la lista de pisos
-    } catch (error) {
-      console.error("Error al añadir el espacio:", error);
-      alert("Hubo un error al añadir el espacio.");
+    setLoading(true);
+    setError(null);
 
-        // Verificar si hay una respuesta del servidor
-        if (error.response) {
-          console.error('Código de estado:', error.response.status);
-          console.error('Mensaje de error:', error.response.data);
-          alert(`Error ${error.response.status}: ${JSON.stringify(error.response.data)}`);
-        } else if (error.request) {
-          console.error('No hubo respuesta del servidor:', error.request);
-          alert('Error: No hubo respuesta del servidor.');
-        } else {
-          console.error('Error en la configuración de la solicitud:', error.message);
-          alert(`Error: ${error.message}`);
-        }
+    try {
+      // Validar que todos los campos requeridos estén presentes
+      if (!formData.inmueble_id || !formData.piso_id || !formData.tipoEspacio_id || !formData.nombre) {
+        throw new Error('Por favor complete todos los campos requeridos');
+      }
+
+      console.log('Datos del formulario:', formData); // Debug
+
+      // Crear el objeto con los datos del espacio
+      const espacioData = {
+        inmueble_id: formData.inmueble_id,
+        piso_id: formData.piso_id,
+        tipoEspacio_id: formData.tipoEspacio_id,
+        nombre: formData.nombre,
+        descripcion: formData.descripcion || '',
+        precio: formData.precio || 0,
+        capacidad: formData.capacidad || 0,
+        bano: formData.baño === 'propio'
+      };
+
+      console.log('Datos a enviar al servicio:', espacioData); // Debug
+
+      // Llamar al servicio para crear el espacio
+      const response = await espacioService.crearEspacio(espacioData);
+      console.log('Respuesta del servicio:', response); // Debug
+
+      // Mostrar mensaje de éxito
+      message.success('Espacio creado correctamente');
+      
+      // Redirigir a la lista de espacios
+      navigate('/espacios-registros');
+    } catch (error) {
+      console.error('Error al añadir el espacio:', error);
+      console.error('Detalles del error:', error.message);
+      setError(error.message);
+      message.error(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -378,7 +321,7 @@ const EspaciosAnadir = () => {
                     
                     <div className="col-12">
                       <div className="doctor-submit text-end">
-                        <button type="submit" className="btn btn-primary submit-form me-2">Guardar</button>
+                        <button type="submit" className="btn btn-primary submit-form me-2" disabled={loading}>Guardar</button>
                         <button type="button" className="btn btn-primary cancel-form">Cancelar</button>
                       </div>
                     </div>
