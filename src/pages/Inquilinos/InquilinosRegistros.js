@@ -18,71 +18,58 @@ import { EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 const InquilinosRegistros = () => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [inquilinos, setInquilinos] = useState([]);
-  const [contratos, setContratos] = useState([]);
   const [filteredInquilinos, setFilteredInquilinos] = useState([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedInquilino, setSelectedInquilino] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [loadingContratos, setLoadingContratos] = useState(false);
   const navigate = useNavigate();
 
-  const datasource = [
-    {
-     
-      Name: "Andrea Lalema",
-      Department: "Otolaryngology",
-      Specialization: "Infertility",
-      Degree: "MBBS, MS",
-      Mobile: "+1 23 456890",
-      Email: "example@email.com",
-      JoiningDate: "01.10.2022",
-      FIELD9: ""
-    }]
   useEffect(() => {
-    fetchInquilinos();
     fetchContratos();
   }, []);
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-    
-        const onSelectChange = (newSelectedRowKeys) => {
-          console.log("selectedRowKeys changed: ", selectedRowKeys);
-          setSelectedRowKeys(newSelectedRowKeys);
-        };
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: onSelectChange,
-  };
-  const onChange = (date, dateString) => {
-    // console.log(date, dateString);
-  };
-
-  const fetchInquilinos = async () => {
-    setLoading(true);
-    try {
-      const data = await inquilinoService.getInquilinos();
-      setInquilinos(data);
-      setFilteredInquilinos(data); // Inicializar los inquilinos filtrados
-    } catch (error) {
-      setError(error.message);
-      message.error('Error al cargar los inquilinos');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchContratos = async () => {
-    setLoadingContratos(true);
+    setLoading(true);
     try {
-      const data = await contratoService.obtenerContratos();
-      console.log('Contratos recibidos:', data);
-      setContratos(data);
+      const data = await contratoService.obtenerContratosDetalles();
+      console.log('Datos recibidos del backend:', data);
+      
+      // Asegurarnos de que los datos sean un array
+      const contratosArray = Array.isArray(data) ? data : [data];
+      
+      // Mapear los datos al formato exacto que espera la tabla
+      const formattedData = contratosArray.map(contrato => {
+        console.log('Procesando contrato:', contrato);
+        return {
+          key: contrato.id, // Añadir key para la tabla
+          id: contrato.id,
+          inquilino_nombre: contrato.inquilino_nombre || '',
+          inquilino_apellido: contrato.inquilino_apellido || '',
+          inquilino_dni: contrato.inquilino_dni || '',
+          inquilino_email: contrato.inquilino_email || '',
+          inquilino_telefono: contrato.inquilino_telefono || '',
+          inmueble_nombre: contrato.inmueble_nombre || '',
+          espacio_nombre: contrato.espacio_nombre || '',
+          fecha_inicio: contrato.fecha_inicio,
+          fecha_fin: contrato.fecha_fin,
+          monto_alquiler: contrato.monto_alquiler,
+          monto_garantia: contrato.monto_garantia,
+          estado: contrato.estado,
+          descripcion: contrato.descripcion,
+          fecha_pago: contrato.fecha_pago
+        };
+      });
+
+      console.log('Datos formateados para la tabla:', formattedData);
+      setInquilinos(formattedData);
+      setFilteredInquilinos(formattedData);
     } catch (error) {
       console.error('Error al cargar los contratos:', error);
       message.error('Error al cargar los contratos');
     } finally {
-      setLoadingContratos(false);
+      setLoading(false);
     }
   };
 
@@ -97,68 +84,51 @@ const InquilinosRegistros = () => {
     setFilteredInquilinos(filtered);
   };
 
-  const handleEdit = (inquilino) => {
-    // Implementa la lógica para editar un inquilino
-    alert(`Editando inquilino con ID: ${inquilino.id}`);
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await inquilinoService.deleteInquilino(id);
-      message.success('Inquilino eliminado exitosamente');
-      fetchInquilinos();
-    } catch (error) {
-      message.error('Error al eliminar el inquilino');
-    }
-  };
-
   const handleViewDetails = (inquilino) => {
     setSelectedInquilino(inquilino);
     setModalVisible(true);
   };
 
-  const getContratoInquilino = (inquilinoId) => {
-    const contrato = contratos.find(contrato => contrato.inquilino_id === inquilinoId);
-    console.log('Buscando contrato para inquilino:', inquilinoId);
-    console.log('Contrato encontrado:', contrato);
-    return contrato;
-  };
-
   const columns = [
     {
-      title: 'Nombre',
-      dataIndex: 'nombre',
-      key: 'nombre',
-      render: (text, record) => `${record.nombre} ${record.apellido}`,
+      title: 'Inquilino',
+      dataIndex: 'inquilino_nombre',
+      key: 'inquilino',
+      render: (text, record) => `${record.inquilino_nombre} ${record.inquilino_apellido}`,
     },
     {
       title: 'Documento',
-      dataIndex: 'dni',
-      key: 'dni',
+      dataIndex: 'inquilino_dni',
+      key: 'documento',
     },
     {
       title: 'Email',
-      dataIndex: 'email',
+      dataIndex: 'inquilino_email',
       key: 'email',
     },
     {
       title: 'Teléfono',
-      dataIndex: 'telefono',
+      dataIndex: 'inquilino_telefono',
       key: 'telefono',
     },
     {
-      title: 'Contrato',
-      key: 'contrato',
-      render: (_, record) => {
-        const contrato = getContratoInquilino(record.id);
-        return contrato ? (
-          <Tag color={contrato.estado === 'activo' ? 'green' : 'red'}>
-            {contrato.estado === 'activo' ? 'Activo' : 'Inactivo'}
-          </Tag>
-        ) : (
-          <Tag color="default">Sin contrato</Tag>
-        );
-      },
+      title: 'Inmueble',
+      dataIndex: 'inmueble_nombre',
+      key: 'inmueble',
+    },
+    {
+      title: 'Espacio',
+      dataIndex: 'espacio_nombre',
+      key: 'espacio',
+    },
+    {
+      title: 'Estado',
+      key: 'estado',
+      render: (_, record) => (
+        <Tag color={record.estado === 'activo' ? 'green' : 'red'}>
+          {record.estado === 'activo' ? 'Activo' : 'Inactivo'}
+        </Tag>
+      ),
     },
     {
       title: 'Acciones',
@@ -172,42 +142,27 @@ const InquilinosRegistros = () => {
           >
             Ver
           </Button>
-          <Button 
-            type="primary" 
-            icon={<EditOutlined />} 
-            onClick={() => navigate(`/inquilinos-editar/${record.id}`)}
-          >
-            Editar
-          </Button>
-          <Button 
-            danger 
-            icon={<DeleteOutlined />} 
-            onClick={() => handleDelete(record.id)}
-          >
-            Eliminar
-          </Button>
         </Space>
       ),
     },
   ];
 
-  const renderContratoInfo = (inquilino) => {
-    const contrato = getContratoInquilino(inquilino.id);
-    if (!contrato) return null;
+  const renderInquilinoInfo = (inquilino) => {
+    if (!inquilino) return null;
 
     return (
       <Card title="Información del Contrato" style={{ marginTop: 16 }}>
         <Row gutter={16}>
           <Col span={8}>
-            <Statistic title="Fecha Inicio" value={new Date(contrato.fecha_inicio).toLocaleDateString()} />
+            <Statistic title="Fecha Inicio" value={new Date(inquilino.fecha_inicio).toLocaleDateString()} />
           </Col>
           <Col span={8}>
-            <Statistic title="Fecha Fin" value={new Date(contrato.fecha_fin).toLocaleDateString()} />
+            <Statistic title="Fecha Fin" value={new Date(inquilino.fecha_fin).toLocaleDateString()} />
           </Col>
           <Col span={8}>
             <Statistic 
               title="Monto Mensual" 
-              value={`$${contrato.monto_alquiler.toFixed(2)}`}
+              value={`$${parseFloat(inquilino.monto_alquiler).toFixed(2)}`}
               precision={2}
             />
           </Col>
@@ -216,21 +171,21 @@ const InquilinosRegistros = () => {
           <Col span={8}>
             <Statistic 
               title="Depósito" 
-              value={`$${contrato.monto_garantia.toFixed(2)}`}
+              value={`$${parseFloat(inquilino.monto_garantia).toFixed(2)}`}
               precision={2}
             />
           </Col>
           <Col span={8}>
-            <Statistic title="Estado" value={contrato.estado} />
+            <Statistic title="Estado" value={inquilino.estado} />
           </Col>
           <Col span={8}>
-            <Statistic title="Fecha de Pago" value={new Date(contrato.fecha_pago).toLocaleDateString()} />
+            <Statistic title="Fecha de Pago" value={new Date(inquilino.fecha_pago).toLocaleDateString()} />
           </Col>
         </Row>
-        {contrato.descripcion && (
+        {inquilino.descripcion && (
           <div style={{ marginTop: 16 }}>
             <h4>Observaciones:</h4>
-            <p>{contrato.descripcion}</p>
+            <p>{inquilino.descripcion}</p>
           </div>
         )}
       </Card>
@@ -250,14 +205,14 @@ const InquilinosRegistros = () => {
           <div className="col-sm-12">
             <ul className="breadcrumb">
               <li className="breadcrumb-item">
-                <Link to="#">Inmuebles </Link>
+                <Link to="#">Inquilinos </Link>
             </li>
               <li className="breadcrumb-item">
                 <i className="feather-chevron-right">
                   <FiChevronRight />
                   </i>
               </li>
-              <li className="breadcrumb-item active">Lista de Inmuebles</li>
+              <li className="breadcrumb-item active">Lista de Inquilinos</li>
             </ul>
           </div>
         </div>
@@ -272,7 +227,7 @@ const InquilinosRegistros = () => {
                 <div className="row align-items-center">
                   <div className="col">
                     <div className="doctor-table-blk">
-                      <h3>Lista de Inmuebles</h3>
+                      <h3>Lista de Inquilinos</h3>
                       <div className="doctor-search-blk">
                         <div className="top-nav-search table-search-blk">
                           <form>
@@ -280,6 +235,8 @@ const InquilinosRegistros = () => {
                               type="text"
                               className="form-control"
                               placeholder="Search here"
+                              value={filter}
+                              onChange={handleFilterChange}
                             />
                             <Link className="btn">
                               <img
@@ -352,18 +309,16 @@ const InquilinosRegistros = () => {
               <div className="table-responsive doctor-list">
               <Table
                         pagination={{
-                          total: datasource.length,
+                          total: filteredInquilinos.length,
                           showTotal: (total, range) =>
-                          `Showing ${range[0]} to ${range[1]} of ${total} entries`,
-                          // showSizeChanger: true,
-                           onShowSizeChange: onShowSizeChange,
-                           itemRender: itemRender,
+                          `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
+                          onShowSizeChange: onShowSizeChange,
+                          itemRender: itemRender,
                         }}
                         columns={columns}
-                        dataSource={inquilinos}
+                        dataSource={filteredInquilinos}
                         loading={loading}
-                        rowSelection={rowSelection}
-                        rowKey={(record) => record.id}
+                        rowKey="id"
                         style={{
                           backgroundColor: '#f2f2f2', // Replace with your desired background color for the table
                         }}
@@ -378,7 +333,7 @@ const InquilinosRegistros = () => {
     </div>
 
     <Modal
-      title="Detalles del Inquilino"
+      title="Detalles del Contrato"
       open={modalVisible}
       onCancel={() => setModalVisible(false)}
       footer={null}
@@ -386,20 +341,21 @@ const InquilinosRegistros = () => {
     >
       {selectedInquilino && (
         <>
-          <Card title="Información Personal">
+          <Card title="Información del Inquilino">
             <Row gutter={16}>
               <Col span={12}>
-                <p><strong>Nombre:</strong> {selectedInquilino.nombre} {selectedInquilino.apellido}</p>
-                <p><strong>Documento:</strong> {selectedInquilino.dni}</p>
-                <p><strong>Email:</strong> {selectedInquilino.email}</p>
+                <p><strong>Nombre:</strong> {selectedInquilino.inquilino_nombre} {selectedInquilino.inquilino_apellido}</p>
+                <p><strong>Documento:</strong> {selectedInquilino.inquilino_dni}</p>
+                <p><strong>Email:</strong> {selectedInquilino.inquilino_email}</p>
               </Col>
               <Col span={12}>
-                <p><strong>Teléfono:</strong> {selectedInquilino.telefono}</p>
-                <p><strong>Dirección:</strong> {selectedInquilino.direccion}</p>
+                <p><strong>Teléfono:</strong> {selectedInquilino.inquilino_telefono}</p>
+                <p><strong>Inmueble:</strong> {selectedInquilino.inmueble_nombre}</p>
+                <p><strong>Espacio:</strong> {selectedInquilino.espacio_nombre}</p>
               </Col>
             </Row>
           </Card>
-          {renderContratoInfo(selectedInquilino)}
+          {renderInquilinoInfo(selectedInquilino)}
         </>
       )}
     </Modal>

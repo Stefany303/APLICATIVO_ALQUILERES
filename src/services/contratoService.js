@@ -4,21 +4,27 @@ import { API_URL, getAuthToken } from './authService';
 const contratoService = {
   obtenerContratos: async () => {
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No hay token de autenticación');
-      }
+      const response = await api.get('/contratos');
+      return response.data;
+    } catch (error) {
+      console.error('Error al obtener contratos:', error);
+      throw error;
+    }
+  },
 
-      console.log('Token usado:', token);
-      const response = await api.get(`${API_URL}/contratos/info`);
+  obtenerContratosDetalles: async () => {
+    try {
+      const response = await api.get('/contratos/detalles/informacion');
       console.log('Respuesta del backend:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error detallado:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      console.error('Error al obtener detalles de contratos:', error);
+      if (error.response) {
+        console.error('Detalles del error:', {
+          status: error.response.status,
+          data: error.response.data
+        });
+      }
       throw error;
     }
   },
@@ -35,29 +41,30 @@ const contratoService = {
 
   crearContrato: async (contratoData) => {
     try {
-      const response = await api.post(`${API_URL}/contratos`, contratoData);
+      const response = await api.post('/contratos', contratoData);
       return response.data;
     } catch (error) {
-      console.error('Error al crear el contrato:', error);
+      console.error('Error al crear contrato:', error);
       throw error;
     }
   },
 
   actualizarContrato: async (id, contratoData) => {
     try {
-      const response = await api.put(`${API_URL}/contratos/${id}`, contratoData);
+      const response = await api.put(`/contratos/${id}`, contratoData);
       return response.data;
     } catch (error) {
-      console.error('Error al actualizar el contrato:', error);
+      console.error('Error al actualizar contrato:', error);
       throw error;
     }
   },
 
   eliminarContrato: async (id) => {
     try {
-      await api.delete(`${API_URL}/contratos/${id}`);
+      const response = await api.delete(`/contratos/${id}`);
+      return response.data;
     } catch (error) {
-      console.error('Error al eliminar el contrato:', error);
+      console.error('Error al eliminar contrato:', error);
       throw error;
     }
   },

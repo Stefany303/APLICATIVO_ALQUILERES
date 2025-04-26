@@ -3,12 +3,21 @@ import Header from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
 import { Link, useNavigate } from 'react-router-dom';
 import { FiChevronRight } from "react-icons/fi";
-import { message } from 'antd';
+import { message, notification, Alert, Form } from 'antd';
 import inquilinoService from '../../services/inquilinoService';
 import inmuebleService from '../../services/inmuebleService';
 import contratoService from '../../services/contratoService';
 import espacioService from '../../services/espacioService';
 import { useAuth } from "../../utils/AuthContext";
+// Importación correcta de estilos de Ant Design
+import 'antd/dist/reset.css'; // Para versiones >= 5.x
+
+// Configurar el mensaje global
+message.config({
+  top: 100,
+  duration: 3,
+  maxCount: 3,
+});
 
 const InquilinosRegistrar = () => {
   const { user, estaAutenticado } = useAuth();
@@ -36,6 +45,21 @@ const InquilinosRegistrar = () => {
     observaciones: ''
   });
   const [step, setStep] = useState(1);
+  const [formErrors, setFormErrors] = useState({
+    nombre: '',
+    apellido: '',
+    email: '',
+    telefono: '',
+    documento: '',
+    tipoDocumento: '',
+    inmuebleId: '',
+    pisoId: '',
+    espacioId: '',
+    fechaInicio: '',
+    fechaFin: '',
+    montoMensual: '',
+    deposito: ''
+  });
 
   // Cargar inmuebles al montar el componente
   useEffect(() => {
@@ -127,73 +151,109 @@ const InquilinosRegistrar = () => {
     console.log('Estado actual de espacios:', espacios);
   }, [espacios]);
 
+  const validateField = (name, value) => {
+    switch (name) {
+      case 'nombre':
+        return value ? '' : 'El nombre es requerido';
+      case 'apellido':
+        return value ? '' : 'El apellido es requerido';
+      case 'email':
+        if (!value) return 'El email es requerido';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Por favor ingrese un email válido';
+        return '';
+      case 'telefono':
+        if (!value) return 'El teléfono es requerido';
+        const telefonoLimpio = value.replace(/\D/g, '');
+        if (telefonoLimpio.length < 9) return 'El teléfono debe contener al menos 9 dígitos';
+        if (telefonoLimpio.length > 12) return 'El teléfono no puede tener más de 12 dígitos';
+        return '';
+      case 'documento':
+        if (!value) return 'El documento es requerido';
+        if (!/^\d+$/.test(value)) return 'El documento debe contener solo números';
+        if (value.length > 20) return 'El documento no puede tener más de 20 dígitos';
+        return '';
+      case 'tipoDocumento':
+        return value ? '' : 'El tipo de documento es requerido';
+      default:
+        return '';
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      // Si cambia el inmueble, resetear piso y espacio
-      if (name === 'inmuebleId') {
-        return {
-          ...prev,
-          inmuebleId: value,
-          pisoId: '',
-          espacioId: ''
-        };
-      }
-      // Si cambia el piso, resetear espacio
-      if (name === 'pisoId') {
-        return {
-          ...prev,
-          pisoId: value,
-          espacioId: ''
-        };
-      }
-      return {
+    
+    // Limitar la longitud de los campos numéricos
+    if (name === 'telefono') {
+      // Solo permitir números
+      const soloNumeros = value.replace(/\D/g, '');
+      if (soloNumeros.length > 12) return;
+      
+      // Actualizar el estado del formulario solo con números
+      setFormData(prev => ({
         ...prev,
-        [name]: value
-      };
-    });
+        [name]: soloNumeros
+      }));
+
+      // Validar el campo
+      const error = validateField(name, soloNumeros);
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: error
+      }));
+      return;
+    }
+
+    if (name === 'documento') {
+      // Solo permitir números
+      const soloNumeros = value.replace(/\D/g, '');
+      if (soloNumeros.length > 20) return;
+      
+      // Actualizar el estado del formulario solo con números
+      setFormData(prev => ({
+        ...prev,
+        [name]: soloNumeros
+      }));
+
+      // Validar el campo
+      const error = validateField(name, soloNumeros);
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: error
+      }));
+      return;
+    }
+    
+    // Validar el campo que está cambiando
+    const error = validateField(name, value);
+    
+    // Actualizar el estado de errores
+    setFormErrors(prev => ({
+      ...prev,
+      [name]: error
+    }));
+
+    // Actualizar el estado del formulario
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleNext = () => {
-    console.log('Datos del formulario:', formData);
-    
-    // Validar campos del primer paso
-    const camposRequeridos = [
-      { campo: 'nombre', mensaje: 'El nombre es requerido' },
-      { campo: 'apellido', mensaje: 'El apellido es requerido' },
-      { campo: 'email', mensaje: 'El email es requerido' },
-      { campo: 'telefono', mensaje: 'El teléfono es requerido' },
-      { campo: 'documento', mensaje: 'El documento es requerido' },
-      { campo: 'tipoDocumento', mensaje: 'El tipo de documento es requerido' }
-    ];
+    // Validar todos los campos del primer paso
+    const camposPrimerPaso = ['nombre', 'apellido', 'email', 'telefono', 'documento', 'tipoDocumento'];
+    let hasErrors = false;
 
-    // Verificar campos vacíos
-    const camposFaltantes = camposRequeridos.filter(({ campo }) => !formData[campo]);
-    if (camposFaltantes.length > 0) {
-      const mensajes = camposFaltantes.map(({ mensaje }) => mensaje);
-      message.error(mensajes.join('\n'));
-      return;
-    }
+    camposPrimerPaso.forEach(campo => {
+      const error = validateField(campo, formData[campo]);
+      if (error) {
+        setFormErrors(prev => ({ ...prev, [campo]: error }));
+        hasErrors = true;
+      }
+    });
 
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      message.error('Por favor ingrese un email válido (ejemplo: usuario@dominio.com)');
-      return;
-    }
-
-    // Validar formato de teléfono (al menos 9 dígitos)
-    const telefonoRegex = /^\d{9,}$/;
-    const telefonoLimpio = formData.telefono.replace(/\D/g, '');
-    if (!telefonoRegex.test(telefonoLimpio)) {
-      message.error('El teléfono debe contener al menos 9 dígitos numéricos');
-      return;
-    }
-
-    // Validar formato de documento (solo números)
-    const documentoRegex = /^\d+$/;
-    if (!documentoRegex.test(formData.documento)) {
-      message.error('El documento debe contener solo números');
+    if (hasErrors) {
+      message.error('Por favor corrija los errores antes de continuar');
       return;
     }
 
@@ -216,7 +276,10 @@ const InquilinosRegistrar = () => {
       const camposFaltantes = camposRequeridos.filter(campo => !formData[campo]);
       
       if (camposFaltantes.length > 0) {
-        throw new Error(`Por favor complete los siguientes campos: ${camposFaltantes.join(', ')}`);
+        const mensajeError = `Por favor complete los siguientes campos: ${camposFaltantes.join(', ')}`;
+        setError(mensajeError);
+        message.error(mensajeError);
+        return;
       }
 
       // Validar fechas
@@ -225,17 +288,26 @@ const InquilinosRegistrar = () => {
       const hoy = new Date();
 
       if (fechaInicio < hoy) {
-        throw new Error('La fecha de inicio no puede ser anterior a hoy');
+        const mensajeError = 'La fecha de inicio no puede ser anterior a hoy';
+        setError(mensajeError);
+        message.error(mensajeError);
+        return;
       }
 
       if (fechaFin <= fechaInicio) {
-        throw new Error('La fecha de fin debe ser posterior a la fecha de inicio');
+        const mensajeError = 'La fecha de fin debe ser posterior a la fecha de inicio';
+        setError(mensajeError);
+        message.error(mensajeError);
+        return;
       }
 
       // Validar monto mensual
       const montoMensual = parseFloat(formData.montoMensual);
       if (isNaN(montoMensual) || montoMensual <= 0) {
-        throw new Error('El monto mensual debe ser mayor a 0');
+        const mensajeError = 'El monto mensual debe ser mayor a 0';
+        setError(mensajeError);
+        message.error(mensajeError);
+        return;
       }
 
       // Preparar los datos para enviar
@@ -266,8 +338,9 @@ const InquilinosRegistrar = () => {
       navigate('/inquilinos-registros');
     } catch (error) {
       console.error('Error al registrar inquilino:', error);
-      setError(error.message);
-      message.error(error.message);
+      const mensajeError = error.response?.data?.mensaje || error.message || 'Error al registrar el inquilino';
+      setError(mensajeError);
+      message.error(mensajeError);
     } finally {
       setLoading(false);
     }
@@ -319,9 +392,13 @@ const InquilinosRegistrar = () => {
                 </div>
                   <div className="card-body">
                   {error && (
-                    <div className="alert alert-danger" role="alert">
-                      {error}
-                    </div>
+                    <Alert
+                      message="Error de validación"
+                      description={error}
+                      type="error"
+                      showIcon
+                      style={{ marginBottom: '20px' }}
+                    />
                   )}
 
                   <form onSubmit={handleSubmit}>
@@ -340,12 +417,17 @@ const InquilinosRegistrar = () => {
                               <label>Nombre <span className="login-danger">*</span></label>
                               <input
                                 type="text"
-                                className="form-control"
+                                className={`form-control ${formErrors.nombre ? 'is-invalid' : ''}`}
                                 name="nombre"
                                 value={formData.nombre}
                                 onChange={handleChange}
                                 required
                               />
+                              {formErrors.nombre && (
+                                <div className="invalid-feedback d-block">
+                                  {formErrors.nombre}
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -354,13 +436,18 @@ const InquilinosRegistrar = () => {
                               <label>Apellido <span className="login-danger">*</span></label>
                               <input
                                 type="text"
-                                className="form-control"
+                                className={`form-control ${formErrors.apellido ? 'is-invalid' : ''}`}
                                 name="apellido"
                                 value={formData.apellido}
                                 onChange={handleChange}
                                 required
                               />
-                        </div>
+                              {formErrors.apellido && (
+                                <div className="invalid-feedback d-block">
+                                  {formErrors.apellido}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="col-12 col-md-6">
@@ -368,27 +455,40 @@ const InquilinosRegistrar = () => {
                               <label>Email <span className="login-danger">*</span></label>
                                 <input
                                 type="email"
-                                className="form-control"
+                                className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
                                 required
                               />
+                              {formErrors.email && (
+                                <div className="invalid-feedback d-block">
+                                  {formErrors.email}
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           <div className="col-12 col-md-6">
                             <div className="form-group local-forms">
                               <label>Teléfono <span className="login-danger">*</span></label>
-                                <input
+                              <input
                                 type="tel"
-                                className="form-control"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
+                                className={`form-control ${formErrors.telefono ? 'is-invalid' : ''}`}
                                 name="telefono"
                                 value={formData.telefono}
                                 onChange={handleChange}
                                 required
+                                placeholder="Ingrese solo números"
                               />
-                              </div>
+                              {formErrors.telefono && (
+                                <div className="invalid-feedback d-block">
+                                  {formErrors.telefono}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="col-12 col-md-6">
@@ -401,7 +501,7 @@ const InquilinosRegistrar = () => {
                                 value={formData.direccion}
                                 onChange={handleChange}
                               />
-                        </div>
+                            </div>
                           </div>
 
                           <div className="col-12 col-md-6">
@@ -409,29 +509,43 @@ const InquilinosRegistrar = () => {
                               <label>Documento <span className="login-danger">*</span></label>
                               <input
                                 type="text"
-                                className="form-control"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
+                                className={`form-control ${formErrors.documento ? 'is-invalid' : ''}`}
                                 name="documento"
                                 value={formData.documento}
                                 onChange={handleChange}
                                 required
+                                placeholder="Ingrese solo números"
                               />
-                        </div>
+                              {formErrors.documento && (
+                                <div className="invalid-feedback d-block">
+                                  {formErrors.documento}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="col-12 col-md-6">
                           <div className="form-group local-forms">
                               <label>Tipo de Documento <span className="login-danger">*</span></label>
                               <select
-                              className="form-control"
+                              className={`form-control ${formErrors.tipoDocumento ? 'is-invalid' : ''}`}
                                 name="tipoDocumento"
                                 value={formData.tipoDocumento}
                                 onChange={handleChange}
                                 required
                               >
+                                <option value="">Seleccionar</option>
                                 <option value="DNI">DNI</option>
                                 <option value="RUC">RUC</option>
                                 <option value="CE">Carné de Extranjería</option>
                               </select>
+                              {formErrors.tipoDocumento && (
+                                <div className="invalid-feedback d-block">
+                                  {formErrors.tipoDocumento}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -471,7 +585,7 @@ const InquilinosRegistrar = () => {
                                   </option>
                                 ))}
                               </select>
-                        </div>
+                            </div>
                           </div>
 
                           <div className="col-12 col-md-6">
@@ -492,9 +606,9 @@ const InquilinosRegistrar = () => {
                                   </option>
                                 ))}
                               </select>
+                            </div>
                           </div>
-                        </div>
-                        
+                          
                           <div className="col-12 col-md-6">
                           <div className="form-group local-forms">
                               <label>Espacio <span className="login-danger">*</span></label>
@@ -550,7 +664,7 @@ const InquilinosRegistrar = () => {
                                 required
                                 min={formData.fechaInicio || new Date().toISOString().split('T')[0]}
                               />
-                        </div>
+                            </div>
                           </div>
 
                           <div className="col-12 col-md-6">

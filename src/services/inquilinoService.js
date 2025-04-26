@@ -55,7 +55,69 @@ const inquilinoService = {
       if (camposFaltantes.length > 0) {
         throw new Error(`Faltan campos requeridos: ${camposFaltantes.join(', ')}`);
       }
+// Validar que el email tenga un formato válido
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(inquilinoData.email)) {
+        throw new Error('El email no tiene un formato válido');
+      }
+      // Validar que el teléfono tenga un formato válido (opcional)
+      const telefonoRegex = /^\d{10}$/; // Ejemplo: 10 dígitos
+      if (inquilinoData.telefono && !telefonoRegex.test(inquilinoData.telefono)) {
+        throw new Error('El teléfono no tiene un formato válido (debe tener 10 dígitos)');
+      }
+      // Validar que el documento tenga un formato válido (opcional)
+      const documentoRegex = /^\d{8,10}$/; // Ejemplo: 8 a 10 dígitos
+      if (inquilinoData.documento && !documentoRegex.test(inquilinoData.documento)) {
+        throw new Error('El documento no tiene un formato válido (debe tener entre 8 y 10 dígitos)');
+      }
+      // Validar que el tipo de documento sea válido (opcional)
+      const tiposDocumentoValidos = ['DNI', 'Pasaporte', 'Cédula', 'RUC'];
+      if (inquilinoData.tipoDocumento && !tiposDocumentoValidos.includes(inquilinoData.tipoDocumento)) {
+        throw new Error(`El tipo de documento no es válido (debe ser uno de los siguientes: ${tiposDocumentoValidos.join(', ')})`);
+      }
+      // Validar que el nombre y apellido no contengan caracteres especiales
+      const nombreRegex = /^[a-zA-Z\s]+$/; // Solo letras y espacios
+      if (!nombreRegex.test(inquilinoData.nombre)) {
+        throw new Error('El nombre no tiene un formato válido (solo letras y espacios)');
+      }
+      if (!nombreRegex.test(inquilinoData.apellido)) {  
+        throw new Error('El apellido no tiene un formato válido (solo letras y espacios)');
+      }
+      // Validar que el monto mensual sea un número válido
+      if (isNaN(inquilinoData.montoMensual) || parseFloat(inquilinoData.montoMensual) <= 0) {
+        throw new Error('El monto mensual debe ser un número válido y mayor que 0');
+      }
+      // Validar que el depósito sea un número válido (opcional)
+      if (inquilinoData.deposito && (isNaN(inquilinoData.deposito) || parseFloat(inquilinoData.deposito) < 0)) {
+        throw new Error('El depósito debe ser un número válido y mayor o igual que 0');
+      }
+      // Validar que las fechas tengan un formato válido (opcional)
+      const fechaRegex = /^\d{4}-\d{2}-\d{2}$/; // Formato YYYY-MM-DD
+      if (inquilinoData.fechaInicio && !fechaRegex.test(inquilinoData.fechaInicio)) {
+        throw new Error('La fecha de inicio no tiene un formato válido (debe ser YYYY-MM-DD)');
+      }
+      if (inquilinoData.fechaFin && !fechaRegex.test(inquilinoData.fechaFin)) {
+        throw new Error('La fecha de fin no tiene un formato válido (debe ser YYYY-MM-DD)');
+      }
+      // Validar que la fecha de inicio sea anterior a la fecha de fin (opcional)
+      if (inquilinoData.fechaInicio && inquilinoData.fechaFin) {
+        const fechaInicio = new Date(inquilinoData.fechaInicio);
+        const fechaFin = new Date(inquilinoData.fechaFin);
+        if (fechaInicio >= fechaFin) {
+          throw new Error('La fecha de inicio debe ser anterior a la fecha de fin');
+        }
+      }
+      // Validar que el inmueble_id sea un número válido
+      const inmuebleId = parseInt(inquilinoData.inmuebleId);
+      if (!inmuebleId || isNaN(inmuebleId)) {
+        throw new Error('El inmueble_id es requerido y debe ser un número válido');
+      }
+      console.log('=== VALIDACIÓN DE INMUEBLE ===');
+      console.log('Inmueble ID recibido del formulario:', inquilinoData.inmuebleId);
+      console.log('Inmueble ID convertido:', inmuebleId);
+      console.log('=== FIN VALIDACIÓN ===');
 
+      
       // Validar campos requeridos para el contrato
     /*  if (!inquilinoData.espacio_id) {
         throw new Error('El espacio_id es requerido para crear el contrato');
