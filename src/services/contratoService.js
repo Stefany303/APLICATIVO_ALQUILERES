@@ -29,6 +29,21 @@ const contratoService = {
     }
   },
 
+  // Obtener contratos con información detallada por inquilino (dni o nombre)
+  obtenerContratosPorInquilino: async (dni = null, nombre = null) => {
+    try {
+      const params = {};
+      if (dni) params.dni = dni;
+      if (nombre) params.nombre = nombre;
+
+      const response = await api.get(`${API_URL}/contratos/inquilinos/detalles`, { params });
+      return response.data; // Devuelve los datos obtenidos
+    } catch (error) {
+      console.error('Error al obtener los contratos:', error);
+      throw error; // Lanza el error para manejarlo en el componente
+    }
+  },
+
   obtenerContratoPorId: async (id) => {
     try {
       const response = await api.get(`${API_URL}/contratos/${id}`);
