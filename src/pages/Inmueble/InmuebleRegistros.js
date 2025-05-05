@@ -5,13 +5,11 @@ import { Table } from 'antd';
 import Header from '../../components/Header';
 import Sidebar from "../../components/Sidebar";
 import { plusicon, refreshicon, searchnormal, pdficon, pdficon3, pdficon4 } from '../../components/imagepath';
-import inmuebleService from '../../services/inmuebleService';
-import personaService from '../../services/personaService';
+import contratoService from '../../services/contratoService';
 
 const InmuebleRegistros = () => {
   const [inmuebles, setInmuebles] = useState([]);
-  const [propietarios, setPropietarios] = useState([]);
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const navigate = useNavigate();
 
@@ -22,26 +20,17 @@ const InmuebleRegistros = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Obtener los inmuebles y los propietarios al cargar el componente
+  // Obtener los inmuebles al cargar el componente
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const inmueblesData = await inmuebleService.obtenerInmuebles();
-        const personasData = await personaService.obtenerPersonas();
-        const propietariosData = personasData.filter(persona => persona.rol === 'propietario');
-        setPropietarios(propietariosData);
-
-        const inmueblesConPropietarios = inmueblesData.map(inmueble => {
-          const propietario = propietariosData.find(p => p.id === inmueble.propietario_id);
-          return {
-            ...inmueble,
-            propietario: propietario ? `${propietario.nombre} ${propietario.apellido}` : 'Desconocido',
-          };
-        });
-
-        setInmuebles(inmueblesConPropietarios);
+        setLoading(true);
+        const response = await contratoService.obtenerContratosPorInquilino();
+        setInmuebles(response);
       } catch (error) {
         console.error("Error al obtener los datos:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -61,7 +50,7 @@ const InmuebleRegistros = () => {
   // Acción para eliminar un inmueble
   const handleDelete = async (inmuebleId) => {
     try {
-      await inmuebleService.eliminarInmueble(inmuebleId);
+      await contratoService.eliminarContrato(inmuebleId);
       setInmuebles(inmuebles.filter(inmueble => inmueble.id !== inmuebleId));
       console.log("Inmueble eliminado con ID:", inmuebleId);
     } catch (error) {
@@ -74,65 +63,62 @@ const InmuebleRegistros = () => {
     {
       title: "ID",
       dataIndex: "id",
+      key: "id",
       sorter: (a, b) => a.id - b.id,
+    },
+    {
+      title: "Inquilino",
+      dataIndex: "inquilino",
+      key: "inquilino",
+      render: (text, record) => `${record.inquilino_nombre} ${record.inquilino_apellido}`,
+      sorter: (a, b) => a.inquilino_nombre.localeCompare(b.inquilino_nombre),
     },
     {
       title: "Propietario",
       dataIndex: "propietario",
-      sorter: (a, b) => a.propietario.localeCompare(b.propietario),
+      key: "propietario",
+      render: (text, record) => `${record.propietario_nombre} ${record.propietario_apellido}`,
+      sorter: (a, b) => a.propietario_nombre.localeCompare(b.propietario_nombre),
     },
     {
-      title: "Nombre Inmueble",
-      dataIndex: "nombre",
-      sorter: (a, b) => a.nombre.localeCompare(b.nombre),
-    },
-    {
-      title: "Descripción",
-      dataIndex: "descripcion",
-      sorter: (a, b) => a.descripcion.localeCompare(b.descripcion),
+      title: "Inmueble",
+      dataIndex: "inmueble_nombre",
+      key: "inmueble_nombre",
+      sorter: (a, b) => a.inmueble_nombre.localeCompare(b.inmueble_nombre),
     },
     {
       title: "Dirección",
-      dataIndex: "direccion",
-      sorter: (a, b) => a.direccion.localeCompare(b.direccion),
-    },
-    {
-      title: "Ubigeo",
-      dataIndex: "ubigeo",
-      sorter: (a, b) => a.ubigeo.localeCompare(b.ubigeo),
+      dataIndex: "inmueble_direccion",
+      key: "inmueble_direccion",
+      sorter: (a, b) => a.inmueble_direccion.localeCompare(b.inmueble_direccion),
     },
     {
       title: "Acciones",
-      dataIndex: "acciones",
+      key: "acciones",
       render: (text, record) => (
         <div className="text-center">
           {windowWidth > 768 ? (
-            // Mostrar botones visibles en pantallas grandes
             <>
               <button
                 className="btn btn-sm btn-primary me-2"
                 onClick={() => handleView(record.id)}
               >
                 <i className="far fa-eye me-2" />
-                {/* Ver */}
               </button>
               <button
                 className="btn btn-sm btn-warning me-2"
                 onClick={() => handleEdit(record.id)}
               >
                 <i className="far fa-edit me-2" />
-                {/* Editar */}
               </button>
               <button
                 className="btn btn-sm btn-danger"
                 onClick={() => handleDelete(record.id)}
               >
                 <i className="fa fa-trash-alt me-2" />
-                {/* Eliminar */}
               </button>
             </>
           ) : (
-            // Mostrar menú desplegable en pantallas pequeñas
             <div className="dropdown dropdown-action">
               <Link
                 to="#"
@@ -169,7 +155,6 @@ const InmuebleRegistros = () => {
       <Sidebar id='menu-item3' id1='menu-items3' activeClassName='inmueble-registros' />
       <div className="page-wrapper">
         <div className="content">
-          {/* Page Header */}
           <div className="page-header">
             <div className="row">
               <div className="col-sm-12">
@@ -187,12 +172,10 @@ const InmuebleRegistros = () => {
               </div>
             </div>
           </div>
-          {/* /Page Header */}
           <div className="row">
             <div className="col-sm-12">
               <div className="card card-table show-entire">
                 <div className="card-body">
-                  {/* Table Header */}
                   <div className="page-table-header mb-2">
                     <div className="row align-items-center">
                       <div className="col">
@@ -241,17 +224,18 @@ const InmuebleRegistros = () => {
                       </div>
                     </div>
                   </div>
-                  {/* /Table Header */}
                   <div className="table-responsive doctor-list">
                     <Table
+                      columns={columns}
+                      dataSource={inmuebles}
+                      rowKey="id"
+                      loading={loading}
                       pagination={{
-                        total: inmuebles.length,
+                        pageSize: 10,
+                        showSizeChanger: true,
                         showTotal: (total, range) =>
                           `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
                       }}
-                      columns={columns}
-                      dataSource={inmuebles}
-                      rowKey={(record) => record.id}
                     />
                   </div>
                 </div>

@@ -4,7 +4,7 @@ import { API_URL, getAuthToken } from './authService';
 const pagoService = {
   obtenerPagos: async () => {
     try {
-      const response = await api.get(`${API_URL}/pagos`);
+      const response = await api.get(`${API_URL}/pagos/buscar`);
       return response.data;
     } catch (error) {
       console.error('Error al obtener pagos:', error);
@@ -84,10 +84,51 @@ const pagoService = {
 
   actualizarPago: async (id, pagoData) => {
     try {
-      const response = await api.put(`${API_URL}/pagos/${id}`, pagoData);
+      // Obtener el token de autenticación
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación disponible para actualizar el pago');
+        throw new Error('No autorizado: Inicie sesión para realizar esta acción');
+      }
+      
+      // Configurar headers con el token
+      const config = {
+        headers: {
+          'Authorization': token
+        }
+      };
+      
+      console.log('Actualizando pago ID:', id, 'con datos:', pagoData);
+      
+      // Asegurarse de que los campos requeridos estén presentes
+      const camposRequeridos = ['contrato_id', 'monto', 'metodo_pago', 'tipo_pago', 'estado', 'fecha_pago', 'fecha_real_pago'];
+      for (const campo of camposRequeridos) {
+        if (!pagoData.hasOwnProperty(campo) || pagoData[campo] === undefined || pagoData[campo] === '') {
+          console.warn(`Campo requerido '${campo}' no está presente o está vacío en la actualización.`);
+        }
+      }
+      
+      const response = await api.put(`${API_URL}/pagos/${id}`, pagoData, config);
+      console.log('Respuesta del servidor al actualizar pago:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error al actualizar el pago:', error);
+      
+      // Obtener más detalles sobre el error
+      if (error.response) {
+        console.error('Detalles del error del servidor:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          endpoint: `${API_URL}/pagos/${id}`
+        });
+        
+        // Si hay un mensaje de error específico en la respuesta, úsalo
+        if (error.response.data && error.response.data.message) {
+          throw new Error(`Error del servidor: ${error.response.data.message}`);
+        }
+      }
+      
       throw error;
     }
   },

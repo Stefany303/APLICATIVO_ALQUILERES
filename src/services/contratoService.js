@@ -12,9 +12,10 @@ const contratoService = {
     }
   },
 
+  //aqui modifique borre informacion y puse detalles para que funcione
   obtenerContratosDetalles: async () => {
     try {
-      const response = await api.get('/contratos/detalles/informacion');
+      const response = await api.get('/contratos/detalles');
       console.log('Respuesta del backend:', response.data);
       return response.data;
     } catch (error) {

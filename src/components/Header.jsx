@@ -1,224 +1,152 @@
 /* eslint-disable no-unused-vars */
-import React, { useEffect} from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import '../assets/styles/Style.css';
-// import "../../src/assets/js/app";
- import {baricon, baricon1, imguser, logo, noteicon, noteicon1, searchnormal, settingicon01, user06 } from './imagepath';
-//import {
-  
-//} from "./imagepath";
+import { baricon, baricon1, logo, noteicon, searchnormal, user06 } from './imagepath';
 import { useAuth } from "../utils/AuthContext";
+
 const Header = () => {
-  const { user,logout } = useAuth();
+  const { user, logout } = useAuth();
+  
   const handlesidebar = () => {
     document.body.classList.toggle("mini-sidebar");
   };
 
   const handlesidebarmobilemenu = () => {
     document.body.classList.toggle("slide-nav");
-    document.getElementsByTagName("html")[0].classList.toggle("menu-opened");
-  
-    const sidebarOverlay = document.getElementsByClassName("sidebar-overlay")[0];
-  
+    document.body.querySelector("html").classList.toggle("menu-opened");
+    
+    const sidebarOverlay = document.querySelector(".sidebar-overlay");
     if (sidebarOverlay) {
       sidebarOverlay.classList.toggle("opened");
-    } else {
-      console.warn("Elemento .sidebar-overlay no encontrado");
     }
   };
-  
 
   const openDrawer = () => {
     const div = document.querySelector(".main-wrapper");
-    if (div?.className?.includes("open-msg-box")) {
+    if (div?.classList?.contains("open-msg-box")) {
       div?.classList?.remove("open-msg-box");
     } else {
       div?.classList?.add("open-msg-box");
     }
   };
 
-  useEffect(() => {
-    const handleClick = () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
-      }
-    };
-
-    const maximizeBtn = document.querySelector(".win-maximize");
-    // maximizeBtn.addEventListener('click', handleClick);
-
-    return () => {
-      // maximizeBtn.removeEventListener('click', handleClick);
-    };
-  }, []);
-
   return (
-    <div className="main-wrapper">
-      <div className="header">
-        <div className="header-left">
-          <Link to="/admin-dashboard" className="logo">
-            <img src={logo} width={65} height={65} alt="" />{" "}
-            <span>Alquileres</span>
+    <div className="header">
+      <div className="header-left">
+        <Link to="/admin-dashboard" className="logo">
+          <img src={logo} width={65} height={65} alt="" />
+          <span>Alquileres</span>
+        </Link>
+      </div>
+      <Link id="toggle_btn" to="#" onClick={handlesidebar}>
+        <img src={baricon} alt="" />
+      </Link>
+      <Link id="mobile_btn" className="mobile_btn float-start" to="#" onClick={handlesidebarmobilemenu}>
+        <img src={baricon1} alt="" />
+      </Link>
+      <div className="top-nav-search mob-view">
+        <form>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Buscar aquí"
+          />
+          <Link className="btn">
+            <img src={searchnormal} alt="" />
           </Link>
-        </div>
-        <Link id="toggle_btn" to="#" onClick={handlesidebar}>
-          <img src={baricon} alt="" />
-        </Link>
-        <Link id="mobile_btn" className="mobile_btn float-start" to="#" onClick={handlesidebarmobilemenu}>
-          <img src={baricon1} alt="" />
-        </Link>
-        <div className="top-nav-search mob-view">
-          <form>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Buscar aquí"
-            />
-            <Link className="btn">
-              <img src={searchnormal} alt="" />
-            </Link>
-          </form>
-        </div>
-        <ul className="nav user-menu float-end">
-          <li className="nav-item dropdown d-none d-sm-block">
-            <Link
-              to="#"
-              className="dropdown-toggle nav-link"
-              data-bs-toggle="dropdown"
-            >
-              <img src={noteicon} alt="" />
-              <span className="pulse" />{" "}
-            </Link>
-            <div className="dropdown-menu notifications">
-              <div className="topnav-dropdown-header">
-                <span>Notifications</span>
-              </div>
-              <div className="drop-scroll">
-                <ul className="notification-list">
-                  <li className="notification-message">
-                    <Link to="/user-activity">
-                      <div className="media">
-                      <span className="avatar">V</span>
-                        <div className="media-body">
-                          <p className="noti-details">
-                            <span className="noti-title">John Doe</span> added
-                            new task{" "}
-                            <span className="noti-title">
-                              Patient appointment booking
-                            </span>
-                          </p>
-                          <p className="noti-time">
-                            <span className="notification-time">
-                              4 mins ago
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  </li>
-                  <li className="notification-message">
-                    <Link to="/user-activity">
-                      <div className="media">
-                        <span className="avatar">V</span>
-                        <div className="media-body">
-                          <p className="noti-details">
-                            <span className="noti-title">Tarah Shropshire</span>{" "}
-                            changed the task name{" "}
-                            <span className="noti-title">
-                              Appointment booking with payment gateway
-                            </span>
-                          </p>
-                          <p className="noti-time">
-                            <span className="notification-time">
-                              6 mins ago
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  </li>
-                  
-                  
-                </ul>
-              </div>
-              <div className="topnav-dropdown-footer">
-                <Link to="/user-activity">View all Notifications</Link>
-              </div>
-            </div>
-          </li>
-          <li className="nav-item dropdown d-none d-sm-block">
-            <Link
-              onClick={openDrawer}
-              id="open_msg_box"
-              className="hasnotifications nav-link"
-            >
-              {/* <img src={noteicon1} alt="" /> */}
-              <span className="pulse" />{" "}
-            </Link>
-          </li>
-          <li className="nav-item dropdown has-arrow">
-            <Link
-              to="#"
-              className="dropdown-toggle nav-link"
-              data-bs-toggle="dropdown"
-            >
-              <span className="user-img">
-                <img src={user06} alt="" />
-                <span className="status online" />
-              </span>
-              <span>{user?.nombre || 'Usuario'}</span>
-            </Link>
-            <div className="dropdown-menu">
-              <div className="user-header">
-                <div className="avatar avatar-sm">
-                  <img src={user06} alt="" className="avatar-img rounded-circle" />
-                </div>
-                <div className="user-text">
-                  <h6>{user?.nombre || 'Usuario'}</h6>
-                  <p className="text-muted mb-0">{user?.rol || 'Usuario'}</p>
-                </div>
-              </div>
-              <Link className="dropdown-item" to="/perfil">Mi Perfil</Link>
-              <Link className="dropdown-item" to="/configuracion">Configuración</Link>
-              <Link className="dropdown-item" onClick={logout} to="#">Cerrar Sesión</Link>
-            </div>
-          </li>
-          <li className="nav-item ">
-            <Link to="/settings" className="hasnotifications nav-link">
-              {/* <img src={settingicon01} alt="" />{" "} */}
-            </Link>
-          </li>
-        </ul>
-        <div className="dropdown mobile-user-menu float-end">
+        </form>
+      </div>
+      <ul className="nav user-menu float-end">
+        <li className="nav-item dropdown d-none d-sm-block">
           <Link
             to="#"
-            className="dropdown-toggle"
+            className="dropdown-toggle nav-link"
             data-bs-toggle="dropdown"
-            aria-expanded="false"
           >
-            <i className="fa-solid fa-ellipsis-vertical" />
+            <img src={noteicon} alt="" />
+            <span className="pulse" />
           </Link>
-          <div className="dropdown-menu dropdown-menu-end">
-            <Link className="dropdown-item" to="/profile">
-              Mi Perfil
-            </Link>
-            <Link className="dropdown-item" to="edit-profile.html">
-              Editar Perfil
-            </Link>
-            <Link className="dropdown-item" to="/conf-cambio-contrasena">
-              Configuración
-            </Link>
-            <Link className="dropdown-item" to="/login">
-              Salida
-            </Link>
+          <div className="dropdown-menu notifications">
+            <div className="topnav-dropdown-header">
+              <span>Notificaciones</span>
+            </div>
+            <div className="drop-scroll">
+              <ul className="notification-list">
+                <li className="notification-message">
+                  <Link to="#">
+                    <div className="media">
+                      <span className="avatar">V</span>
+                      <div className="media-body">
+                        <p className="noti-details">
+                          <span className="noti-title">Nuevo inquilino</span> registrado
+                        </p>
+                        <p className="noti-time">
+                          <span className="notification-time">Hace 4 mins</span>
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div className="topnav-dropdown-footer">
+              <Link to="#">Ver todas las notificaciones</Link>
+            </div>
           </div>
+        </li>
+        <li className="nav-item dropdown has-arrow">
+          <Link
+            to="#"
+            className="dropdown-toggle nav-link"
+            data-bs-toggle="dropdown"
+          >
+            <span className="user-img">
+              <img src={user06} alt="" />
+              <span className="status online" />
+            </span>
+            <span>{user?.nombre || 'Usuario'}</span>
+          </Link>
+          <div className="dropdown-menu">
+            <div className="user-header">
+              <div className="avatar avatar-sm">
+                <img src={user06} alt="" className="avatar-img rounded-circle" />
+              </div>
+              <div className="user-text">
+                <h6>{user?.nombre || 'Usuario'}</h6>
+                <p className="text-muted mb-0">{user?.rol || 'Usuario'}</p>
+              </div>
+            </div>
+            <Link className="dropdown-item" to="/perfil">Mi Perfil</Link>
+            <Link className="dropdown-item" to="/conf-cambio-contrasena">Configuración</Link>
+            <Link className="dropdown-item" onClick={logout} to="#">Cerrar Sesión</Link>
+          </div>
+        </li>
+      </ul>
+      <div className="dropdown mobile-user-menu float-end">
+        <Link
+          to="#"
+          className="dropdown-toggle"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          <i className="fa-solid fa-ellipsis-vertical" />
+        </Link>
+        <div className="dropdown-menu dropdown-menu-end">
+          <Link className="dropdown-item" to="/perfil">
+            Mi Perfil
+          </Link>
+          <Link className="dropdown-item" to="/editar-perfil">
+            Editar Perfil
+          </Link>
+          <Link className="dropdown-item" to="/conf-cambio-contrasena">
+            Configuración
+          </Link>
+          <Link className="dropdown-item" onClick={logout} to="#">
+            Cerrar Sesión
+          </Link>
         </div>
       </div>
-
     </div>
   );
 };
