@@ -12,11 +12,43 @@ axios.defaults.validateStatus = function (status) {
   return status >= 200 && status < 500; // Aceptar cualquier status que no sea error del servidor
 };
 
+// Función para obtener el token
+const getAuthToken = () => {
+  return localStorage.getItem('token');
+};
+
+// Configurar interceptor para agregar el token a todas las peticiones
+axios.interceptors.request.use(
+  (config) => {
+    const token = getAuthToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 const inmuebleService = {
   // Obtener todos los inmuebles
   obtenerInmuebles: async () => {
     try {
-      const response = await axios.get(`${API_URL}/inmuebles`);
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return [];
+      }
+
+      const response = await axios.get(`${API_URL}/inmuebles`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      console.log('Respuesta de inmuebles:', response.data); // Debug
+
       // Verificar si la respuesta tiene la estructura esperada
       if (response.data && Array.isArray(response.data)) {
         return response.data;
@@ -26,6 +58,9 @@ const inmuebleService = {
       return [];
     } catch (error) {
       console.error('Error al obtener inmuebles:', error);
+      if (error.response) {
+        console.error('Detalles del error:', error.response.data);
+      }
       return [];
     }
   },
@@ -33,7 +68,17 @@ const inmuebleService = {
   // Obtener un inmueble por ID
   obtenerInmueblePorId: async (id) => {
     try {
-      const response = await axios.get(`${API_URL}/inmuebles/${id}`);
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return null;
+      }
+
+      const response = await axios.get(`${API_URL}/inmuebles/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       return response.data || null;
     } catch (error) {
       console.error('Error al obtener el inmueble:', error);
@@ -44,9 +89,20 @@ const inmuebleService = {
   // Obtener pisos por inmueble
   obtenerEspaciosPorInmueble: async (inmuebleId) => {
     try {
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return [];
+      }
+
       console.log('Obteniendo pisos para inmueble:', inmuebleId); // Debug
-      const response = await axios.get(`${API_URL}/pisos/inmuebles/${inmuebleId}/pisos`);
+      const response = await axios.get(`${API_URL}/pisos/inmuebles/${inmuebleId}/pisos`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       console.log('Respuesta de pisos:', response.data); // Debug
+
       // Verificar si la respuesta tiene la estructura esperada
       if (response.data && Array.isArray(response.data)) {
         return response.data;
@@ -63,7 +119,17 @@ const inmuebleService = {
   // Crear un nuevo inmueble
   crearInmueble: async (inmuebleData) => {
     try {
-      const response = await axios.post(`${API_URL}/inmuebles`, inmuebleData);
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return null;
+      }
+
+      const response = await axios.post(`${API_URL}/inmuebles`, inmuebleData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       return response.data || null;
     } catch (error) {
       console.error('Error al crear inmueble:', error);
@@ -74,7 +140,17 @@ const inmuebleService = {
   // Actualizar un inmueble existente
   actualizarInmueble: async (id, inmuebleData) => {
     try {
-      const response = await axios.put(`${API_URL}/inmuebles/${id}`, inmuebleData);
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return null;
+      }
+
+      const response = await axios.put(`${API_URL}/inmuebles/${id}`, inmuebleData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       return response.data || null;
     } catch (error) {
       console.error('Error al actualizar inmueble:', error);
@@ -85,7 +161,17 @@ const inmuebleService = {
   // Eliminar un inmueble
   eliminarInmueble: async (id) => {
     try {
-      const response = await axios.delete(`${API_URL}/inmuebles/${id}`);
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return null;
+      }
+
+      const response = await axios.delete(`${API_URL}/inmuebles/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       return response.data || null;
     } catch (error) {
       console.error('Error al eliminar inmueble:', error);
@@ -95,8 +181,18 @@ const inmuebleService = {
 
   obtenerPisosPorInmueble: async (inmuebleId) => {
     try {
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return [];
+      }
+
       console.log('Obteniendo pisos para inmueble:', inmuebleId);
-      const response = await axios.get(`${API_URL}/pisos/inmuebles/${inmuebleId}/pisos`);
+      const response = await axios.get(`${API_URL}/pisos/inmuebles/${inmuebleId}/pisos`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       console.log('Respuesta de pisos:', response.data);
       return response.data;
     } catch (error) {

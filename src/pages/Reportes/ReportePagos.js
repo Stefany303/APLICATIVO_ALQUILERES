@@ -1,146 +1,225 @@
 /* eslint-disable react/jsx-no-duplicate-props */
 /* eslint-disable no-unused-vars */
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import { Link } from 'react-router-dom';
 import { Table } from 'antd';
-import { useState } from 'react';
 import { blogimg10, blogimg12, blogimg2, blogimg6, blogimg8, imagesend, pdficon, pdficon2, pdficon3, pdficon4, plusicon, refreshicon, searchnormal } from '../../components/imagepath';
 import { DatePicker, Space } from 'antd';
 import { FiChevronRight } from "react-icons/fi";
-import {onShowSizeChange,itemRender}from  '../../components/Pagination'
+import {onShowSizeChange,itemRender}from '../../components/Pagination'
 import Select from "react-select";
+import reporteService from '../../services/reporteService';
+import inmuebleService from '../../services/inmuebleService';
+import moment from 'moment';
 
 const ReportePagos = () => {
-    const [selectedOption, setSelectedOption] = useState(null);
-
-  const [payment, setPayment] = useState([
-    { value: 1, label: "Selecciona estado de pago" },
-    { value: 2, label: "Cancelado" },
-    { value: 3, label: "Pendiente" }
-  ]);
-    const onChange = (date, dateString) => {
-    };
+    const [inmuebles, setInmuebles] = useState([]);
+    const [pagos, setPagos] = useState([]);
+    const [estadisticas, setEstadisticas] = useState(null);
+    const [loading, setLoading] = useState(false);
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    const [filtros, setFiltros] = useState({
+        fecha_inicio: '',
+        fecha_fin: '',
+        inmueble_id: '',
+        estado: ''
+    });
+
+    // Estados de pago
+    const [payment, setPayment] = useState([
+        { value: '', label: "Todos los estados" },
+        { value: "pagado", label: "Pagado" },
+        { value: "pendiente", label: "Pendiente" }
+    ]);
+
+    // Cargar inmuebles al iniciar
+    useEffect(() => {
+        const cargarInmuebles = async () => {
+            try {
+                const data = await inmuebleService.obtenerInmuebles();
+                const opcionesInmuebles = data.map(inmueble => ({
+                    value: inmueble.id,
+                    label: inmueble.nombre
+                }));
+                
+                // Agregar opción "Todos los inmuebles"
+                opcionesInmuebles.unshift({ value: '', label: "Todos los inmuebles" });
+                
+                setInmuebles(opcionesInmuebles);
+            } catch (error) {
+                console.error('Error al cargar inmuebles:', error);
+            }
+        };
+
+        cargarInmuebles();
+    }, []);
+
+    // Función para generar el reporte
+    const generarReporte = async () => {
+        setLoading(true);
+        try {
+            // Añadir incluir_estadisticas=true para obtener estadísticas
+            const filtrosConEstadisticas = { ...filtros, incluir_estadisticas: 'true' };
+            const response = await reporteService.generarReportePagos(filtrosConEstadisticas);
+            
+            if (response.datos) {
+                setPagos(response.datos);
+                setEstadisticas(response.estadisticas);
+            } else {
+                setPagos(response);
+                setEstadisticas(null);
+            }
+        } catch (error) {
+            console.error('Error al generar reporte de pagos:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Generar reporte al cargar el componente
+    useEffect(() => {
+        generarReporte();
+    }, []);
+
+    // Handler para cambios en las fechas
+    const handleFechaInicio = (date) => {
+        setFiltros({
+            ...filtros,
+            fecha_inicio: date ? date.format('YYYY-MM-DD') : ''
+        });
+    };
+
+    const handleFechaFin = (date) => {
+        setFiltros({
+            ...filtros,
+            fecha_fin: date ? date.format('YYYY-MM-DD') : ''
+        });
+    };
+
+    // Handler para cambios en el inmueble seleccionado
+    const handleInmuebleChange = (selectedOption) => {
+        setFiltros({
+            ...filtros,
+            inmueble_id: selectedOption ? selectedOption.value : ''
+        });
+    };
+
+    // Handler para cambios en el estado de pago
+    const handleEstadoChange = (selectedOption) => {
+        setFiltros({
+            ...filtros,
+            estado: selectedOption ? selectedOption.value : ''
+        });
+    };
+
+    // Handler para el botón de búsqueda
+    const handleSearch = () => {
+        generarReporte();
+    };
 
     const onSelectChange = (newSelectedRowKeys) => {
-        console.log("selectedRowKeys changed: ", selectedRowKeys);
         setSelectedRowKeys(newSelectedRowKeys);
     };
+
     const rowSelection = {
         selectedRowKeys,
         onChange: onSelectChange
     };
-    const datasource = [
-        {
-            id:1,
-            Invoice_Number: "#INV-0004",
-            Img: blogimg2,
-            patient: "Andrea Lalema",
-            Payment_Type: "Credit card",
-            Paid_Date: "01.10.2022",
-            Paid_Amount: "$2450",
-            Status: "Paid",
-            FIELD8: ""
-        },
-        {
-            id:2,
-            Invoice_Number: "#INV-0001",
-            Img: blogimg6,
-            patient: "Smith Bruklin",
-            Payment_Type: "Debit card",
-            Paid_Date: "02.10.2022",
-            Paid_Amount: "$1505",
-            Status: "Un paid",
-            FIELD8: ""
-        }
-    ]
+
     const columns = [
         {
             title: "Nombre Inmueble",
-            dataIndex: "nombre",
-            sorter: (a, b) => a.nombre.localeCompare(b.nombre),
+            dataIndex: "nombre_inmueble",
+            sorter: (a, b) => a.nombre_inmueble?.localeCompare(b.nombre_inmueble),
         },
         {
-            title: "Código Espacio",
-            dataIndex: "codigo",
-            sorter: (a, b) => a.nombre.localeCompare(b.nombre),
+            title: "Espacio",
+            dataIndex: "nombre_espacio",
+            sorter: (a, b) => a.nombre_espacio?.localeCompare(b.nombre_espacio),
+        },
+        {
+            title: "Inquilino",
+            render: (_, record) => `${record.Nombres} ${record.Apellidos}`,
+            sorter: (a, b) => `${a.Nombres} ${a.Apellidos}`.localeCompare(`${b.Nombres} ${b.Apellidos}`),
+        },
+        {
+            title: "DNI",
+            dataIndex: "DNI",
+            sorter: (a, b) => a.DNI?.localeCompare(b.DNI),
         },
         {
             title: "Monto",
             dataIndex: "monto",
-            sorter: (a, b) => (a.monto || 0) - (b.monto || 0),
-            render: (monto) => (typeof monto === "number" ? `S/ ${monto.toFixed(2)}` : "N/A")
+            sorter: (a, b) => parseFloat(a.monto || 0) - parseFloat(b.monto || 0),
+            render: (monto) => `S/ ${parseFloat(monto).toFixed(2)}`
         },
         {
             title: "Método de Pago",
             dataIndex: "metodo_pago",
-            sorter: (a, b) => a.metodo_pago.localeCompare(b.metodo_pago)
+            sorter: (a, b) => a.metodo_pago?.localeCompare(b.metodo_pago),
+            render: (text) => text?.charAt(0).toUpperCase() + text?.slice(1)
         },
         {
             title: "Tipo de Pago",
             dataIndex: "tipo_pago",
-            sorter: (a, b) => a.tipo_pago.localeCompare(b.tipo_pago)
+            sorter: (a, b) => a.tipo_pago?.localeCompare(b.tipo_pago),
+            render: (text) => text?.charAt(0).toUpperCase() + text?.slice(1)
         },
-        
         {
             title: "Fecha de Pago",
-            dataIndex: "creado_en",
-            sorter: (a, b) => new Date(a.creado_en) - new Date(b.creado_en),
-            render: (fecha) => new Date(fecha).toLocaleDateString("es-PE")
+            dataIndex: "fecha_pago",
+            sorter: (a, b) => new Date(a.fecha_pago) - new Date(b.fecha_pago),
+            render: (fecha) => fecha ? new Date(fecha).toLocaleDateString("es-PE") : "N/A"
         },
-    
         {
             title: "Estado",
-            dataIndex: "Estado",
-            sorter: (a, b) => a.Status.length - b.Status.length,
-            render: (text, record) => (
+            dataIndex: "estado",
+            sorter: (a, b) => a.estado?.localeCompare(b.estado),
+            render: (text) => (
                 <div>
-                    {text === "Cancelado" && (
+                    {text === "pagado" && (
                         <span className="custom-badge status-green">
-                            {text}
+                            Pagado
                         </span>
                     )}
-                    {text === "Pendiente" && (
-                        <span className="custom-badge status-pink ">
-                            {text}
+                    {text === "pendiente" && (
+                        <span className="custom-badge status-pink">
+                            Pendiente
                         </span>
                     )}
-                     
                 </div>
             )
         },
         {
             title: "",
-            dataIndex: "FIELD8",
-            render: (text, record) => (
-              <>
+            dataIndex: "acciones",
+            render: (_, record) => (
                 <div className="text-end">
-                  <div className="dropdown dropdown-action">
-                    <Link
-                      to="#"
-                      className="action-icon dropdown-toggle"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                    >
-                      <i className="fas fa-ellipsis-v" />
-                    </Link>
-                    <div className="dropdown-menu dropdown-menu-end">
-                      <Link className="dropdown-item" to="/edit-payment">
-                        <i className="far fa-edit me-2" />
-                        Edit
-                      </Link>
-                      <Link className="dropdown-item" to="#" data-bs-toggle="modal" data-bs-target="#delete_patient">
-                       <i className="fa fa-trash-alt m-r-5"></i> Delete</Link>
+                    <div className="dropdown dropdown-action">
+                        <Link
+                            to="#"
+                            className="action-icon dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                        >
+                            <i className="fas fa-ellipsis-v" />
+                        </Link>
+                        <div className="dropdown-menu dropdown-menu-end">
+                            <Link className="dropdown-item" to={`/edit-payment/${record.id}`}>
+                                <i className="far fa-edit me-2" />
+                                Editar
+                            </Link>
+                            <Link className="dropdown-item" to="#" data-bs-toggle="modal" data-bs-target="#delete_patient">
+                                <i className="fa fa-trash-alt m-r-5"></i> Eliminar
+                            </Link>
+                        </div>
                     </div>
-                  </div>
                 </div>
-              </>
             ),
-          },
-
-    ]
+        },
+    ];
 
     const customStyles = {
         menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -163,6 +242,7 @@ const ReportePagos = () => {
           height: "35px",
         }),
       };
+
     return (
         <>
             <Header />
@@ -212,7 +292,7 @@ const ReportePagos = () => {
                                                                 </div>
                                                                 <div className="add-group">
                                                                     <Link to="/addpayment" className="btn btn-primary add-pluss ms-2"><img src={plusicon} alt="#" /></Link>
-                                                                   <Link to="#" className="btn btn-primary doctor-refresh ms-2"><img src={refreshicon} alt="#" /></Link>
+                                                                   <Link to="#" className="btn btn-primary doctor-refresh ms-2" onClick={generarReporte}><img src={refreshicon} alt="#" /></Link>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -231,68 +311,124 @@ const ReportePagos = () => {
                                                     <div className="row">
                                                         <div className="col-12 col-md-6 col-xl-3">
                                                             <div className="form-group local-forms cal-icon">
-                                                                <label>Desde
-                                                                </label>
-                                                                <DatePicker className="form-control datetimepicker" onChange={onChange}
+                                                                <label>Desde</label>
+                                                                <DatePicker 
+                                                                    className="form-control datetimepicker" 
+                                                                    onChange={handleFechaInicio}
                                                                     suffixIcon={null}
-                                                                // placeholder='24/11/2022'
+                                                                    format="DD/MM/YYYY"
                                                                 />
                                                             </div>
                                                         </div>
                                                         <div className="col-12 col-md-6 col-xl-3">
                                                             <div className="form-group local-forms cal-icon">
-                                                                <label>Hasta
-                                                                </label>
-                                                                <DatePicker className="form-control datetimepicker" onChange={onChange}
+                                                                <label>Hasta</label>
+                                                                <DatePicker 
+                                                                    className="form-control datetimepicker" 
+                                                                    onChange={handleFechaFin}
                                                                     suffixIcon={null}
-                                                                // placeholder='24/11/2022'
+                                                                    format="DD/MM/YYYY"
                                                                 />
                                                             </div>
                                                         </div>
-                                                        <div className="col-12 col-md-6 col-xl-3 ">
+                                                        <div className="col-12 col-md-6 col-xl-3">
                                                             <div className="form-group local-forms">
-                                                                <label>Estado Pago
-                                                                </label>
+                                                                <label>Seleccionar Inmueble </label>
                                                                 <Select
-                                menuPortalTarget={document.body}
-                                styles={customStyles}
-                                  defaultValue={selectedOption}
-                                  onChange={setSelectedOption}
-                                  options={payment}
-                                  id="search-commodity"
-                                  components={{
-                                    IndicatorSeparator: () => null
-                                  }}
-                                  
-                                />
-                                                             
+                                                                    options={inmuebles}
+                                                                    onChange={handleInmuebleChange}
+                                                                    menuPortalTarget={document.body}
+                                                                    styles={customStyles}
+                                                                    placeholder="Seleccionar inmueble"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="col-12 col-md-6 col-xl-3">
+                                                            <div className="form-group local-forms">
+                                                                <label>Estado de Pago </label>
+                                                                <Select
+                                                                    options={payment}
+                                                                    onChange={handleEstadoChange}
+                                                                    menuPortalTarget={document.body}
+                                                                    styles={customStyles}
+                                                                    placeholder="Seleccionar estado"
+                                                                />
                                                             </div>
                                                         </div>
                                                         <div className="col-12 col-md-6 col-xl-3 ms-auto">
                                                             <div className="doctor-submit">
-                                                                <button type="submit" className="btn btn-primary submit-list-form me-2">Aplicar Filtros</button>
+                                                                <button type="button" className="btn btn-primary submit-form me-2" onClick={handleSearch}>
+                                                                    Buscar
+                                                                </button>
+                                                                <button type="button" className="btn btn-primary filter-form" onClick={() => {
+                                                                    setFiltros({
+                                                                        fecha_inicio: '',
+                                                                        fecha_fin: '',
+                                                                        inmueble_id: '',
+                                                                        estado: ''
+                                                                    });
+                                                                    generarReporte();
+                                                                }}>
+                                                                    Limpiar
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </form>
                                             </div>
+                                            
+                                            {/* Estadísticas */}
+                                            {estadisticas && (
+                                                <div className="row mb-4">
+                                                    <div className="col-md-3">
+                                                        <div className="card bg-light">
+                                                            <div className="card-body">
+                                                                <h5 className="card-title">Total Registros</h5>
+                                                                <p className="card-text h4">{estadisticas.total_registros}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-md-3">
+                                                        <div className="card bg-light">
+                                                            <div className="card-body">
+                                                                <h5 className="card-title">Monto Total</h5>
+                                                                <p className="card-text h4">S/ {estadisticas.total_monto.toFixed(2)}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-md-3">
+                                                        <div className="card bg-light">
+                                                            <div className="card-body">
+                                                                <h5 className="card-title">Pagos Cancelados</h5>
+                                                                <p className="card-text h4">{estadisticas.pagos_completados}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-md-3">
+                                                        <div className="card bg-light">
+                                                            <div className="card-body">
+                                                                <h5 className="card-title">Pagos Pendientes</h5>
+                                                                <p className="card-text h4">{estadisticas.pagos_pendientes}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
                                             <div className="table-responsive">
-                                                <Table className="table table-stripped table-hover datatable thead-light "
+                                                <Table
                                                     pagination={{
-                                                        total: datasource.length,
-                                                        showTotal: (total, range) =>
-                                                            `Showing ${range[0]} to ${range[1]} of ${total} entries`,
-                                                        // showSizeChanger: true,
-                                                        onShowSizeChange: onShowSizeChange,
-                                                        itemRender: itemRender,
+                                                        total: pagos.length,
+                                                        showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} entradas`,
+                                                        showSizeChanger: true, onShowSizeChange: onShowSizeChange, itemRender: itemRender
                                                     }}
+                                                    style={{ overflowX: 'auto' }}
                                                     columns={columns}
-                                                    dataSource={datasource}
-
+                                                    dataSource={pagos}
+                                                    rowKey={record => record.id}
                                                     rowSelection={rowSelection}
-                                                    rowKey={
-                                                        (record) => record.id
-                                                    } />
+                                                    loading={loading}
+                                                />
                                             </div>
                                         </div>
                                     </div>

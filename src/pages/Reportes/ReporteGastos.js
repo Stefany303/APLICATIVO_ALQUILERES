@@ -1,74 +1,141 @@
 /* eslint-disable react/jsx-no-duplicate-props */
 /* eslint-disable no-unused-vars */
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import { Link } from 'react-router-dom';
 import { Table } from 'antd';
-import { useState } from 'react';
 import { blogimg10, blogimg12, blogimg2, blogimg6, blogimg8, imagesend, pdficon, pdficon2, pdficon3, pdficon4, plusicon, refreshicon, searchnormal } from '../../components/imagepath';
 import { DatePicker, Space } from 'antd';
 import { FiChevronRight } from "react-icons/fi";
 import {onShowSizeChange,itemRender}from  '../../components/Pagination'
 import Select from "react-select";
+import reporteService from '../../services/reporteService';
+import inmuebleService from '../../services/inmuebleService';
+import moment from 'moment';
 
 const ReporteGastos = () => {
-    const [selectedOption, setSelectedOption] = useState(null);
-
-  const [options, setOptions] = useState([
-    { value: 1, label: "Select LeaveType" },
-    { value: 2, label: "Medical Leave" },
-    { value: 3, label: "Casual Leave" },
-    { value: 3, label: "Loss of Pay" }
-  ]);
-  const [payment, setPayment] = useState([
-    { value: 1, label: "Selecciona estado de pago" },
-    { value: 2, label: "Cancelado" },
-    { value: 3, label: "Pendiente" }
-  ]);
-    const onChange = (date, dateString) => {
-    };
+    const [inmuebles, setInmuebles] = useState([]);
+    const [gastos, setGastos] = useState([]);
+    const [estadisticas, setEstadisticas] = useState(null);
+    const [loading, setLoading] = useState(false);
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    const [filtros, setFiltros] = useState({
+        fecha_inicio: '',
+        fecha_fin: '',
+        inmueble_id: '',
+        tipo_gasto: ''
+    });
+
+    // Tipos de gastos
+    const [tipoGastos, setTipoGastos] = useState([
+        { value: '', label: "Todos los tipos" },
+        { value: "Mantenimiento", label: "Mantenimiento" },
+        { value: "Servicios", label: "Servicios" },
+        { value: "Impuestos", label: "Impuestos" },
+        { value: "Otros", label: "Otros" }
+    ]);
+
+    // Cargar inmuebles al iniciar
+    useEffect(() => {
+        const cargarInmuebles = async () => {
+            try {
+                const data = await inmuebleService.obtenerInmuebles();
+                const opcionesInmuebles = data.map(inmueble => ({
+                    value: inmueble.id,
+                    label: inmueble.nombre
+                }));
+                
+                // Agregar opción "Todos los inmuebles"
+                opcionesInmuebles.unshift({ value: '', label: "Todos los inmuebles" });
+                
+                setInmuebles(opcionesInmuebles);
+            } catch (error) {
+                console.error('Error al cargar inmuebles:', error);
+            }
+        };
+
+        cargarInmuebles();
+    }, []);
+
+    // Función para generar el reporte
+    const generarReporte = async () => {
+        setLoading(true);
+        try {
+            // Añadir incluir_estadisticas=true para obtener estadísticas
+            const filtrosConEstadisticas = { ...filtros, incluir_estadisticas: 'true' };
+            const response = await reporteService.generarReporteGastos(filtrosConEstadisticas);
+            
+            if (response.datos) {
+                setGastos(response.datos);
+                setEstadisticas(response.estadisticas);
+            } else {
+                setGastos(response);
+                setEstadisticas(null);
+            }
+        } catch (error) {
+            console.error('Error al generar reporte de gastos:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Generar reporte al cargar el componente
+    useEffect(() => {
+        generarReporte();
+    }, []);
+
+    // Handler para cambios en las fechas
+    const handleFechaInicio = (date) => {
+        setFiltros({
+            ...filtros,
+            fecha_inicio: date ? date.format('YYYY-MM-DD') : ''
+        });
+    };
+
+    const handleFechaFin = (date) => {
+        setFiltros({
+            ...filtros,
+            fecha_fin: date ? date.format('YYYY-MM-DD') : ''
+        });
+    };
+
+    // Handler para cambios en el inmueble seleccionado
+    const handleInmuebleChange = (selectedOption) => {
+        setFiltros({
+            ...filtros,
+            inmueble_id: selectedOption ? selectedOption.value : ''
+        });
+    };
+
+    // Handler para cambios en el tipo de gasto
+    const handleTipoGastoChange = (selectedOption) => {
+        setFiltros({
+            ...filtros,
+            tipo_gasto: selectedOption ? selectedOption.value : ''
+        });
+    };
+
+    // Handler para el botón de búsqueda
+    const handleSearch = () => {
+        generarReporte();
+    };
 
     const onSelectChange = (newSelectedRowKeys) => {
-        console.log("selectedRowKeys changed: ", selectedRowKeys);
         setSelectedRowKeys(newSelectedRowKeys);
     };
+
     const rowSelection = {
         selectedRowKeys,
         onChange: onSelectChange
     };
-    const datasource = [
-        {
-            id:1,
-            Invoice_Number: "#INV-0004",
-            Img: blogimg2,
-            patient: "Andrea Lalema",
-            Payment_Type: "Credit card",
-            Paid_Date: "01.10.2022",
-            Paid_Amount: "$2450",
-            Status: "Paid",
-            FIELD8: ""
-        },
-        {
-            id:2,
-            Invoice_Number: "#INV-0001",
-            Img: blogimg6,
-            patient: "Smith Bruklin",
-            Payment_Type: "Debit card",
-            Paid_Date: "02.10.2022",
-            Paid_Amount: "$1505",
-            Status: "Un paid",
-            FIELD8: ""
-        }
-    ]
+
     const columns = [
         {
             title: "Nombre Inmueble",
             dataIndex: "nombre",
-            sorter: (a, b) => a.nombre.localeCompare(b.nombre),
+            sorter: (a, b) => a.nombre?.localeCompare(b.nombre),
         },
-        
         {
             title: "Monto",
             dataIndex: "monto",
@@ -78,22 +145,24 @@ const ReporteGastos = () => {
         {
             title: "Método de Pago",
             dataIndex: "metodo_pago",
-            sorter: (a, b) => a.metodo_pago.localeCompare(b.metodo_pago)
+            sorter: (a, b) => a.metodo_pago?.localeCompare(b.metodo_pago)
         },
         {
-            title: "Tipo de Pago",
+            title: "Tipo de Gasto",
             dataIndex: "tipo_pago",
-            sorter: (a, b) => a.tipo_pago.localeCompare(b.tipo_pago)
+            sorter: (a, b) => a.tipo_pago?.localeCompare(b.tipo_pago)
         },
-        
         {
-            title: "Fecha de Pago",
+            title: "Descripción",
+            dataIndex: "descripcion",
+            sorter: (a, b) => a.descripcion?.localeCompare(b.descripcion)
+        },
+        {
+            title: "Fecha",
             dataIndex: "creado_en",
             sorter: (a, b) => new Date(a.creado_en) - new Date(b.creado_en),
-            render: (fecha) => new Date(fecha).toLocaleDateString("es-PE")
+            render: (fecha) => fecha ? new Date(fecha).toLocaleDateString("es-PE") : "N/A"
         },
-    
-        
         {
             title: "",
             dataIndex: "FIELD8",
@@ -110,20 +179,19 @@ const ReporteGastos = () => {
                       <i className="fas fa-ellipsis-v" />
                     </Link>
                     <div className="dropdown-menu dropdown-menu-end">
-                      <Link className="dropdown-item" to="/edit-payment">
+                      <Link className="dropdown-item" to={`/edit-gasto/${record.id}`}>
                         <i className="far fa-edit me-2" />
-                        Edit
+                        Editar
                       </Link>
                       <Link className="dropdown-item" to="#" data-bs-toggle="modal" data-bs-target="#delete_patient">
-                       <i className="fa fa-trash-alt m-r-5"></i> Delete</Link>
+                       <i className="fa fa-trash-alt m-r-5"></i> Eliminar</Link>
                     </div>
                   </div>
                 </div>
               </>
             ),
           },
-
-    ]
+    ];
 
     const customStyles = {
         menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -146,6 +214,7 @@ const ReporteGastos = () => {
           height: "35px",
         }),
       };
+      
     return (
         <>
             <Header />
@@ -194,8 +263,8 @@ const ReporteGastos = () => {
                                                                     </form>
                                                                 </div>
                                                                 <div className="add-group">
-                                                                    <Link to="/addpayment" className="btn btn-primary add-pluss ms-2"><img src={plusicon} alt="#" /></Link>
-                                                                   <Link to="#" className="btn btn-primary doctor-refresh ms-2"><img src={refreshicon} alt="#" /></Link>
+                                                                    <Link to="/addgasto" className="btn btn-primary add-pluss ms-2"><img src={plusicon} alt="#" /></Link>
+                                                                   <Link to="#" className="btn btn-primary doctor-refresh ms-2" onClick={generarReporte}><img src={refreshicon} alt="#" /></Link>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -211,313 +280,135 @@ const ReporteGastos = () => {
                                             {/* /Table Header */}
                                             <div className="staff-search-table">
                                                 <form>
-                                                
                                                     <div className="row">
-                                                    <div className="col-12 col-md-6 col-xl-3">
-                                                    <div className="form-group local-forms">
-                                                    <label>Seleccionar Inmueble </label>
-                                                    <Select
-                                                        defaultValue={selectedOption}
-                                                        onChange={setSelectedOption}
-                                                        options={options}
-                                                        menuPortalTarget={document.body}
-                                                        styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                                                    />
-                                                    </div>
-                                                </div>
                                                         <div className="col-12 col-md-6 col-xl-3">
-                                                            <div className="form-group local-forms cal-icon">
-                                                                <label>Desde
-                                                                </label>
-                                                                <DatePicker className="form-control datetimepicker" onChange={onChange}
-                                                                    suffixIcon={null}
-                                                                // placeholder='24/11/2022'
+                                                            <div className="form-group local-forms">
+                                                                <label>Seleccionar Inmueble </label>
+                                                                <Select
+                                                                    options={inmuebles}
+                                                                    onChange={handleInmuebleChange}
+                                                                    menuPortalTarget={document.body}
+                                                                    styles={customStyles}
+                                                                    placeholder="Seleccionar inmueble"
                                                                 />
                                                             </div>
                                                         </div>
                                                         <div className="col-12 col-md-6 col-xl-3">
                                                             <div className="form-group local-forms cal-icon">
-                                                                <label>Hasta
-                                                                </label>
-                                                                <DatePicker className="form-control datetimepicker" onChange={onChange}
+                                                                <label>Desde</label>
+                                                                <DatePicker 
+                                                                    className="form-control datetimepicker" 
+                                                                    onChange={handleFechaInicio}
                                                                     suffixIcon={null}
-                                                                // placeholder='24/11/2022'
+                                                                    format="DD/MM/YYYY"
                                                                 />
                                                             </div>
                                                         </div>
-                                                        
+                                                        <div className="col-12 col-md-6 col-xl-3">
+                                                            <div className="form-group local-forms cal-icon">
+                                                                <label>Hasta</label>
+                                                                <DatePicker 
+                                                                    className="form-control datetimepicker" 
+                                                                    onChange={handleFechaFin}
+                                                                    suffixIcon={null}
+                                                                    format="DD/MM/YYYY"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="col-12 col-md-6 col-xl-3">
+                                                            <div className="form-group local-forms">
+                                                                <label>Tipo de Gasto</label>
+                                                                <Select
+                                                                    options={tipoGastos}
+                                                                    onChange={handleTipoGastoChange}
+                                                                    menuPortalTarget={document.body}
+                                                                    styles={customStyles}
+                                                                    placeholder="Seleccionar tipo"
+                                                                />
+                                                            </div>
+                                                        </div>
                                                         <div className="col-12 col-md-6 col-xl-3 ms-auto">
                                                             <div className="doctor-submit">
-                                                                <button type="submit" className="btn btn-primary submit-list-form me-2">Aplicar Filtros</button>
+                                                                <button type="button" className="btn btn-primary submit-form me-2" onClick={handleSearch}>
+                                                                    Buscar
+                                                                </button>
+                                                                <button type="button" className="btn btn-primary filter-form" onClick={() => {
+                                                                    setFiltros({
+                                                                        fecha_inicio: '',
+                                                                        fecha_fin: '',
+                                                                        inmueble_id: '',
+                                                                        tipo_gasto: ''
+                                                                    });
+                                                                    generarReporte();
+                                                                }}>
+                                                                    Limpiar
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </form>
                                             </div>
+                                            
+                                            {/* Estadísticas */}
+                                            {estadisticas && (
+                                                <div className="row mb-4">
+                                                    <div className="col-md-4">
+                                                        <div className="card bg-light">
+                                                            <div className="card-body">
+                                                                <h5 className="card-title">Total Registros</h5>
+                                                                <p className="card-text h4">{estadisticas.total_registros}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-md-4">
+                                                        <div className="card bg-light">
+                                                            <div className="card-body">
+                                                                <h5 className="card-title">Monto Total</h5>
+                                                                <p className="card-text h4">S/ {estadisticas.total_monto.toFixed(2)}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="col-md-4">
+                                                        <div className="card bg-light">
+                                                            <div className="card-body">
+                                                                <h5 className="card-title">Distribución por Tipo</h5>
+                                                                <div style={{maxHeight: '100px', overflowY: 'auto'}}>
+                                                                    {Object.entries(estadisticas.gastos_por_tipo).map(([tipo, data]) => (
+                                                                        <div key={tipo} className="d-flex justify-content-between">
+                                                                            <span>{tipo}:</span>
+                                                                            <span>S/ {data.monto_total.toFixed(2)} ({data.cantidad})</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
                                             <div className="table-responsive">
-                                                <Table className="table table-stripped table-hover datatable thead-light "
+                                                <Table
                                                     pagination={{
-                                                        total: datasource.length,
-                                                        showTotal: (total, range) =>
-                                                            `Showing ${range[0]} to ${range[1]} of ${total} entries`,
-                                                        // showSizeChanger: true,
-                                                        onShowSizeChange: onShowSizeChange,
-                                                        itemRender: itemRender,
+                                                        total: gastos.length,
+                                                        showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} entradas`,
+                                                        showSizeChanger: true, onShowSizeChange: onShowSizeChange, itemRender: itemRender
                                                     }}
+                                                    style={{ overflowX: 'auto' }}
                                                     columns={columns}
-                                                    dataSource={datasource}
-
+                                                    dataSource={gastos}
+                                                    rowKey={record => record.id}
                                                     rowSelection={rowSelection}
-                                                    rowKey={
-                                                        (record) => record.id
-                                                    } />
+                                                    loading={loading}
+                                                />
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div className="notification-box">
-                            <div className="msg-sidebar notifications msg-noti">
-                                <div className="topnav-dropdown-header">
-                                    <span>Messages</span>
-                                </div>
-                                <div className="drop-scroll msg-list-scroll" id="msg_list">
-                                    <ul className="list-box">
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">R</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">Richard Miles
-                                                        </span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item new-message">
-                                                    <div className="list-left">
-                                                        <span className="avatar">J</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">John Doe</span>
-                                                        <span className="message-time">1 Aug</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">T</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">
-                                                            Tarah Shropshire
-                                                        </span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">M</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">Mike Litorus</span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">C</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">
-                                                            Catherine Manseau
-                                                        </span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">D</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">
-                                                            Domenic Houston
-                                                        </span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">B</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">
-                                                            Buster Wigton
-                                                        </span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">R</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">
-                                                            Rolland Webber
-                                                        </span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">C</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">
-                                                            Claire Mapes
-                                                        </span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">M</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">Melita Faucher</span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">J</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">Jeffery Lalor</span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">L</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">Loren Gatlin</span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                           <Link to="#">
-                                                <div className="list-item">
-                                                    <div className="list-left">
-                                                        <span className="avatar">T</span>
-                                                    </div>
-                                                    <div className="list-body">
-                                                        <span className="message-author">Tarah Shropshire</span>
-                                                        <span className="message-time">12:28 AM</span>
-                                                        <div className="clearfix" />
-                                                        <span className="message-content">Lorem ipsum dolor sit amet, consectetur adipiscing</span>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                    </ul>
-                                </div>
-                                <div className="topnav-dropdown-footer">
-                                   <Link to="#">See all messages</Link>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="delete_patient" className="modal fade delete-modal" role="dialog">
-                        <div className="modal-dialog modal-dialog-centered">
-                            <div className="modal-content">
-                                <div className="modal-body text-center">
-                                    <img src={imagesend} alt="#"
-                                        width={50}
-                                        height={46} />
-                                    <h3>Are you sure want to delete this ?</h3>
-                                    <div className="m-t-20">
-                                       <Link to="#" className="btn btn-white me-2" data-bs-dismiss="modal">Close</Link>
-                                        <button type="submit" className="btn btn-danger">Delete</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
-
             </>
         </>
     )
