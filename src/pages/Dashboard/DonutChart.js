@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import ApexCharts from 'apexcharts';
 import espacioService from '../../services/espacioService';
 import inmuebleService from '../../services/inmuebleService';
 
 const DonutChart = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const chartRef = useRef(null);
 
   useEffect(() => {
+    let chart = null;
+
     const fetchData = async () => {
       try {
-        setLoading(true);
         const inmuebles = await inmuebleService.obtenerInmuebles();
         let pagosAlDia = 0;
         let pagosPendientes = 0;
@@ -37,86 +37,70 @@ const DonutChart = () => {
           }
         }
 
-        if (document.querySelector('#donut-chart-dash')) {
+        if (chartRef.current) {
           const donutChartOptions = {
             chart: {
-              height: 290,
+              height: 350,
               type: 'donut',
               toolbar: {
-                show: false,
-              },
-            },
-            plotOptions: {
-              bar: {
-                horizontal: false,
-                columnWidth: '50%',
-              },
-            },
-            dataLabels: {
-              enabled: false,
+                show: false
+              }
             },
             series: [pagosAlDia, pagosPendientes, pagosVencidos, sinContrato],
             labels: ['Al Día', 'Pendientes', 'Vencidos', 'Sin Contrato'],
             colors: ['#2E37A4', '#FFA500', '#FF0000', '#808080'],
-            responsive: [
-              {
-                breakpoint: 480,
-                options: {
-                  chart: {
-                    width: 200,
-                  },
-                  legend: {
-                    position: 'bottom',
-                  },
-                },
-              },
-            ],
-            legend: {
-              position: 'bottom',
-              labels: {
-                colors: '#333',
-                useSeriesColors: false
+            plotOptions: {
+              pie: {
+                donut: {
+                  size: '50%',
+                  labels: {
+                    show: true,
+                    total: {
+                      show: true,
+                      label: 'Total',
+                      formatter: function (w) {
+                        return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                      }
+                    }
+                  }
+                }
               }
             },
+            dataLabels: {
+              enabled: true,
+              formatter: function (val) {
+                return val.toFixed(1) + '%';
+              }
+            },
+            legend: {
+              position: 'bottom',
+              offsetY: 0,
+              height: 40
+            }
           };
 
-          const donut = new ApexCharts(
-            document.querySelector('#donut-chart-dash'),
-            donutChartOptions
-          );
+          if (chart) {
+            chart.destroy();
+          }
 
-          donut.render();
+          chart = new ApexCharts(chartRef.current, donutChartOptions);
+          chart.render();
         }
       } catch (error) {
         console.error('Error fetching payment data:', error);
-        setError('Error al cargar los datos de pagos');
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchData();
+
+    return () => {
+      if (chart) {
+        chart.destroy();
+      }
+    };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '290px' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="alert alert-danger" role="alert">
-        {error}
-      </div>
-    );
-  }
-
-  return <div id="donut-chart-dash"></div>;
+  return <div ref={chartRef} style={{ width: '100%', height: '100%' }}></div>;
 };
 
 export default DonutChart;

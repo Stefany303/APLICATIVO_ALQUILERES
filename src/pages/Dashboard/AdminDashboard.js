@@ -39,64 +39,114 @@ const AdminDashboard = () => {
     espaciosDisponibles: 0,
     ingresosMensuales: 0,
     pagosPendientes: 0,
-    contratosActivos: 0
+    contratosActivos: 0,
+    totalEspacios: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null);
 
-  const [year, setyear] = useState([
-    { value: 1, label: "2024" },
-    { value: 2, label: "2023" },
-    { value: 3, label: "2022" },
-    { value: 4, label: "2021" },
-  ]);
+  // Generar opciones de años (últimos 10 años)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 10 }, (_, i) => ({
+    value: currentYear - i,
+    label: (currentYear - i).toString()
+  }));
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
+        setDebugInfo(null);
         
         // Obtener total de clientes
-        const personas = await personaService.obtenerPersonas();
+        console.log('Obteniendo personas...');
+        const personas = await personaService.obtenerInquilinos();
+        console.log('Respuesta de personas:', personas);
         const totalClientes = personas.length;
 
         // Obtener datos de inmuebles y espacios
+        console.log('Obteniendo inmuebles...');
         const inmuebles = await inmuebleService.obtenerInmuebles();
+        console.log('Respuesta de inmuebles:', inmuebles);
+        
         let espaciosOcupados = 0;
         let espaciosDisponibles = 0;
         let ingresosMensuales = 0;
         let contratosActivos = 0;
-
-        // Iterar sobre cada inmueble para obtener sus espacios
-        for (const inmueble of inmuebles) {
-          const pisos = inmueble.pisos || [];
-          for (const piso of pisos) {
+        let totalEspacios = 0;
+          
+        // Procesar todos los inmuebles en paralelo
+        const inmueblesPromises = inmuebles.map(async (inmueble) => {
+          console.log('Procesando inmueble:', inmueble.nombre);
+          
+          // Obtener los pisos del inmueble
+          const pisos = await inmuebleService.obtenerPisosPorInmueble(inmueble.id);
+          console.log(`Pisos encontrados para ${inmueble.nombre}:`, pisos.length);
+          
+          // Procesar todos los pisos en paralelo
+          const pisosPromises = pisos.map(async (piso) => {
+            console.log(`Procesando piso ${piso.id} del inmueble ${inmueble.nombre}`);
+            
+            // Obtener espacios de este piso
             const espacios = await espacioService.obtenerEspaciosPorPiso(inmueble.id, piso.id);
-            espacios.forEach(espacio => {
-              if (espacio.estado === 'OCUPADO') {
-                espaciosOcupados++;
-                if (espacio.contrato) {
-                  contratosActivos++;
-                  ingresosMensuales += espacio.contrato.montoMensual || 0;
-                }
-              } else if (espacio.estado === 'DISPONIBLE') {
-                espaciosDisponibles++;
+            console.log(`Espacios encontrados en piso ${piso.id}:`, espacios.length);
+            
+            return espacios;
+          });
+          
+          // Esperar a que se procesen todos los pisos
+          const espaciosPorPiso = await Promise.all(pisosPromises);
+          
+          // Aplanar el array de espacios
+          const espacios = espaciosPorPiso.flat();
+          
+          // Procesar los espacios
+          espacios.forEach(espacio => {
+            totalEspacios++;
+            if (espacio.estado === 1) {
+              espaciosOcupados++;
+              if (espacio.contrato) {
+                contratosActivos++;
+                ingresosMensuales += espacio.contrato.montoMensual || 0;
               }
-            });
-          }
-        }
+            } else if (espacio.estado === 0) {
+              espaciosDisponibles++;
+            }
+          });
+        });
+        
+        // Esperar a que se procesen todos los inmuebles
+        await Promise.all(inmueblesPromises);
 
-        setDashboardData({
+        const newDashboardData = {
           totalClientes,
           espaciosOcupados,
           espaciosDisponibles,
           ingresosMensuales,
-          pagosPendientes: 0, // TODO: Implementar cuando tengamos el servicio de pagos
-          contratosActivos
+          pagosPendientes: 0,
+          contratosActivos,
+          totalEspacios
+        };
+
+        console.log('Datos finales del dashboard:', newDashboardData);
+        setDashboardData(newDashboardData);
+        
+        // Guardar información de debug
+        setDebugInfo({
+          personas,
+          inmuebles,
+          dashboardData: newDashboardData
         });
+
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setError('Error al cargar los datos del dashboard');
+        console.error('Error detallado:', error);
+        console.error('Error response:', error.response);
+        console.error('Error message:', error.message);
+        setError({
+          message: 'Error al cargar los datos del dashboard',
+          details: error.response?.data || error.message
+        });
       } finally {
         setLoading(false);
       }
@@ -124,8 +174,22 @@ const AdminDashboard = () => {
       <div className="page-wrapper">
         <div className="content">
           <div className="alert alert-danger" role="alert">
-            {error}
+            <h4 className="alert-heading">Error al cargar el dashboard</h4>
+            <p>{error.message}</p>
+            {error.details && (
+              <pre className="mt-3">
+                {JSON.stringify(error.details, null, 2)}
+              </pre>
+            )}
           </div>
+          {debugInfo && (
+            <div className="mt-4">
+              <h5>Información de Debug:</h5>
+              <pre>
+                {JSON.stringify(debugInfo, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -275,20 +339,20 @@ const AdminDashboard = () => {
                       <ul className="nav chat-user-total">
                         <li>
                           <i className="fa fa-circle current-users" aria-hidden="true" />
-                          Ocupados {Math.round((dashboardData.espaciosOcupados / (dashboardData.espaciosOcupados + dashboardData.espaciosDisponibles)) * 100)}%
+                          Ocupados {Math.round((dashboardData.espaciosOcupados / dashboardData.totalEspacios) * 100)}%
                         </li>
                         <li>
                           <i className="fa fa-circle old-users" aria-hidden="true" />{" "}
-                          Disponibles {Math.round((dashboardData.espaciosDisponibles / (dashboardData.espaciosOcupados + dashboardData.espaciosDisponibles)) * 100)}%
+                          Disponibles {Math.round((dashboardData.espaciosDisponibles / dashboardData.totalEspacios) * 100)}%
                         </li>
                       </ul>
                     </div>
                     <div className="form-group mb-0">
                       <Select
                         className="custom-react-select"
-                        defaultValue={selectedOption}
+                        defaultValue={yearOptions[0]}
                         onChange={setSelectedOption}
-                        options={year}
+                        options={yearOptions}
                         id="search-commodity"
                         components={{
                           IndicatorSeparator: () => null
@@ -316,8 +380,14 @@ const AdminDashboard = () => {
                       />
                     </div>
                   </div>
-                  <div id="patient-chart" />
-                  <InquilinosChart />
+                  <div id="patient-chart">
+                    <InquilinosChart 
+                      espaciosOcupados={dashboardData.espaciosOcupados}
+                      espaciosDisponibles={dashboardData.espaciosDisponibles}
+                      totalEspacios={dashboardData.totalEspacios}
+                      selectedYear={selectedOption?.value || currentYear}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

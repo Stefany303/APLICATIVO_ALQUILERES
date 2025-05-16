@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import '../assets/styles/Style.css';
 import { baricon, baricon1, logo, noteicon, searchnormal, user06 } from './imagepath';
@@ -7,16 +7,37 @@ import { useAuth } from "../utils/AuthContext";
 
 const Header = () => {
   const { user, logout } = useAuth();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1070);
   
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 1070);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handlesidebar = () => {
-    document.body.classList.toggle("mini-sidebar");
+    const body = document.body;
+    if (body) {
+      body.classList.toggle("mini-sidebar");
+    }
   };
 
   const handlesidebarmobilemenu = () => {
-    document.body.classList.toggle("slide-nav");
-    document.body.querySelector("html").classList.toggle("menu-opened");
-    
+    const body = document.body;
+    const html = document.documentElement;
     const sidebarOverlay = document.querySelector(".sidebar-overlay");
+    
+    if (body) {
+      body.classList.toggle("slide-nav");
+    }
+    
+    if (html) {
+      html.classList.toggle("menu-opened");
+    }
+    
     if (sidebarOverlay) {
       sidebarOverlay.classList.toggle("opened");
     }
@@ -39,12 +60,16 @@ const Header = () => {
           <span>Alquileres</span>
         </Link>
       </div>
-      <Link id="toggle_btn" to="#" onClick={handlesidebar}>
-        <img src={baricon} alt="" />
-      </Link>
-      <Link id="mobile_btn" className="mobile_btn float-start" to="#" onClick={handlesidebarmobilemenu}>
-        <img src={baricon1} alt="" />
-      </Link>
+      {!isMobile && (
+        <Link id="toggle_btn" to="#" onClick={handlesidebar}>
+          <img src={baricon} alt="" />
+        </Link>
+      )}
+      {isMobile && (
+        <Link id="mobile_btn" className="mobile_btn float-start" to="#" onClick={handlesidebarmobilemenu}>
+          <img src={baricon1} alt="" />
+        </Link>
+      )}
       <div className="top-nav-search mob-view">
         <form>
           <input

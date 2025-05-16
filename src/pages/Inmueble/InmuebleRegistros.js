@@ -6,7 +6,7 @@ import Header from '../../components/Header';
 import Sidebar from "../../components/Sidebar";
 import { plusicon, refreshicon, searchnormal, pdficon, pdficon3, pdficon4 } from '../../components/imagepath';
 import contratoService from '../../services/contratoService';
-
+import inmuebleService from '../../services/inmuebleService';
 const InmuebleRegistros = () => {
   const [inmuebles, setInmuebles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -25,10 +25,25 @@ const InmuebleRegistros = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await contratoService.obtenerContratosPorInquilino();
-        setInmuebles(response);
+        const response = await inmuebleService.obtenerInmuebles();
+        console.log('Respuesta del backend:', response);
+        
+        // Verificar el tipo de respuesta
+        console.log('Tipo de respuesta:', typeof response);
+        console.log('¿Es array?', Array.isArray(response));
+        
+        // Asegurarnos de que los datos sean un array
+        const inmueblesArray = Array.isArray(response) ? response : [response];
+        console.log('Datos procesados para la tabla:', inmueblesArray);
+        
+        setInmuebles(inmueblesArray);
       } catch (error) {
         console.error("Error al obtener los datos:", error);
+        console.error("Detalles del error:", {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
       } finally {
         setLoading(false);
       }
@@ -67,30 +82,34 @@ const InmuebleRegistros = () => {
       sorter: (a, b) => a.id - b.id,
     },
     {
-      title: "Inquilino",
-      dataIndex: "inquilino",
-      key: "inquilino",
-      render: (text, record) => `${record.inquilino_nombre} ${record.inquilino_apellido}`,
-      sorter: (a, b) => a.inquilino_nombre.localeCompare(b.inquilino_nombre),
-    },
-    {
       title: "Propietario",
-      dataIndex: "propietario",
+      dataIndex: "propietario_nombre",
       key: "propietario",
-      render: (text, record) => `${record.propietario_nombre} ${record.propietario_apellido}`,
       sorter: (a, b) => a.propietario_nombre.localeCompare(b.propietario_nombre),
     },
     {
       title: "Inmueble",
-      dataIndex: "inmueble_nombre",
-      key: "inmueble_nombre",
-      sorter: (a, b) => a.inmueble_nombre.localeCompare(b.inmueble_nombre),
+      dataIndex: "nombre",
+      key: "nombre",
+      sorter: (a, b) => a.nombre.localeCompare(b.nombre),
     },
     {
       title: "Dirección",
-      dataIndex: "inmueble_direccion",
-      key: "inmueble_direccion",
-      sorter: (a, b) => a.inmueble_direccion.localeCompare(b.inmueble_direccion),
+      dataIndex: "direccion",
+      key: "direccion",
+      sorter: (a, b) => a.direccion.localeCompare(b.direccion),
+    },
+    {
+      title: "Tipo",
+      dataIndex: "tipo_inmueble",
+      key: "tipo_inmueble",
+      sorter: (a, b) => a.tipo_inmueble.localeCompare(b.tipo_inmueble),
+    },
+    {
+      title: "Cantidad de Pisos",
+      dataIndex: "cantidad_pisos",
+      key: "cantidad_pisos",
+      sorter: (a, b) => a.cantidad_pisos - b.cantidad_pisos,
     },
     {
       title: "Acciones",
@@ -227,7 +246,7 @@ const InmuebleRegistros = () => {
                   <div className="table-responsive doctor-list">
                     <Table
                       columns={columns}
-                      dataSource={inmuebles}
+                      dataSource={Array.isArray(inmuebles) ? inmuebles : []}
                       rowKey="id"
                       loading={loading}
                       pagination={{

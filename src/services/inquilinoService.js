@@ -61,9 +61,9 @@ const inquilinoService = {
         throw new Error('El email no tiene un formato válido');
       }
       // Validar que el teléfono tenga un formato válido (opcional)
-      const telefonoRegex = /^\d{10}$/; // Ejemplo: 10 dígitos
+      const telefonoRegex = /^\d{9}$/; // Ejemplo: 10 dígitos
       if (inquilinoData.telefono && !telefonoRegex.test(inquilinoData.telefono)) {
-        throw new Error('El teléfono no tiene un formato válido (debe tener 10 dígitos)');
+        throw new Error('El teléfono no tiene un formato válido (debe tener 9 dígitos)');
       }
       // Validar que el documento tenga un formato válido (opcional)
       const documentoRegex = /^\d{8,10}$/; // Ejemplo: 8 a 10 dígitos

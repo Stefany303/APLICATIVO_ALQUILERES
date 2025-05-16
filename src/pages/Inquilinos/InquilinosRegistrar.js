@@ -3,22 +3,13 @@ import Header from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
 import { Link, useNavigate } from 'react-router-dom';
 import { FiChevronRight } from "react-icons/fi";
-import { message, notification, Alert, Form } from 'antd';
+import Swal from 'sweetalert2';
 import inquilinoService from '../../services/inquilinoService';
 import inmuebleService from '../../services/inmuebleService';
 import contratoService from '../../services/contratoService';
 import espacioService from '../../services/espacioService';
 import pagoService from '../../services/pagoService';
 import { useAuth } from "../../utils/AuthContext";
-// Importación correcta de estilos de Ant Design
-import 'antd/dist/reset.css'; // Para versiones >= 5.x
-
-// Configurar el mensaje global
-message.config({
-  top: 100,
-  duration: 3,
-  maxCount: 3,
-});
 
 const InquilinosRegistrar = () => {
   const { user, estaAutenticado } = useAuth();
@@ -258,7 +249,13 @@ const InquilinosRegistrar = () => {
     });
 
     if (hasErrors) {
-      message.error('Por favor corrija los errores antes de continuar');
+      Swal.fire({
+        title: 'Error de validación',
+        text: 'Por favor corrija los errores antes de continuar',
+        icon: 'warning',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#3085d6'
+      });
       return;
     }
 
@@ -327,83 +324,51 @@ const InquilinosRegistrar = () => {
     setError(null);
 
     try {
-      // Validar campos del segundo paso
-      const camposRequeridos = ['inmuebleId', 'pisoId', 'espacioId', 'fechaInicio', 'fechaFin', 'montoMensual'];
-      const camposFaltantes = camposRequeridos.filter(campo => !formData[campo]);
+      // Crear el inquilino
+      const response = await inquilinoService.crearInquilino(formData);
       
-      if (camposFaltantes.length > 0) {
-        const mensajeError = `Por favor complete los siguientes campos: ${camposFaltantes.join(', ')}`;
-        setError(mensajeError);
-        message.error(mensajeError);
-        return;
+      if (response) {
+        await Swal.fire({
+          title: '¡Registro Exitoso!',
+          text: 'El inquilino ha sido registrado correctamente',
+          icon: 'success',
+          confirmButtonText: 'Aceptar',
+          confirmButtonColor: '#3085d6',
+          timer: 2000,
+          timerProgressBar: true,
+          showConfirmButton: false
+        });
+        navigate('/inquilinos-registros');
       }
-
-      // Validar fechas
-      const fechaInicio = new Date(formData.fechaInicio);
-      const fechaFin = new Date(formData.fechaFin);
-      const hoy = new Date();
-
-      if (fechaInicio < hoy) {
-        const mensajeError = 'La fecha de inicio no puede ser anterior a hoy';
-        setError(mensajeError);
-        message.error(mensajeError);
-        return;
-      }
-
-      if (fechaFin <= fechaInicio) {
-        const mensajeError = 'La fecha de fin debe ser posterior a la fecha de inicio';
-        setError(mensajeError);
-        message.error(mensajeError);
-        return;
-      }
-
-      // Validar monto mensual
-      const montoMensual = parseFloat(formData.montoMensual);
-      if (isNaN(montoMensual) || montoMensual <= 0) {
-        const mensajeError = 'El monto mensual debe ser mayor a 0';
-        setError(mensajeError);
-        message.error(mensajeError);
-        return;
-      }
-
-      // Preparar los datos para enviar
-      const inquilinoData = {
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-        email: formData.email,
-        telefono: formData.telefono,
-        direccion: formData.direccion,
-        documento: formData.documento,
-        tipoDocumento: formData.tipoDocumento,
-        espacioId: formData.espacioId,
-        inmuebleId: formData.inmuebleId,
-        fechaInicio: formData.fechaInicio,
-        fechaFin: formData.fechaFin,
-        montoMensual: formData.montoMensual,
-        deposito: formData.deposito,
-        observaciones: formData.observaciones
-      };
-
-      // Crear el inquilino y el contrato
-      const resultado = await inquilinoService.crearInquilino(inquilinoData);
-      
-      // Generar pagos mensuales si se ha creado el contrato
-      if (resultado && resultado.contrato && resultado.contrato.id) {
-        await generarPagosMensuales(
-          resultado.contrato.id,
-          montoMensual,
-          formData.fechaInicio,
-          formData.fechaFin
-        );
-      }
-
-      message.success('Inquilino registrado exitosamente');
-      navigate('/inquilinos-registros');
     } catch (error) {
-      console.error('Error al registrar inquilino:', error);
-      const mensajeError = error.response?.data?.mensaje || error.message || 'Error al registrar el inquilino';
-      setError(mensajeError);
-      message.error(mensajeError);
+      console.error('Error completo:', error);
+      console.error('Error response data:', error.response?.data);
+      
+      // Verificar si el error es por email duplicado
+      if (error.response?.data?.error?.includes('Duplicate entry') && error.response?.data?.error?.includes('email')) {
+        const emailDuplicado = error.response.data.error.match(/'([^']+)'/)[1];
+        Swal.fire({
+          title: 'Error',
+          text: `El email ${emailDuplicado} ya está registrado en el sistema`,
+          icon: 'error',
+          confirmButtonText: 'Aceptar',
+          confirmButtonColor: '#d33'
+        });
+      } else {
+        // Mostrar el error completo del servidor
+        const errorData = error.response?.data || {};
+        const errorMessage = errorData.error || errorData.message || error.message || 'Error al crear el inquilino. Por favor, intente nuevamente.';
+        
+        Swal.fire({
+          title: 'Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'Aceptar',
+          confirmButtonColor: '#d33'
+        });
+      }
+      
+      setError('Error al crear el inquilino');
     } finally {
       setLoading(false);
     }
@@ -455,13 +420,9 @@ const InquilinosRegistrar = () => {
                 </div>
                   <div className="card-body">
                   {error && (
-                    <Alert
-                      message="Error de validación"
-                      description={error}
-                      type="error"
-                      showIcon
-                      style={{ marginBottom: '20px' }}
-                    />
+                    <div className="alert alert-danger" role="alert">
+                      {error}
+                    </div>
                   )}
 
                   <form onSubmit={handleSubmit}>

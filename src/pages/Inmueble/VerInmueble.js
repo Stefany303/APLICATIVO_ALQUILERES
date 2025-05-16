@@ -98,13 +98,13 @@ const VerInmueble = () => {
                     <div className="col-12 col-md-6 col-xl-6">
                       <div className="form-group local-forms">
                         <label>Propietario</label>
-                        <p>{inmueble.propietario?.nombre} {inmueble.propietario?.apellido}</p>
+                        <p>{inmueble.propietario_nombre}</p>
                       </div>
                     </div>
                     <div className="col-12 col-md-6 col-xl-6">
                       <div className="form-group local-forms">
                         <label>Tipo de Inmueble</label>
-                        <p>{inmueble.tipoInmueble?.nombre}</p>
+                        <p>{inmueble.tipo_inmueble}</p>
                       </div>
                     </div>
                     <div className="col-12">

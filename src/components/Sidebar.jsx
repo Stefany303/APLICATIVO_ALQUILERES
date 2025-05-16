@@ -6,12 +6,24 @@ import Scrollbars from "react-scrollbars-custom";
 const Sidebar = (props) => {
   // 'sidebar' guarda el label del submenú activo.
   const [sidebar, setSidebar] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1070);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 1070);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Función para alternar la visualización de un submenú y actualizar el estado
   const handleClick = (e, item, item1, label) => {
     const div = document.querySelector(`#${item}`);
     const ulDiv = document.querySelector(`.${item1}`);
     
+    if (!div || !ulDiv) return;
+
     if (sidebar === label) {
       // Si ya estaba activo, se cierra
       ulDiv.style.display = 'none';
@@ -82,6 +94,20 @@ const Sidebar = (props) => {
     document.body.classList.add("expand-menu");
   };
 
+  const toggleSidebar = () => {
+    if (isMobile) {
+      const body = document.body;
+      if (body) {
+        body.classList.toggle('slide-nav');
+      }
+    } else {
+      const body = document.body;
+      if (body) {
+        body.classList.toggle('mini-sidebar');
+      }
+    }
+  };
+
   return (
     <>
       <div className="sidebar" id="sidebar">
@@ -139,13 +165,13 @@ const Sidebar = (props) => {
                   </Link>
                   <ul style={{ display: sidebar === 'Inmuebles' ? 'block' : 'none' }} className="menu-items1">
                     <li>
-                      <Link className={props?.activeClassName === 'inmueble-anadir' ? 'active' : ''} to="/inmueble-anadir">Añadir</Link>
+                      <Link className={props?.activeClassName === 'inmueble-anadir' ? 'active' : ''} to="/inmueble-anadir">Añadir Inmueble</Link>
                     </li>
                     <li>
-                      <Link className={props?.activeClassName === 'persona-registrar' ? 'active' : ''} to="/persona-registrar">Registrar</Link>
+                      <Link className={props?.activeClassName === 'espacios-registrar' ? 'active' : ''} to="/espacios-registrar">Registrar Espacios</Link>
                     </li>
                     <li>
-                      <Link className={props?.activeClassName === 'inmueble-registros' ? 'active' : ''} to="/inmueble-registros">Registros</Link>
+                      <Link className={props?.activeClassName === 'inmueble-registros' ? 'active' : ''} to="/inmueble-registros">Registros Inmuebles</Link>
                     </li>
                   </ul>
                 </li>
@@ -159,13 +185,11 @@ const Sidebar = (props) => {
                   </Link>
                   <ul style={{ display: sidebar === 'Espacios' ? 'block' : 'none' }} className="menu-items2">
                   <li>
-                      <Link className={props?.activeClassName === 'espacios-anadir' ? 'active' : ''} to="/espacios-anadir">Añadir</Link>
+                      <Link className={props?.activeClassName === 'espacios-anadir' ? 'active' : ''} to="/espacios-anadir">Registrar Detalle </Link>
                     </li>
+                   
                     <li>
-                      <Link className={props?.activeClassName === 'espacios-registrar' ? 'active' : ''} to="/espacios-registrar">Registrar</Link>
-                    </li>
-                    <li>
-                      <Link className={props?.activeClassName === 'espacios-registros' ? 'active' : ''} to="/espacios-registros">Registros </Link>
+                      <Link className={props?.activeClassName === 'espacios-registros' ? 'active' : ''} to="/espacios-registros">Registros</Link>
                     </li>
                     
                   </ul>
@@ -272,6 +296,9 @@ const Sidebar = (props) => {
                     <li>
                       <Link className={props?.activeClassName === 'conf-cambio-contrasena' ? 'active' : ''} to="/conf-cambio-contrasena">Cambio de contraseña</Link>
                     </li>
+                    <li>
+                      <Link className={props?.activeClassName === 'persona-registrar' ? 'active' : ''} to="/persona-registrar">Registrar Usuario</Link>
+                    </li>
                     
                   </ul>
                 </li>
@@ -288,6 +315,7 @@ const Sidebar = (props) => {
           </div>
         </Scrollbars>
       </div>
+      <div className="sidebar-overlay" onClick={toggleSidebar}></div>
     </>
   )
 }

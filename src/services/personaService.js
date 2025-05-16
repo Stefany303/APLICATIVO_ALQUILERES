@@ -12,6 +12,17 @@ const personaService = {
     }
   },
 
+  obtenerInquilinos: async () => {
+    try {
+      const response = await api.get('/personas/inquilinosObtener');
+      console.log('Respuesta de personas:', response);
+      return response.data;
+
+    } catch (error) {
+      console.error('Error fetching personas:', error);
+      throw error;
+    }
+  },
   // Obtener una persona por ID (público)
   obtenerPersonaPorId: async (id) => {
     try {

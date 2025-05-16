@@ -1,155 +1,158 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import ApexCharts from 'apexcharts';
-import espacioService from '../../services/espacioService';
-import inmuebleService from '../../services/inmuebleService';
 
-const InquilinosChart = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const InquilinosChart = ({ espaciosOcupados, espaciosDisponibles, totalEspacios, selectedYear }) => {
+  const chartRef = useRef(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const inmuebles = await inmuebleService.obtenerInmuebles();
-        const ocupacionMensual = Array(12).fill(0);
-        const disponibilidadMensual = Array(12).fill(0);
+    let chart = null;
 
-        for (const inmueble of inmuebles) {
-          const pisos = inmueble.pisos || [];
-          for (const piso of pisos) {
-            const espacios = await espacioService.obtenerEspaciosPorPiso(inmueble.id, piso.id);
-            espacios.forEach(espacio => {
-              const fechaContrato = espacio.contrato ? new Date(espacio.contrato.fechaInicio) : null;
-              if (fechaContrato) {
-                const mes = fechaContrato.getMonth();
-                if (espacio.estado === 'OCUPADO') {
-                  ocupacionMensual[mes]++;
-                } else if (espacio.estado === 'DISPONIBLE') {
-                  disponibilidadMensual[mes]++;
-                }
-              }
-            });
+    const renderChart = () => {
+      const meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ];
+
+      // Generar datos para cada mes (por ahora usando los mismos valores)
+      const ocupadosData = meses.map(() => espaciosOcupados);
+      const disponiblesData = meses.map(() => espaciosDisponibles);
+
+      const sColStackedOptions = {
+        chart: {
+          height: 230,
+          type: 'bar',
+          stacked: true,
+          toolbar: {
+            show: false,
+          },
+        },
+        responsive: [
+          {
+            breakpoint: 480,
+            options: {
+              legend: {
+                position: 'bottom',
+                offsetX: -10,
+                offsetY: 0,
+              },
+            },
+          },
+        ],
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: '15%',
+            borderRadius: 5,
+          },
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function (val) {
+            return val;
+          },
+          style: {
+            fontSize: '12px',
+            colors: ['#fff']
+          }
+        },
+        stroke: {
+          width: 1,
+          colors: ['#fff']
+        },
+        series: [
+          {
+            name: 'Ocupados',
+            color: '#2E37A4',
+            data: ocupadosData,
+          },
+          {
+            name: 'Disponibles',
+            color: '#00D3C7',
+            data: disponiblesData,
+          },
+        ],
+        xaxis: {
+          categories: meses,
+          labels: {
+            style: {
+              colors: '#333',
+              fontSize: '12px'
+            },
+            rotate: -45,
+            rotateAlways: false,
+            hideOverlappingLabels: true,
+          },
+          title: {
+            text: 'Meses',
+            style: {
+              color: '#333',
+              fontSize: '12px',
+              fontWeight: 500,
+            },
+          },
+        },
+        yaxis: {
+          min: 0,
+          max: totalEspacios + 10,
+          tickAmount: Math.ceil((totalEspacios + 10) / 5),
+          labels: {
+            style: {
+              colors: '#333',
+            },
+          },
+          title: {
+            text: 'Cantidad de Espacios',
+            style: {
+              color: '#333',
+              fontSize: '12px',
+              fontWeight: 500,
+            },
+          },
+        },
+        legend: {
+          position: 'bottom',
+          labels: {
+            colors: '#333',
+            useSeriesColors: false,
+          },
+        },
+        grid: {
+          borderColor: '#f1f1f1',
+          padding: {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: function (value) {
+              return value + " espacios";
+            }
           }
         }
+      };
 
-        if (document.querySelector('#patient-chart')) {
-          const sColStackedOptions = {
-            chart: {
-              height: 230,
-              type: 'bar',
-              stacked: true,
-              toolbar: {
-                show: false,
-              },
-            },
-            responsive: [
-              {
-                breakpoint: 480,
-                options: {
-                  legend: {
-                    position: 'bottom',
-                    offsetX: -10,
-                    offsetY: 0,
-                  },
-                },
-              },
-            ],
-            plotOptions: {
-              bar: {
-                horizontal: false,
-                columnWidth: '15%',
-              },
-            },
-            dataLabels: {
-              enabled: false,
-            },
-            series: [
-              {
-                name: 'Ocupados',
-                color: '#2E37A4',
-                data: ocupacionMensual,
-              },
-              {
-                name: 'Disponibles',
-                color: '#00D3C7',
-                data: disponibilidadMensual,
-              },
-            ],
-            xaxis: {
-              categories: [
-                'Ene',
-                'Feb',
-                'Mar',
-                'Abr',
-                'May',
-                'Jun',
-                'Jul',
-                'Ago',
-                'Sep',
-                'Oct',
-                'Nov',
-                'Dic',
-              ],
-              labels: {
-                style: {
-                  colors: '#333',
-                },
-              },
-            },
-            yaxis: {
-              labels: {
-                style: {
-                  colors: '#333',
-                },
-              },
-            },
-            legend: {
-              position: 'bottom',
-              labels: {
-                colors: '#333',
-                useSeriesColors: false,
-              },
-            },
-          };
-
-          const chart = new ApexCharts(
-            document.querySelector('#patient-chart'),
-            sColStackedOptions
-          );
-
-          chart.render();
+      if (chartRef.current) {
+        if (chart) {
+          chart.destroy();
         }
-      } catch (error) {
-        console.error('Error fetching occupancy data:', error);
-        setError('Error al cargar los datos de ocupación');
-      } finally {
-        setLoading(false);
+        chart = new ApexCharts(chartRef.current, sColStackedOptions);
+        chart.render();
       }
     };
 
-    fetchData();
-  }, []);
+    renderChart();
 
-  if (loading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '230px' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </div>
-    );
-  }
+    return () => {
+      if (chart) {
+        chart.destroy();
+      }
+    };
+  }, [espaciosOcupados, espaciosDisponibles, totalEspacios, selectedYear]);
 
-  if (error) {
-    return (
-      <div className="alert alert-danger" role="alert">
-        {error}
-      </div>
-    );
-  }
-
-  return <div id="patient-chart"></div>;
+  return <div ref={chartRef}></div>;
 };
 
 export default InquilinosChart;

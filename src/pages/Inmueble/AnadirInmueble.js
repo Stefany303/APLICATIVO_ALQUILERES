@@ -1,55 +1,48 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
-import { DatePicker } from "antd";
+import { notification } from "antd";
 import Select from "react-select";
-import { Link, useNavigate } from 'react-router-dom';
-import { FaChevronRight } from 'react-icons/fa';
-import '../../assets/styles/Style.css';
+import { Link, useNavigate } from "react-router-dom";
+import { FaChevronRight } from "react-icons/fa";
+import "../../assets/styles/Style.css";
 import { useAuth } from "../../utils/AuthContext";
-import inmuebleService from "../../services/inmuebleService"; // Importa el servicio de inmuebles
-import personaService from "../../services/personaService"; // Importa el servicio de personas
+import inmuebleService from "../../services/inmuebleService";
+import personaService from "../../services/personaService";
 import tipoInmuebleService from "../../services/tipoInmuebleService";
+import Swal from "sweetalert2";
 
 const AnadirInmueble = () => {
-  const { user, estaAutenticado } = useAuth(); // Obtén el usuario y el estado de autenticación
+  const { user, estaAutenticado } = useAuth();
   const navigate = useNavigate();
 
-  const [selectedOption, setSelectedOption] = useState(null);
-  const [options, setOptions] = useState([
-    { value: 1, label: "Inquilino" },
-    { value: 2, label: "Propietario" },
-    { value: 3, label: "Administrador" },
-  ]);
   const [formData, setFormData] = useState({
-    propietario_id: '',
-    tipoInmueble_id: '',
-    nombre: '',
-    descripcion: '',
-    direccion: '',
-    ubigeo: ''
+    propietario_id: "",
+    tipoInmueble_id: "",
+    nombre: "",
+    descripcion: "",
+    direccion: "",
+    ubigeo: "",
+    cantidad_pisos: "",
   });
 
   const [propietarios, setPropietarios] = useState([]);
   const [tiposInmueble, setTiposInmueble] = useState([]);
-  const [error, setError] = useState("");
+  const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
-    // Verifica si el usuario está autenticado
     if (!estaAutenticado) {
-      navigate("/login"); // Redirige al login si no está autenticado
+      navigate("/login");
     }
 
-    // Obtener propietarios y tipos de inmueble
     const fetchData = async () => {
       try {
-        // Obtener todas las personas
         const personas = await personaService.obtenerPersonas();
-        // Filtrar las personas con rol de "propietario"
-        const propietariosFiltrados = personas.filter(persona => persona.rol === "propietario");
+        const propietariosFiltrados = personas.filter(
+          (persona) => persona.rol === "propietario"
+        );
         setPropietarios(propietariosFiltrados);
 
-        // Obtener tipos de inmueble desde el servicio
         const tiposInmuebleData = await tipoInmuebleService.obtenertipoInmueble();
         setTiposInmueble(tiposInmuebleData);
       } catch (error) {
@@ -60,38 +53,105 @@ const AnadirInmueble = () => {
     fetchData();
   }, [estaAutenticado, navigate]);
 
+  const validateField = (name, value) => {
+    switch (name) {
+      case "propietario_id":
+        return value ? "" : "El propietario es requerido";
+      case "tipoInmueble_id":
+        return value ? "" : "El tipo de inmueble es requerido";
+      case "nombre":
+        return value ? "" : "El nombre es requerido";
+      case "direccion":
+        return value ? "" : "La dirección es requerida";
+      case "descripcion":
+        return value ? "" : "La descripción es requerida";
+      case "ubigeo":
+        return value ? "" : "El ubigeo es requerido";
+      case "cantidad_pisos":
+        return value && !isNaN(value) && Number(value) > 0
+          ? ""
+          : "La cantidad de pisos debe ser un número mayor que 0";
+      default:
+        return "";
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    Object.keys(formData).forEach((key) => {
+      const error = validateField(key, formData[key]);
+      if (error) errors[key] = error;
+    });
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Validar solo ese campo en particular al cambiar
+    const error = validateField(name, value);
+    setFormErrors((prev) => ({ ...prev, [name]: error }));
   };
 
   const handleSelectChange = (selected, name) => {
-    setFormData({ ...formData, [name]: selected.value });
+    setFormData((prev) => ({ ...prev, [name]: selected ? selected.value : "" }));
+
+    const error = validateField(name, selected ? selected.value : "");
+    setFormErrors((prev) => ({ ...prev, [name]: error }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+
+    if (!validateForm()) {
+      Swal.fire({
+        title: "Campos incompletos",
+        text: "Por favor corrija los errores antes de continuar",
+        icon: "warning",
+        confirmButtonText: "Aceptar",
+      });
+      return;
+    }
 
     try {
-      // Enviar los datos al backend usando el servicio
       const response = await inmuebleService.crearInmueble(formData);
 
       if (response) {
-        alert('Inmueble añadido correctamente');
-        setFormData({
-          propietario_id: '',
-          tipoInmueble_id: '',
-          nombre: '',
-          descripcion: '',
-          direccion: '',
-          ubigeo: ''
+        Swal.fire({
+          title: "¡Éxito!",
+          text: "El inmueble ha sido registrado correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar",
+        }).then(() => {
+          navigate("/inmueble-registros");
         });
-        navigate("/inmuebles"); // Redirige a la lista de inmuebles
       }
     } catch (error) {
       console.error("Error al añadir el inmueble:", error);
-      setError("Error al añadir el inmueble. Inténtalo de nuevo.");
+      Swal.fire({
+        title: "Error",
+        text: "Error al añadir el inmueble. Inténtalo de nuevo.",
+        icon: "error",
+        confirmButtonText: "Aceptar",
+      });
     }
+  };
+
+  const handleCancel = () => {
+    Swal.fire({
+      title: "¿Estás seguro?",
+      text: "Los datos no guardados se perderán",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar",
+      cancelButtonText: "No, continuar",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        navigate("/inmueble-registros");
+      }
+    });
   };
 
   return (
@@ -110,7 +170,7 @@ const AnadirInmueble = () => {
                   </li>
                   <li className="breadcrumb-item">
                     <i className="feather-chevron-right">
-                      <FaChevronRight icon="chevron-right" />
+                      <FaChevronRight />
                     </i>
                   </li>
                   <li className="breadcrumb-item active">Añadir</li>
@@ -119,123 +179,175 @@ const AnadirInmueble = () => {
             </div>
           </div>
           {/* /Page Header */}
+
           <div className="row">
             <div className="col-sm-12">
               <div className="card">
                 <div className="card-body">
-                  <form onSubmit={handleSubmit}>
+                  <form onSubmit={handleSubmit} noValidate>
                     <div className="row">
                       <div className="col-12">
                         <div className="form-heading">
                           <h4>Detalles del Inmueble</h4>
                         </div>
                       </div>
+
                       <div className="col-12 col-md-6 col-xl-6">
                         <div className="form-group local-forms">
                           <label>
                             Nombre del Inmueble <span className="login-danger">*</span>
                           </label>
                           <input
-                            className="form-control"
+                            className={`form-control ${formErrors.nombre ? "is-invalid" : ""}`}
                             type="text"
                             name="nombre"
                             value={formData.nombre}
                             onChange={handleChange}
                             required
                           />
+                          {formErrors.nombre && (
+                            <div className="invalid-feedback">{formErrors.nombre}</div>
+                          )}
                         </div>
                       </div>
+
                       <div className="col-12 col-md-6 col-xl-6">
                         <div className="form-group local-forms">
                           <label>
                             Descripción <span className="login-danger">*</span>
                           </label>
                           <textarea
-                            className="form-control"
+                            className={`form-control ${formErrors.descripcion ? "is-invalid" : ""}`}
                             rows={2}
-                            cols={30}
                             name="descripcion"
                             value={formData.descripcion}
                             onChange={handleChange}
                             required
                           />
+                          {formErrors.descripcion && (
+                            <div className="invalid-feedback">{formErrors.descripcion}</div>
+                          )}
                         </div>
                       </div>
+
                       <div className="col-12 col-md-6 col-xl-6">
                         <div className="form-group local-forms">
                           <label>
                             Dirección <span className="login-danger">*</span>
                           </label>
                           <input
-                            className="form-control"
+                            className={`form-control ${formErrors.direccion ? "is-invalid" : ""}`}
                             type="text"
                             name="direccion"
                             value={formData.direccion}
                             onChange={handleChange}
                             required
                           />
+                          {formErrors.direccion && (
+                            <div className="invalid-feedback">{formErrors.direccion}</div>
+                          )}
                         </div>
                       </div>
+
                       <div className="col-12 col-md-6 col-xl-6">
                         <div className="form-group local-forms">
                           <label>
                             Ubigeo <span className="login-danger">*</span>
                           </label>
                           <input
-                            className="form-control"
+                            className={`form-control ${formErrors.ubigeo ? "is-invalid" : ""}`}
                             type="text"
                             name="ubigeo"
                             value={formData.ubigeo}
                             onChange={handleChange}
                             required
                           />
+                          {formErrors.ubigeo && (
+                            <div className="invalid-feedback">{formErrors.ubigeo}</div>
+                          )}
                         </div>
                       </div>
+
                       <div className="col-12 col-md-6 col-xl-6">
                         <div className="form-group local-forms">
                           <label>
                             Cantidad de Pisos <span className="login-danger">*</span>
                           </label>
                           <input
-                            className="form-control"
+                            className={`form-control ${formErrors.cantidad_pisos ? "is-invalid" : ""}`}
                             type="number"
+                            min="1"
                             name="cantidad_pisos"
                             value={formData.cantidad_pisos}
                             onChange={handleChange}
                             required
                           />
+                          {formErrors.cantidad_pisos && (
+                            <div className="invalid-feedback">{formErrors.cantidad_pisos}</div>
+                          )}
                         </div>
                       </div>
+
                       <div className="col-12 col-md-6 col-xl-6">
                         <div className="form-group local-forms">
                           <label>
                             Propietario <span className="login-danger">*</span>
                           </label>
                           <Select
-                            options={propietarios.map(p => ({ 
-                              value: p.id, 
-                              label: `${p.nombre} ${p.apellido}` // Mostrar nombre y apellido
+                            options={propietarios.map((p) => ({
+                              value: p.id,
+                              label: `${p.nombre} ${p.apellido}`,
                             }))}
+                            placeholder="Seleccionar propietario"
                             onChange={(selected) => handleSelectChange(selected, "propietario_id")}
-                            placeholder="Selecciona un propietario"
-                            required
+                            className={formErrors.propietario_id ? "is-invalid" : ""}
+                            value={
+                              propietarios
+                                .filter((p) => p.id === formData.propietario_id)
+                                .map((p) => ({
+                                  value: p.id,
+                                  label: `${p.nombre} ${p.apellido}`,
+                                }))[0] || null
+                            }
+                            isClearable
                           />
+                          {formErrors.propietario_id && (
+                            <div className="invalid-feedback d-block">{formErrors.propietario_id}</div>
+                          )}
                         </div>
                       </div>
+
                       <div className="col-12 col-md-6 col-xl-6">
                         <div className="form-group local-forms">
                           <label>
                             Tipo de Inmueble <span className="login-danger">*</span>
                           </label>
                           <Select
-                            options={tiposInmueble.map(t => ({ value: t.id, label: t.nombre }))} 
+                            options={tiposInmueble.map((tipo) => ({
+                              value: tipo.id,
+                              label: tipo.nombre,
+                            }))}
+                            placeholder="Seleccionar tipo de inmueble"
                             onChange={(selected) => handleSelectChange(selected, "tipoInmueble_id")}
-                            placeholder="Selecciona un tipo de inmueble"
-                            required
+                            className={formErrors.tipoInmueble_id ? "is-invalid" : ""}
+                            value={
+                              tiposInmueble
+                                .filter((tipo) => tipo.id === formData.tipoInmueble_id)
+                                .map((tipo) => ({
+                                  value: tipo.id,
+                                  label: tipo.nombre,
+                                }))[0] || null
+                            }
+                            isClearable
                           />
+                          {formErrors.tipoInmueble_id && (
+                            <div className="invalid-feedback d-block">{formErrors.tipoInmueble_id}</div>
+                          )}
                         </div>
                       </div>
-                      <div className="col-12">
+                    </div>
+
+                    <div className="col-12">
                         <div className="doctor-submit text-end">
                           <button
                             type="submit"
@@ -246,15 +358,14 @@ const AnadirInmueble = () => {
                           <button
                             type="button"
                             className="btn btn-primary cancel-form"
-                            onClick={() => navigate("/inmuebles")}
+                            onClick={handleCancel}
                           >
                             Cancelar
                           </button>
                         </div>
                       </div>
-                    </div>
+                    
                   </form>
-                  {error && <div className="alert alert-danger mt-3">{error}</div>}
                 </div>
               </div>
             </div>
