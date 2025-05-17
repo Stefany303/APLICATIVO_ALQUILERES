@@ -16,24 +16,39 @@ import { DatePicker} from "antd";
 import { useAuth } from "../../utils/AuthContext";
 import inmuebleService from "../../services/inmuebleService";
 import espacioService from "../../services/espacioService";
+import pisoService from "../../services/pisoService";
+import tipoespacioService from "../../services/tipoespacioService";
 import '../../assets/styles/form-styles.css';
 import '../../assets/styles/EspaciosRegistrar.css';
-import { message, Spin, Alert } from 'antd';
+import { message, Spin, Alert, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { SearchOutlined, PlusOutlined, EditOutlined, DeleteOutlined, FileExcelOutlined } from '@ant-design/icons';
 
 const EspaciosRegistros = () => {
-  const { user, estaAutenticado } = useAuth();
+  const { user, estaAutenticado, token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [espacios, setEspacios] = useState([]);
   const [espaciosFiltrados, setEspaciosFiltrados] = useState([]);
   const [inmuebles, setInmuebles] = useState([]);
   const [pisos, setPisos] = useState([]);
+  const [tipoEspacios, setTipoEspacios] = useState([]);
   const [selectedInmueble, setSelectedInmueble] = useState('');
   const [selectedPiso, setSelectedPiso] = useState('');
+  const [selectedTipoEspacio, setSelectedTipoEspacio] = useState('');
   const [searchText, setSearchText] = useState('');
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [modalEditVisible, setModalEditVisible] = useState(false);
+  const [modalViewVisible, setModalViewVisible] = useState(false);
+  const [espacioSeleccionado, setEspacioSeleccionado] = useState(null);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    descripcion: '',
+    precio: '',
+    capacidad: '',
+    bano: '',
+    tipoEspacio_id: ''
+  });
   const navigate = useNavigate();
 
   const onSelectChange = (newSelectedRowKeys) => {
@@ -49,98 +64,109 @@ const EspaciosRegistros = () => {
     // console.log(date, dateString);
   };
 
-  // Cargar inmuebles y espacios al montar el componente
+  // Verificar autenticación
+  useEffect(() => {
+    if (!estaAutenticado) {
+      navigate('/login');
+    }
+  }, [estaAutenticado, navigate]);
+
+  // Cargar datos iniciales
   useEffect(() => {
     const cargarDatosIniciales = async () => {
+      if (!estaAutenticado) return;
+
       setLoading(true);
       setError(null);
       try {
         // Cargar inmuebles
         const inmueblesData = await inmuebleService.obtenerInmuebles();
-        console.log('Inmuebles cargados:', inmueblesData);
-        setInmuebles(inmueblesData);
+        setInmuebles(Array.isArray(inmueblesData) ? inmueblesData : []);
+
+        // Cargar tipos de espacio
+        const tiposData = await tipoespacioService.obtenerTodos();
+        setTipoEspacios(Array.isArray(tiposData) ? tiposData : []);
 
         // Cargar todos los espacios
         const espaciosData = await espacioService.obtenerEspacios();
-        console.log('Todos los espacios cargados:', espaciosData);
-        setEspacios(espaciosData);
-        setEspaciosFiltrados(espaciosData); // Inicialmente mostrar todos los espacios
+        const espaciosArray = Array.isArray(espaciosData) ? espaciosData : [];
+        setEspacios(espaciosArray);
+        setEspaciosFiltrados(espaciosArray);
       } catch (error) {
         console.error('Error al cargar datos iniciales:', error);
         setError('Error al cargar los datos');
+        setEspacios([]);
+        setEspaciosFiltrados([]);
       } finally {
         setLoading(false);
       }
     };
 
     cargarDatosIniciales();
-  }, []);
+  }, [estaAutenticado]);
 
   // Cargar pisos cuando se selecciona un inmueble
   useEffect(() => {
     const cargarPisos = async () => {
-      if (!selectedInmueble) {
+      if (!selectedInmueble || !estaAutenticado) {
         setPisos([]);
-        setEspaciosFiltrados(espacios); // Mostrar todos los espacios si no hay inmueble seleccionado
         return;
       }
 
-      setLoading(true);
-      setError(null);
       try {
-        console.log('Cargando pisos para inmueble:', selectedInmueble);
-        const data = await inmuebleService.obtenerEspaciosPorInmueble(selectedInmueble);
-        console.log('Pisos cargados:', data);
-        setPisos(data);
+        const pisosData = await pisoService.obtenerPorInmueble(selectedInmueble);
+        setPisos(Array.isArray(pisosData) ? pisosData : []);
         setSelectedPiso('');
-
-        // Filtrar espacios por los pisos del inmueble
-        const pisosDelInmueble = data.map(piso => piso.id);
-        const filtrados = espacios.filter(espacio => 
-          pisosDelInmueble.includes(espacio.piso_id)
-        );
-        console.log('Espacios filtrados por inmueble:', filtrados);
-        setEspaciosFiltrados(filtrados);
       } catch (error) {
         console.error('Error al cargar pisos:', error);
-        setError('Error al cargar los pisos');
         setPisos([]);
-      } finally {
-        setLoading(false);
       }
     };
 
     cargarPisos();
-  }, [selectedInmueble, espacios]);
+  }, [selectedInmueble, estaAutenticado]);
 
-  // Filtrar espacios cuando se selecciona un piso
+  // Aplicar filtros
   useEffect(() => {
-    if (!selectedPiso) {
-      // Si no hay piso seleccionado, mostrar los espacios filtrados por inmueble
-      const pisosDelInmueble = pisos.map(piso => piso.id);
-      const filtrados = espacios.filter(espacio => 
-        !selectedInmueble || pisosDelInmueble.includes(espacio.piso_id)
-      );
-      setEspaciosFiltrados(filtrados);
-      return;
+    let filtered = [...espacios];
+
+    // Filtrar por inmueble
+    if (selectedInmueble) {
+      filtered = filtered.filter(espacio => espacio.inmueble_id === parseInt(selectedInmueble));
     }
 
-    // Filtrar por piso específico
-    const filtrados = espacios.filter(espacio => 
-      espacio.piso_id === parseInt(selectedPiso)
-    );
-    console.log('Espacios filtrados por piso:', filtrados);
-    setEspaciosFiltrados(filtrados);
-  }, [selectedPiso, espacios, pisos, selectedInmueble]);
+    // Filtrar por piso
+    if (selectedPiso) {
+      filtered = filtered.filter(espacio => espacio.piso_id === parseInt(selectedPiso));
+    }
+
+    // Filtrar por tipo de espacio
+    if (selectedTipoEspacio) {
+      filtered = filtered.filter(espacio => espacio.tipoEspacio_id === parseInt(selectedTipoEspacio));
+    }
+
+    // Filtrar por texto de búsqueda
+    if (searchText) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(espacio =>
+        espacio.nombre.toLowerCase().includes(searchLower) ||
+        espacio.descripcion.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setEspaciosFiltrados(filtered);
+  }, [espacios, selectedInmueble, selectedPiso, selectedTipoEspacio, searchText]);
 
   const handleInmuebleChange = (e) => {
-    console.log('Inmueble seleccionado:', e.target.value);
     setSelectedInmueble(e.target.value);
   };
 
   const handlePisoChange = (e) => {
-    console.log('Piso seleccionado:', e.target.value);
     setSelectedPiso(e.target.value);
+  };
+
+  const handleTipoEspacioChange = (e) => {
+    setSelectedTipoEspacio(e.target.value);
   };
 
   const handleSearch = (value) => {
@@ -153,21 +179,80 @@ const EspaciosRegistros = () => {
   };
 
   const handleEdit = (record) => {
-    navigate(`/espacios/editar/${record.id}`);
+    setEspacioSeleccionado(record);
+    setFormData({
+      nombre: record.nombre,
+      descripcion: record.descripcion,
+      precio: record.precio,
+      capacidad: record.capacidad,
+      bano: record.baño,
+      tipoEspacio_id: record.tipoEspacio_id
+    });
+    setModalEditVisible(true);
   };
 
   const handleDelete = async (record) => {
+    if (!estaAutenticado) {
+      message.error('No hay sesión activa');
+      return;
+    }
+
     try {
-      await espacioService.eliminarEspacio(record.id);
+      await espacioService.eliminarEspacio(record.inmueble_id, record.piso_id, record.id);
       message.success('Espacio eliminado correctamente');
+      
       // Recargar espacios
-      if (selectedPiso) {
-        const data = await espacioService.obtenerEspaciosPorPiso(selectedPiso);
-        setEspacios(data);
-      }
+      const espaciosData = await espacioService.obtenerEspacios();
+      setEspacios(Array.isArray(espaciosData) ? espaciosData : []);
     } catch (error) {
       message.error('Error al eliminar el espacio');
     }
+  };
+
+  const handleSubmitEdit = async (e) => {
+    e.preventDefault();
+    if (!estaAutenticado) {
+      message.error('No hay sesión activa');
+      return;
+    }
+
+    try {
+      await espacioService.actualizarEspacio(
+        espacioSeleccionado.inmueble_id,
+        espacioSeleccionado.piso_id,
+        espacioSeleccionado.id,
+        formData
+      );
+      message.success('Espacio actualizado correctamente');
+      setModalEditVisible(false);
+      
+      // Recargar espacios
+      const espaciosData = await espacioService.obtenerEspacios();
+      setEspacios(Array.isArray(espaciosData) ? espaciosData : []);
+    } catch (error) {
+      message.error('Error al actualizar el espacio');
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleView = (record) => {
+    setEspacioSeleccionado(record);
+    setModalViewVisible(true);
+  };
+
+  // Agregar nueva función para limpiar filtros 
+  const handleLimpiarFiltros = () => {
+    setSelectedInmueble('');
+    setSelectedPiso('');
+    setSelectedTipoEspacio('');
+    setSearchText('');
   };
 
   const columns = [
@@ -179,17 +264,9 @@ const EspaciosRegistros = () => {
     },
     {
       title: "Tipo",
-      dataIndex: "tipoEspacio_id",
-      key: "tipoEspacio_id",
-      sorter: (a, b) => a.tipoEspacio_id - b.tipoEspacio_id,
-      render: (tipo) => {
-        const tipos = {
-          1: "Oficina",
-          2: "Local",
-          3: "Depósito"
-        };
-        return tipos[tipo] || "Desconocido";
-      }
+      dataIndex: "tipo_espacio",
+      key: "tipo_espacio",
+      sorter: (a, b) => a.tipo_espacio.localeCompare(b.tipo_espacio),
     },
     {
       title: "Descripción",
@@ -201,8 +278,11 @@ const EspaciosRegistros = () => {
       title: "Precio",
       dataIndex: "precio",
       key: "precio",
-      sorter: (a, b) => a.precio - b.precio,
-      render: (precio) => `S/ ${precio.toFixed(2)}`
+      sorter: (a, b) => parseFloat(a.precio) - parseFloat(b.precio),
+      render: (precio) => {
+        const precioNumero = parseFloat(precio);
+        return isNaN(precioNumero) ? 'S/ 0.00' : `S/ ${precioNumero.toFixed(2)}`;
+      }
     },
     {
       title: "Capacidad",
@@ -212,55 +292,47 @@ const EspaciosRegistros = () => {
     },
     {
       title: "Baño",
-      dataIndex: "bano",
-      key: "bano",
-      render: (bano) => bano ? "Propio" : "Compartido"
+      dataIndex: "baño",
+      key: "baño",
+      render: (bano) => bano === 'propio' ? 'Propio' : 'Compartido'
     },
     {
       title: "Estado",
       dataIndex: "estado",
       key: "estado",
-      render: (estado) => estado
+      render: (estado) => estado === 0 ? 'Desocupado' : 'Ocupado'
     },
     {
       title: "Acciones",
       key: "acciones",
+      align: "center",
       render: (_, record) => (
-        <div className="text-end">
-          <div className="dropdown dropdown-action">
-            <Link
-              to="#"
-              className="action-icon dropdown-toggle"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              <i className="fas fa-ellipsis-v" />
-            </Link>
-            <div className="dropdown-menu dropdown-menu-end">
-              <Link className="dropdown-item" to={`/espacios/editar/${record.id}`}>
-                <i className="far fa-edit me-2" />
-                Editar
-              </Link>
-              <Link 
-                className="dropdown-item" 
-                to="#" 
-                onClick={() => handleDelete(record)}
-              >
-                <i className="fa fa-trash-alt me-2" />
-                Eliminar
-              </Link>
-            </div>
-          </div>
+        <div className="d-flex justify-content-center">
+          <button
+            className="btn btn-primary btn-sm mx-1"
+            onClick={() => handleView(record)}
+            title="Ver detalles"
+          >
+            <i className="fas fa-eye" />
+          </button>
+          <button
+            className="btn btn-warning btn-sm mx-1"
+            onClick={() => handleEdit(record)}
+            title="Editar"
+          >
+            <i className="fas fa-edit" />
+          </button>
+          <button
+            className="btn btn-danger btn-sm mx-1"
+            onClick={() => handleDelete(record)}
+            title="Eliminar"
+          >
+            <i className="fas fa-trash" />
+          </button>
         </div>
       ),
     },
   ];
-
-  const filteredData = espaciosFiltrados.filter(item =>
-    Object.values(item).some(val =>
-      String(val).toLowerCase().includes(searchText.toLowerCase())
-    )
-  );
 
   if (loading) {
     return (
@@ -324,9 +396,6 @@ const EspaciosRegistros = () => {
                                 placeholder="Buscar aquí"
                                 onChange={(e) => handleSearch(e.target.value)}
                               />
-                              <Link className="btn">
-                                <img src={searchnormal} alt="#" />
-                              </Link>
                             </form>
                           </div>
                           <div className="add-group">
@@ -334,90 +403,162 @@ const EspaciosRegistros = () => {
                               to="/espacios/registrar"
                               className="btn btn-primary add-pluss ms-2"
                             >
-                              <img src={plusicon} alt="#" />
-                            </Link>
-                            <Link
-                              to="#"
-                              className="btn btn-primary doctor-refresh ms-2"
-                              onClick={() => window.location.reload()}
-                            >
-                              <img src={refreshicon} alt="#" />
+                              <i className="fas fa-plus"></i>
                             </Link>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="col-auto text-end float-end ms-auto download-grp">
-                      <Link to="#" className="me-2">
-                        <img src={pdficon} alt="#" />
-                      </Link>
-                      <Link to="#" className="me-2">
-                        <img src={pdficon3} alt="#" />
-                      </Link>
-                      <Link to="#" className="me-2">
-                        <img src={pdficon4} alt="#" />
-                      </Link>
-                    </div>
                   </div>
                 </div>
 
                 <div className="staff-search-table">
-                  <form>
-                    <div className="row">
-                      <div className="col-12 col-md-6 col-xl-4">
-                        <div className="form-group local-forms">
-                          <label>Seleccionar Inmueble</label>
-                          <select
-                            className="form-control"
-                            value={selectedInmueble}
-                            onChange={handleInmuebleChange}
-                          >
-                            <option value="">Seleccionar inmueble</option>
-                            {inmuebles.map(inmueble => (
-                              <option key={inmueble.id} value={inmueble.id}>
-                                {inmueble.descripcion}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="col-12 col-md-6 col-xl-4">
-                        <div className="form-group local-forms">
-                          <label>Seleccionar Piso</label>
-                          <select
-                            className="form-control"
-                            value={selectedPiso}
-                            onChange={handlePisoChange}
-                            disabled={!selectedInmueble}
-                          >
-                            <option value="">Seleccionar piso</option>
-                            {pisos.map(piso => (
-                              <option key={piso.id} value={piso.id}>
-                                Piso {piso.numero}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
+                  <div className="card mb-4">
+                    <div className="card-header bg-light">
+                      <h5 className="mb-0">
+                        <i className="fas fa-filter me-2"></i>
+                        Filtros de búsqueda
+                      </h5>
                     </div>
-                  </form>
+                    <div className="card-body">
+                      <form>
+                        <div className="row">
+                          <div className="col-12 col-md-4 mb-3">
+                            <div className="form-group local-forms">
+                              <label>
+                                <i className="fas fa-building me-2"></i>
+                                Inmueble
+                              </label>
+                              <select
+                                className="form-select"
+                                value={selectedInmueble}
+                                onChange={handleInmuebleChange}
+                              >
+                                <option value="">Todos los inmuebles</option>
+                                {inmuebles.map(inmueble => (
+                                  <option key={inmueble.id} value={inmueble.id}>
+                                    {inmueble.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="col-12 col-md-4 mb-3">
+                            <div className="form-group local-forms">
+                              <label>
+                                <i className="fas fa-layers me-2"></i>
+                                Piso
+                              </label>
+                              <select
+                                className="form-select"
+                                value={selectedPiso}
+                                onChange={handlePisoChange}
+                                disabled={!selectedInmueble}
+                              >
+                                <option value="">Todos los pisos</option>
+                                {pisos.map(piso => (
+                                  <option key={piso.id} value={piso.id}>
+                                    Piso {piso.numero}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="col-12 col-md-4 mb-3">
+                            <div className="form-group local-forms">
+                              <label>
+                                <i className="fas fa-door-open me-2"></i>
+                                Tipo de Espacio
+                              </label>
+                              <select
+                                className="form-select"
+                                value={selectedTipoEspacio}
+                                onChange={handleTipoEspacioChange}
+                              >
+                                <option value="">Todos los tipos</option>
+                                {tipoEspacios.map(tipo => (
+                                  <option key={tipo.id} value={tipo.id}>
+                                    {tipo.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="row">
+                          <div className="col-12 col-md-8 mb-3">
+                            <div className="form-group local-forms">
+                              <label>
+                                <i className="fas fa-search me-2"></i>
+                                Buscar por nombre o descripción
+                              </label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Escriba para buscar..."
+                                value={searchText}
+                                onChange={(e) => handleSearch(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="col-12 col-md-4 d-flex align-items-end mb-3">
+                            <button 
+                              type="button" 
+                              className="btn btn-primary me-2"
+                              onClick={() => {}}
+                            >
+                              <i className="fas fa-filter me-2"></i>
+                              Aplicar filtros
+                            </button>
+                            <button 
+                              type="button" 
+                              className="btn btn-secondary" 
+                              onClick={handleLimpiarFiltros}
+                            >
+                              <i className="fas fa-undo me-2"></i>
+                              Limpiar
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                      {(selectedInmueble || selectedPiso || selectedTipoEspacio || searchText) && (
+                        <div className="alert alert-info mt-3">
+                          <strong>Filtros aplicados:</strong>
+                          {selectedInmueble && (
+                            <span className="badge bg-primary me-2">
+                              Inmueble: {inmuebles.find(i => i.id === parseInt(selectedInmueble))?.nombre}
+                            </span>
+                          )}
+                          {selectedPiso && (
+                            <span className="badge bg-primary me-2">
+                              Piso: {pisos.find(p => p.id === parseInt(selectedPiso))?.numero}
+                            </span>
+                          )}
+                          {selectedTipoEspacio && (
+                            <span className="badge bg-primary me-2">
+                              Tipo: {tipoEspacios.find(t => t.id === parseInt(selectedTipoEspacio))?.nombre}
+                            </span>
+                          )}
+                          {searchText && (
+                            <span className="badge bg-primary me-2">
+                              Búsqueda: {searchText}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="table-responsive doctor-list">
+                <div className="table-responsive">
                   <Table
                     columns={columns}
-                    dataSource={filteredData}
+                    dataSource={espaciosFiltrados}
                     rowKey="id"
-                    rowSelection={rowSelection}
                     pagination={{
                       total: espaciosFiltrados.length,
                       showTotal: (total, range) =>
                         `Mostrando ${range[0]} de ${range[1]} de ${total} registros`,
-                      onShowSizeChange: onShowSizeChange,
-                      itemRender: itemRender,
-                    }}
-                    style={{
-                      backgroundColor: '#f2f2f2',
                     }}
                   />
                 </div>
@@ -427,6 +568,204 @@ const EspaciosRegistros = () => {
         </div>
       </div>
     </div>
+
+    {/* Modal de Edición */}
+    <Modal
+      title="Editar Espacio"
+      open={modalEditVisible}
+      onCancel={() => setModalEditVisible(false)}
+      footer={null}
+      width={800}
+    >
+      {espacioSeleccionado && (
+        <form onSubmit={handleSubmitEdit}>
+          <div className="row">
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Nombre <span className="login-danger">*</span></label>
+                <input
+                  type="text"
+                  className="form-control"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Tipo de Espacio <span className="login-danger">*</span></label>
+                <select
+                  className="form-control"
+                  name="tipoEspacio_id"
+                  value={formData.tipoEspacio_id}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Seleccionar tipo</option>
+                  {tipoEspacios.map(tipo => (
+                    <option key={tipo.id} value={tipo.id}>
+                      {tipo.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="col-12">
+              <div className="form-group local-forms">
+                <label>Descripción <span className="login-danger">*</span></label>
+                <textarea
+                  className="form-control"
+                  name="descripcion"
+                  value={formData.descripcion}
+                  onChange={handleChange}
+                  required
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Precio <span className="login-danger">*</span></label>
+                <input
+                  type="number"
+                  className="form-control"
+                  name="precio"
+                  value={formData.precio}
+                  onChange={handleChange}
+                  required
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Capacidad <span className="login-danger">*</span></label>
+                <input
+                  type="number"
+                  className="form-control"
+                  name="capacidad"
+                  value={formData.capacidad}
+                  onChange={handleChange}
+                  required
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Baño <span className="login-danger">*</span></label>
+                <select
+                  className="form-control"
+                  name="bano"
+                  value={formData.bano}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Seleccionar tipo de baño</option>
+                  <option value="propio">Propio</option>
+                  <option value="compartido">Compartido</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="col-12">
+              <div className="doctor-submit text-end">
+                <button type="submit" className="btn btn-primary submit-form me-2">
+                  Actualizar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary cancel-form"
+                  onClick={() => setModalEditVisible(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      )}
+    </Modal>
+
+    {/* Modal de Ver Detalles */}
+    <Modal
+      title="Detalles del Espacio"
+      open={modalViewVisible}
+      onCancel={() => setModalViewVisible(false)}
+      footer={[
+        <button 
+          key="close" 
+          className="btn btn-secondary" 
+          onClick={() => setModalViewVisible(false)}
+        >
+          Cerrar
+        </button>
+      ]}
+      width={800}
+    >
+      {espacioSeleccionado && (
+        <div className="row">
+          <div className="col-12 col-md-6">
+            <div className="view-details mb-3">
+              <h5>Nombre:</h5>
+              <p>{espacioSeleccionado.nombre}</p>
+            </div>
+          </div>
+
+          <div className="col-12 col-md-6">
+            <div className="view-details mb-3">
+              <h5>Tipo de Espacio:</h5>
+              <p>{espacioSeleccionado.tipo_espacio}</p>
+            </div>
+          </div>
+
+          <div className="col-12">
+            <div className="view-details mb-3">
+              <h5>Descripción:</h5>
+              <p>{espacioSeleccionado.descripcion}</p>
+            </div>
+          </div>
+
+          <div className="col-12 col-md-6">
+            <div className="view-details mb-3">
+              <h5>Precio:</h5>
+              <p>S/ {parseFloat(espacioSeleccionado.precio).toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div className="col-12 col-md-6">
+            <div className="view-details mb-3">
+              <h5>Capacidad:</h5>
+              <p>{espacioSeleccionado.capacidad} persona(s)</p>
+            </div>
+          </div>
+
+          <div className="col-12 col-md-6">
+            <div className="view-details mb-3">
+              <h5>Baño:</h5>
+              <p>{espacioSeleccionado.baño === 'propio' ? 'Propio' : 'Compartido'}</p>
+            </div>
+          </div>
+
+          <div className="col-12 col-md-6">
+            <div className="view-details mb-3">
+              <h5>Estado:</h5>
+              <p className={espacioSeleccionado.estado === 0 ? 'text-success' : 'text-danger'}>
+                {espacioSeleccionado.estado === 0 ? 'Desocupado' : 'Ocupado'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </Modal>
     </>
   );
 };

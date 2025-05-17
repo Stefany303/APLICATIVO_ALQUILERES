@@ -18,7 +18,7 @@ const inquilinoService = {
   // Obtener todos los inquilinos
   obtenerInquilinos: async () => {
     try {
-      const response = await api.get(`${API_URL}/inquilinos`);
+      const response = await api.get(`${API_URL}/personas/inquilinos`);
       return response.data;
     } catch (error) {
       console.error('Error al obtener inquilinos:', error);
@@ -29,7 +29,7 @@ const inquilinoService = {
   // Obtener un inquilino por ID
   obtenerInquilino: async (id) => {
     try {
-      const response = await api.get(`${API_URL}/inquilinos/${id}`);
+      const response = await api.get(`${API_URL}/personas/inquilinos/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error al obtener inquilino:', error);
