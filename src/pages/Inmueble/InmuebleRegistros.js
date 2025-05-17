@@ -601,4 +601,3 @@ const InmuebleRegistros = () => {
 };
 
 export default InmuebleRegistros;
-export default InmuebleRegistros;
