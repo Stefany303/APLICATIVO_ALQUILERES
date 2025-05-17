@@ -328,6 +328,27 @@ const InquilinosRegistrar = () => {
       const response = await inquilinoService.crearInquilino(formData);
       
       if (response) {
+        // Actualizar el estado del espacio a ocupado (1)
+        try {
+          // Datos para actualizar el espacio
+          const espacioData = {
+            estado: 1 // 1 = Ocupado
+          };
+          
+          // Actualizar el espacio
+          await espacioService.actualizarEspacio(
+            formData.inmuebleId,
+            formData.pisoId, 
+            formData.espacioId,
+            espacioData
+          );
+          
+          console.log('Espacio actualizado a estado "Ocupado"');
+        } catch (espacioError) {
+          console.error('Error al actualizar estado del espacio:', espacioError);
+          // No interrumpimos el flujo principal si falla esta actualización
+        }
+
         await Swal.fire({
           title: '¡Registro Exitoso!',
           text: 'El inquilino ha sido registrado correctamente',
@@ -514,19 +535,28 @@ const InquilinosRegistrar = () => {
                               )}
                             </div>
                           </div>
-
                           <div className="col-12 col-md-6">
-                            <div className="form-group local-forms">
-                              <label>Dirección</label>
-                              <input
-                                type="text"
-                                className="form-control"
-                                name="direccion"
-                                value={formData.direccion}
+                          <div className="form-group local-forms">
+                              <label>Tipo de Documento <span className="login-danger">*</span></label>
+                              <select
+                              className={`form-control ${formErrors.tipoDocumento ? 'is-invalid' : ''}`}
+                                name="tipoDocumento"
+                                value={formData.tipoDocumento}
                                 onChange={handleChange}
-                              />
+                                required
+                              >
+                                <option value="">Seleccionar</option>
+                                <option value="DNI">DNI</option>
+                                <option value="RUC">RUC</option>
+                                <option value="CE">Carné de Extranjería</option>
+                              </select>
+                              {formErrors.tipoDocumento && (
+                                <div className="invalid-feedback d-block">
+                                  {formErrors.tipoDocumento}
+                                </div>
+                              )}
                             </div>
-                          </div>
+                          </div>                          
 
                           <div className="col-12 col-md-6">
                             <div className="form-group local-forms">
@@ -550,30 +580,21 @@ const InquilinosRegistrar = () => {
                             </div>
                           </div>
 
+                          
                           <div className="col-12 col-md-6">
-                          <div className="form-group local-forms">
-                              <label>Tipo de Documento <span className="login-danger">*</span></label>
-                              <select
-                              className={`form-control ${formErrors.tipoDocumento ? 'is-invalid' : ''}`}
-                                name="tipoDocumento"
-                                value={formData.tipoDocumento}
+                            <div className="form-group local-forms">
+                              <label>Dirección</label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                name="direccion"
+                                value={formData.direccion}
                                 onChange={handleChange}
-                                required
-                              >
-                                <option value="">Seleccionar</option>
-                                <option value="DNI">DNI</option>
-                                <option value="RUC">RUC</option>
-                                <option value="CE">Carné de Extranjería</option>
-                              </select>
-                              {formErrors.tipoDocumento && (
-                                <div className="invalid-feedback d-block">
-                                  {formErrors.tipoDocumento}
-                                </div>
-                              )}
+                              />
                             </div>
                           </div>
                         </div>
-
+                        
                         <div className="text-center mt-4">
                           <button type="button" className="btn btn-primary" onClick={handleNext}>
                             Siguiente

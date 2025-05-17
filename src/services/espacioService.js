@@ -73,7 +73,8 @@ const espacioService = {
         descripcion: espacioData.descripcion,
         precio: parseFloat(espacioData.precio),
         capacidad: parseInt(espacioData.capacidad),
-        baño: espacioData.bano ? 'propio' : 'compartido'
+        baño: espacioData.bano ? 'propio' : 'compartido',
+        estado: espacioData.estado || 0
       };
 
       if (environment.DEBUG) {
@@ -136,6 +137,13 @@ const espacioService = {
         datosActualizados.baño = datosActualizados.bano ? 'propio' : 'compartido';
         delete datosActualizados.bano;
       }
+
+      // Asegurar que el estado se procese correctamente si está presente
+      if (datosActualizados.estado !== undefined) {
+        datosActualizados.estado = parseInt(datosActualizados.estado);
+      }
+      
+      console.log('Actualizando espacio con datos:', datosActualizados);
 
       const response = await api.put(
         `${ENDPOINT_INMUEBLES}/${inmuebleId}/pisos/${pisoId}/espacios/${espacioId}`,

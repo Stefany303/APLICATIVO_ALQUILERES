@@ -23,7 +23,8 @@ const INITIAL_FORM_STATE = {
   descripcion: '',
   precio: '',
   capacidad: '',
-  bano: ''
+  bano: '',
+  estado: '0'
 };
 
 const EspaciosRegistrar = () => {
@@ -108,6 +109,7 @@ const EspaciosRegistrar = () => {
     }
 
     try {
+      // Asegurar que el valor de estado sea 0 explícitamente
       const espacioData = {
         inmueble_id: formData.inmueble_id,
         piso_id: formData.piso_id,
@@ -116,8 +118,11 @@ const EspaciosRegistrar = () => {
         descripcion: formData.descripcion.trim(),
         precio: parseFloat(formData.precio),
         capacidad: parseInt(formData.capacidad),
-        bano: formData.bano === 'propio'
+        bano: formData.bano === 'propio',
+        estado: 0 // Forzar valor 0 para espacio disponible
       };
+
+      console.log("Datos a enviar:", JSON.stringify(espacioData)); // Para depuración - formato JSON completo
 
       const espacioCreado = await espacioService.crearEspacio(espacioData);
 
@@ -229,23 +234,6 @@ const EspaciosRegistrar = () => {
 
                       <div className="col-12 col-md-6">
                         <div className="form-group local-forms">  
-                          <label htmlFor="nombre">Nombre *</label>
-                          <input
-                            id="nombre"
-                            type="text"
-                            name="nombre"
-                            value={formData.nombre}
-                            onChange={handleChange}
-                            required
-                            className="form-control"
-                            placeholder="Ingrese el nombre del espacio"
-                            maxLength={100}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="col-12 col-md-6">
-                        <div className="form-group local-forms">  
                           <label htmlFor="tipoEspacio">Tipo de Espacio *</label>
                           <select
                             id="tipoEspacio"
@@ -260,6 +248,23 @@ const EspaciosRegistrar = () => {
                               <option key={t.id} value={t.nombre}>{t.nombre}</option>
                             ))}
                           </select>
+                        </div>
+                      </div>
+
+                      <div className="col-12 col-md-6">
+                        <div className="form-group local-forms">  
+                          <label htmlFor="nombre">Nombre *</label>
+                          <input
+                            id="nombre"
+                            type="text"
+                            name="nombre"
+                            value={formData.nombre}
+                            onChange={handleChange}
+                            required
+                            className="form-control"
+                            placeholder="Ingrese el nombre del espacio"
+                            maxLength={100}
+                          />
                         </div>
                       </div>
 
@@ -333,6 +338,30 @@ const EspaciosRegistrar = () => {
                             <option value="propio">Propio</option>
                             <option value="compartido">Compartido</option>
                           </select>
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="form-group local-forms">  
+                          <label htmlFor="estado">Estado *</label>
+                          <select
+                            id="estado"
+                            name="estado"
+                            value="0"
+                            className="form-select"
+                            disabled
+                          >
+                            <option value="0">Disponible</option>
+                            <option value="1">Ocupado</option>
+                          </select>
+                          <input 
+                            type="hidden" 
+                            name="estado" 
+                            value="0" 
+                          />
+                          <small className="form-text text-muted">
+                            Los espacios nuevos siempre se crean como disponibles
+                          </small>
                         </div>
                       </div>
 

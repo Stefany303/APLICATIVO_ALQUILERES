@@ -22,7 +22,6 @@ import VerInmueble from '../pages/Inmueble/VerInmueble';
 import EditarInmueble from '../pages/Inmueble/EditarInmueble';
 
 // Espacios
-import EspaciosAnadir from '../pages/Espacios/EspaciosAnadir';
 import EspaciosRegistrar from '../pages/Espacios/EspaciosRegistrar';
 import EspaciosRegistros from '../pages/Espacios/EspaciosRegistros';
 
@@ -73,7 +72,7 @@ const AppRoutes = () => {
           <Route path="/inmuebles/editar/:id" element={<EditarInmueble />} />
           
           {/* Espacios */}
-          <Route path="/espacios-anadir" element={<EspaciosAnadir />} />
+          <Route path="/espacios-anadir" element={<EspaciosRegistrar />} />
           <Route path="/espacios-registrar" element={<EspaciosRegistrar />} />
           <Route path="/espacios-registros" element={<EspaciosRegistros />} />
           
