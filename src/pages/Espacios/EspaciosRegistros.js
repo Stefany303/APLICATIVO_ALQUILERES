@@ -400,7 +400,7 @@ const EspaciosRegistros = () => {
                           </div>
                           <div className="add-group">
                             <Link
-                              to="/espacios/registrar"
+                              to="/espacios-anadir"
                               className="btn btn-primary add-pluss ms-2"
                             >
                               <i className="fas fa-plus"></i>
@@ -414,12 +414,12 @@ const EspaciosRegistros = () => {
 
                 <div className="staff-search-table">
                   <div className="card mb-4">
-                    <div className="card-header bg-light">
+                    {/*<div className="card-header bg-light">
                       <h5 className="mb-0">
                         <i className="fas fa-filter me-2"></i>
                         Filtros de búsqueda
                       </h5>
-                    </div>
+                    </div>*/}
                     <div className="card-body">
                       <form>
                         <div className="row">
@@ -429,18 +429,16 @@ const EspaciosRegistros = () => {
                                 <i className="fas fa-building me-2"></i>
                                 Inmueble
                               </label>
-                              <select
-                                className="form-select"
-                                value={selectedInmueble}
-                                onChange={handleInmuebleChange}
-                              >
-                                <option value="">Todos los inmuebles</option>
-                                {inmuebles.map(inmueble => (
-                                  <option key={inmueble.id} value={inmueble.id}>
-                                    {inmueble.nombre}
-                                  </option>
-                                ))}
-                              </select>
+                              <Select
+                                classNamePrefix="select"
+                                options={inmuebles.map(i => ({ value: i.id, label: i.nombre }))}
+                                value={inmuebles.find(i => i.id === parseInt(selectedInmueble)) ? 
+                                  { value: parseInt(selectedInmueble), label: inmuebles.find(i => i.id === parseInt(selectedInmueble)).nombre } : 
+                                  null}
+                                onChange={(selected) => handleInmuebleChange({ target: { value: selected?.value } })}
+                                placeholder="Todos los inmuebles"
+                                isClearable
+                              />
                             </div>
                           </div>
                           <div className="col-12 col-md-4 mb-3">
@@ -449,19 +447,17 @@ const EspaciosRegistros = () => {
                                 <i className="fas fa-layers me-2"></i>
                                 Piso
                               </label>
-                              <select
-                                className="form-select"
-                                value={selectedPiso}
-                                onChange={handlePisoChange}
-                                disabled={!selectedInmueble}
-                              >
-                                <option value="">Todos los pisos</option>
-                                {pisos.map(piso => (
-                                  <option key={piso.id} value={piso.id}>
-                                    Piso {piso.numero}
-                                  </option>
-                                ))}
-                              </select>
+                              <Select
+                                classNamePrefix="select"
+                                options={pisos.map(p => ({ value: p.id, label: p.nombre }))}
+                                value={pisos.find(p => p.id === parseInt(selectedPiso)) ? 
+                                  { value: parseInt(selectedPiso), label: pisos.find(p => p.id === parseInt(selectedPiso)).nombre } : 
+                                  null}
+                                onChange={(selected) => handlePisoChange({ target: { value: selected?.value } })}
+                                placeholder="Todos los pisos"
+                                isClearable
+                                isDisabled={!selectedInmueble}
+                              />
                             </div>
                           </div>
                           <div className="col-12 col-md-4 mb-3">
@@ -470,38 +466,21 @@ const EspaciosRegistros = () => {
                                 <i className="fas fa-door-open me-2"></i>
                                 Tipo de Espacio
                               </label>
-                              <select
-                                className="form-select"
-                                value={selectedTipoEspacio}
-                                onChange={handleTipoEspacioChange}
-                              >
-                                <option value="">Todos los tipos</option>
-                                {tipoEspacios.map(tipo => (
-                                  <option key={tipo.id} value={tipo.id}>
-                                    {tipo.nombre}
-                                  </option>
-                                ))}
-                              </select>
+                              <Select
+                                classNamePrefix="select"
+                                options={tipoEspacios.map(t => ({ value: t.id, label: t.nombre }))}
+                                value={tipoEspacios.find(t => t.id === parseInt(selectedTipoEspacio)) ? 
+                                  { value: parseInt(selectedTipoEspacio), label: tipoEspacios.find(t => t.id === parseInt(selectedTipoEspacio)).nombre } : 
+                                  null}
+                                onChange={(selected) => handleTipoEspacioChange({ target: { value: selected?.value } })}
+                                placeholder="Todos los tipos"
+                                isClearable
+                              />
                             </div>
                           </div>
                         </div>
                         <div className="row">
-                          <div className="col-12 col-md-8 mb-3">
-                            <div className="form-group local-forms">
-                              <label>
-                                <i className="fas fa-search me-2"></i>
-                                Buscar por nombre o descripción
-                              </label>
-                              <input
-                                type="text"
-                                className="form-control"
-                                placeholder="Escriba para buscar..."
-                                value={searchText}
-                                onChange={(e) => handleSearch(e.target.value)}
-                              />
-                            </div>
-                          </div>
-                          <div className="col-12 col-md-4 d-flex align-items-end mb-3">
+                          <div className="col-12 d-flex justify-content-end mb-3">
                             <button 
                               type="button" 
                               className="btn btn-primary me-2"
@@ -531,7 +510,7 @@ const EspaciosRegistros = () => {
                           )}
                           {selectedPiso && (
                             <span className="badge bg-primary me-2">
-                              Piso: {pisos.find(p => p.id === parseInt(selectedPiso))?.numero}
+                              Piso: {pisos.find(p => p.id === parseInt(selectedPiso))?.nombre}
                             </span>
                           )}
                           {selectedTipoEspacio && (

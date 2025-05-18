@@ -248,7 +248,7 @@ const InquilinosRegistros = () => {
                         </div>
                         <div className="add-group">
                           <Link
-                            to="/add-doctor"
+                            to="/inquilinos-registrar"
                             className="btn btn-primary add-pluss ms-2"
                           >
                             <img src={plusicon} alt="#" />

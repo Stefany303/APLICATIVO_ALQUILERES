@@ -1,0 +1,43 @@
+/* Estilos para los componentes Select */
+.select__control {
+  min-height: 45px !important;
+  border: 2px solid rgba(46, 55, 164, 0.1) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.select__control:hover {
+  border-color: rgba(46, 55, 164, 0.1) !important;
+}
+
+.select__menu {
+  border-radius: 10px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  z-index: 9999 !important;
+}
+
+.select__menu-list {
+  z-index: 9999 !important;
+}
+
+.select__option {
+  background-color: white !important;
+  color: #333448 !important;
+}
+
+.select__option--is-focused {
+  background-color: rgba(46, 55, 164, 0.1) !important;
+}
+
+.select__option--is-selected {
+  background-color: #2e37a4 !important;
+  color: white !important;
+}
+
+.select__option:hover {
+  background-color: rgba(46, 55, 164, 0.1) !important;
+}
+
+.select__option--is-selected:hover {
+  background-color: #2e37a4 !important;
+} 

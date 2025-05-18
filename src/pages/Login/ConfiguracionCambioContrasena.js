@@ -31,7 +31,7 @@ const ConfiguracionCambioContrasena = () => {
     </div>
     
     <div className="row">
-      <div className="col-lg-8">
+      <div className="col-md-12">
         <div className="card">
           <div className="card-body">
             <form>

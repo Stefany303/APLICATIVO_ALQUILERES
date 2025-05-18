@@ -11,6 +11,7 @@ import inmuebleService from "../../services/inmuebleService";
 import personaService from "../../services/personaService";
 import tipoInmuebleService from "../../services/tipoInmuebleService";
 import Swal from "sweetalert2";
+import "../../assets/styles/select-components.css";
 
 const AnadirInmueble = () => {
   const { user, estaAutenticado } = useAuth();
@@ -294,13 +295,11 @@ const AnadirInmueble = () => {
                             Propietario <span className="login-danger">*</span>
                           </label>
                           <Select
+                            classNamePrefix="select"
                             options={propietarios.map((p) => ({
                               value: p.id,
                               label: `${p.nombre} ${p.apellido}`,
                             }))}
-                            placeholder="Seleccionar propietario"
-                            onChange={(selected) => handleSelectChange(selected, "propietario_id")}
-                            className={formErrors.propietario_id ? "is-invalid" : ""}
                             value={
                               propietarios
                                 .filter((p) => p.id === formData.propietario_id)
@@ -309,7 +308,8 @@ const AnadirInmueble = () => {
                                   label: `${p.nombre} ${p.apellido}`,
                                 }))[0] || null
                             }
-                            isClearable
+                            onChange={(selected) => handleSelectChange(selected, "propietario_id")}
+                            placeholder="Seleccione un propietario"
                           />
                           {formErrors.propietario_id && (
                             <div className="invalid-feedback d-block">{formErrors.propietario_id}</div>
@@ -323,13 +323,11 @@ const AnadirInmueble = () => {
                             Tipo de Inmueble <span className="login-danger">*</span>
                           </label>
                           <Select
+                            classNamePrefix="select"
                             options={tiposInmueble.map((tipo) => ({
                               value: tipo.id,
                               label: tipo.nombre,
                             }))}
-                            placeholder="Seleccionar tipo de inmueble"
-                            onChange={(selected) => handleSelectChange(selected, "tipoInmueble_id")}
-                            className={formErrors.tipoInmueble_id ? "is-invalid" : ""}
                             value={
                               tiposInmueble
                                 .filter((tipo) => tipo.id === formData.tipoInmueble_id)
@@ -338,7 +336,8 @@ const AnadirInmueble = () => {
                                   label: tipo.nombre,
                                 }))[0] || null
                             }
-                            isClearable
+                            onChange={(selected) => handleSelectChange(selected, "tipoInmueble_id")}
+                            placeholder="Seleccione un tipo de inmueble"
                           />
                           {formErrors.tipoInmueble_id && (
                             <div className="invalid-feedback d-block">{formErrors.tipoInmueble_id}</div>

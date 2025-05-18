@@ -10,16 +10,18 @@ import pisoService from "../../services/pisoService";
 import tipoespacioService from "../../services/tipoespacioService";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
+import Swal from "sweetalert2";
 import '../../assets/styles/form-styles.css';
 import '../../assets/styles/table-styles.css';
 import '../../assets/styles/EspaciosRegistrar.css';
+import Select from 'react-select';
+import "../../assets/styles/select-components.css";
 
 const INITIAL_FORM_STATE = {
   inmueble_id: '',
   piso_id: '',
   nombre: '',
-  tipoEspacio: '',
+  tipoEspacio_id: '',
   descripcion: '',
   precio: '',
   capacidad: '',
@@ -36,19 +38,57 @@ const EspaciosRegistrar = () => {
   const [inmuebles, setInmuebles] = useState([]);
   const [pisos, setPisos] = useState([]);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [formErrors, setFormErrors] = useState({});
 
   // Validación del formulario
+  // const validateForm = () => {
+  //   const errors = [];
+  //   if (!formData.inmueble_id) errors.push('Debe seleccionar un inmueble');
+  //   if (!formData.piso_id) errors.push('Debe seleccionar un piso');
+  //   if (!formData.nombre?.trim()) errors.push('El nombre es requerido');
+  //   if (!formData.tipoEspacio) errors.push('Debe seleccionar un tipo de espacio');
+  //   if (!formData.descripcion?.trim()) errors.push('La descripción es requerida');
+  //   if (!formData.precio || formData.precio <= 0) errors.push('El precio debe ser mayor a 0');
+  //   if (!formData.capacidad || formData.capacidad < 1) errors.push('La capacidad debe ser al menos 1');
+  //   if (!formData.bano) errors.push('Debe seleccionar el tipo de baño');
+  //   return errors;
+  // };
+
+  const validateField = (name, value) => {
+    switch (name) {
+      case "inmueble_id":
+        return value ? "" : "El inmueble es requerido";
+      case "piso_id":
+        return value ? "" : "El piso es requerido";
+      case "nombre":
+        return value ? "" : "El nombre es requerido";
+      case "tipoEspacio_id":
+        return value ? "" : "El tipo de espacio es requerido";
+      case "precio":
+        return value && !isNaN(value) && Number(value) > 0
+          ? ""
+          : "El precio debe ser mayor a 0";
+      case "capacidad":
+        return value && !isNaN(value) && Number(value) >= 1
+          ? ""
+          : "La capacidad debe ser al menos 1";
+      case "descripcion":
+        return value ? "" : "La descripción es requerida";
+      case "bano":
+        return value ? "" : "Debe seleccionar el tipo de baño";
+      default:
+        return "";
+    }
+  };
+
   const validateForm = () => {
-    const errors = [];
-    if (!formData.inmueble_id) errors.push('Debe seleccionar un inmueble');
-    if (!formData.piso_id) errors.push('Debe seleccionar un piso');
-    if (!formData.nombre?.trim()) errors.push('El nombre es requerido');
-    if (!formData.tipoEspacio) errors.push('Debe seleccionar un tipo de espacio');
-    if (!formData.descripcion?.trim()) errors.push('La descripción es requerida');
-    if (!formData.precio || formData.precio <= 0) errors.push('El precio debe ser mayor a 0');
-    if (!formData.capacidad || formData.capacidad < 1) errors.push('La capacidad debe ser al menos 1');
-    if (!formData.bano) errors.push('Debe seleccionar el tipo de baño');
-    return errors;
+    const errors = {};
+    Object.keys(formData).forEach((key) => {
+      const error = validateField(key, formData[key]);
+      if (error) errors[key] = error;
+    });
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Cargar datos iniciales
@@ -85,6 +125,9 @@ const EspaciosRegistrar = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
+    const error = validateField(name, value);
+    setFormErrors((prev) => ({ ...prev, [name]: error }));
+
     if (name === "inmueble_id") {
       setFormData(prev => ({ ...prev, piso_id: '' })); // Reset piso when inmueble changes
       try {
@@ -96,45 +139,82 @@ const EspaciosRegistrar = () => {
     }
   };
 
+  const handleSelectChange = (selected, name) => {
+    setFormData((prev) => ({ ...prev, [name]: selected ? selected.value : "" }));
+
+    const error = validateField(name, selected ? selected.value : "");
+    setFormErrors((prev) => ({ ...prev, [name]: error }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join('\n'));
+    if (!validateForm()) {
+      Swal.fire({
+        title: "Campos incompletos",
+        text: "Por favor corrija los errores antes de continuar",
+        icon: "warning",
+        confirmButtonText: "Aceptar",
+      });
       setLoading(false);
       return;
     }
 
     try {
-      // Asegurar que el valor de estado sea 0 explícitamente
       const espacioData = {
         inmueble_id: formData.inmueble_id,
         piso_id: formData.piso_id,
         nombre: formData.nombre.trim(),
-        tipoEspacio_id: tipoEspacios.find(t => t.nombre === formData.tipoEspacio)?.id,
+        tipoEspacio_id: formData.tipoEspacio_id,
         descripcion: formData.descripcion.trim(),
         precio: parseFloat(formData.precio),
         capacidad: parseInt(formData.capacidad),
         bano: formData.bano === 'propio',
-        estado: 0 // Forzar valor 0 para espacio disponible
+        estado: 0
       };
 
-      console.log("Datos a enviar:", JSON.stringify(espacioData)); // Para depuración - formato JSON completo
+      console.log("Datos a enviar:", JSON.stringify(espacioData));
 
       const espacioCreado = await espacioService.crearEspacio(espacioData);
-
-      if (!espacioCreado) throw new Error('No se pudo crear el espacio');
-
-      toast.success('Espacio registrado exitosamente');
-      navigate('/espacios-registros');
+      
+      if (espacioCreado) {
+        Swal.fire({
+          title: "¡Éxito!",
+          text: "El espacio ha sido registrado correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar",
+        }).then(() => {
+          navigate("/espacios-registros");
+        });
+      }
     } catch (error) {
-      handleError(error, 'Error al registrar el espacio');
+      console.error("Error al añadir el espacio:", error);
+      Swal.fire({
+        title: "Error",
+        text: "Error al añadir el espacio. Inténtalo de nuevo.",
+        icon: "error",
+        confirmButtonText: "Aceptar",
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    Swal.fire({
+      title: "¿Estás seguro?",
+      text: "Los datos no guardados se perderán",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar",
+      cancelButtonText: "No, continuar",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        navigate("/espacios-registros");
+      }
+    });
   };
 
   if (loading) {
@@ -152,7 +232,7 @@ const EspaciosRegistrar = () => {
   return (
     <>
       <Header />
-      <Sidebar id='menu-item6' id1='menu-items6' activeClassName='espacios-registrar'/>
+      <Sidebar id='menu-item2' id1='menu-item2' activeClassName='espacios-registrar'/>
       <div className="page-wrapper">
         <div className="content">
           <div className="page-header">
@@ -188,20 +268,21 @@ const EspaciosRegistrar = () => {
                       <div className="col-12 col-md-6">
                         <div className="form-group local-forms">  
                           <label htmlFor="inmueble_id">Inmueble *</label>
-                          <select
-                            id="inmueble_id"
-                            name="inmueble_id"
-                            value={formData.inmueble_id}
-                            onChange={handleChange}
-                            required
-                            className="form-select"
-                            aria-describedby="inmuebleHelp"
-                          >
-                            <option value="">Seleccione un inmueble</option>
-                            {inmuebles.map(i => (
-                              <option key={i.id} value={i.id}>{i.nombre}</option>
-                            ))}
-                          </select>
+                          <Select
+                            classNamePrefix="select"
+                            options={inmuebles.map(i => ({ value: i.id, label: i.nombre }))}
+                            value={inmuebles.find(i => i.id === formData.inmueble_id) ? 
+                              { value: formData.inmueble_id, label: inmuebles.find(i => i.id === formData.inmueble_id).nombre } : 
+                              null}
+                            onChange={(selected) => {
+                              handleChange({ target: { name: 'inmueble_id', value: selected?.value } });
+                              handleSelectChange(selected, 'inmueble_id');
+                            }}
+                            placeholder="Seleccione un inmueble"
+                          />
+                          {formErrors.inmueble_id && (
+                            <div className="invalid-feedback">{formErrors.inmueble_id}</div>
+                          )}
                           <small id="inmuebleHelp" className="form-text text-muted">
                             Seleccione el inmueble donde se encuentra el espacio
                           </small>
@@ -211,21 +292,21 @@ const EspaciosRegistrar = () => {
                       <div className="col-12 col-md-6">
                         <div className="form-group local-forms">  
                           <label htmlFor="piso_id">Piso *</label>
-                          <select
-                            id="piso_id"
-                            name="piso_id"
-                            value={formData.piso_id}
-                            onChange={handleChange}
-                            required
-                            disabled={!formData.inmueble_id}
-                            className="form-select"
-                            aria-describedby="pisoHelp"
-                          >
-                            <option value="">Seleccione un piso</option>
-                            {pisos.map(p => (
-                              <option key={p.id} value={p.id}>{p.nombre}</option>
-                            ))}
-                          </select>
+                          <Select
+                            classNamePrefix="select"
+                            options={pisos.map(p => ({ value: p.id, label: p.nombre }))}
+                            value={pisos.find(p => p.id === formData.piso_id) ? 
+                              { value: formData.piso_id, label: pisos.find(p => p.id === formData.piso_id).nombre } : 
+                              null}
+                            onChange={(selected) => {
+                              handleChange({ target: { name: 'piso_id', value: selected?.value } });
+                              handleSelectChange(selected, 'piso_id');
+                            }}
+                            placeholder="Seleccione un piso"
+                          />
+                          {formErrors.piso_id && (
+                            <div className="invalid-feedback">{formErrors.piso_id}</div>
+                          )}
                           <small id="pisoHelp" className="form-text text-muted">
                             {!formData.inmueble_id ? 'Primero seleccione un inmueble' : 'Seleccione el piso del espacio'}
                           </small>
@@ -234,20 +315,22 @@ const EspaciosRegistrar = () => {
 
                       <div className="col-12 col-md-6">
                         <div className="form-group local-forms">  
-                          <label htmlFor="tipoEspacio">Tipo de Espacio *</label>
-                          <select
-                            id="tipoEspacio"
-                            name="tipoEspacio"
-                            value={formData.tipoEspacio}
-                            onChange={handleChange}
-                            required
-                            className="form-select"
-                          >
-                            <option value="">Seleccione tipo</option>
-                            {tipoEspacios.map(t => (
-                              <option key={t.id} value={t.nombre}>{t.nombre}</option>
-                            ))}
-                          </select>
+                          <label htmlFor="tipoEspacio_id">Tipo de Espacio *</label>
+                          <Select
+                            classNamePrefix="select"
+                            options={tipoEspacios.map(t => ({ value: t.id, label: t.nombre }))}
+                            value={tipoEspacios.find(t => t.id === formData.tipoEspacio_id) ? 
+                              { value: formData.tipoEspacio_id, label: tipoEspacios.find(t => t.id === formData.tipoEspacio_id).nombre } : 
+                              null}
+                            onChange={(selected) => {
+                              handleChange({ target: { name: 'tipoEspacio_id', value: selected?.value } });
+                              handleSelectChange(selected, 'tipoEspacio_id');
+                            }}
+                            placeholder="Seleccione un tipo de espacio"
+                          />
+                          {formErrors.tipoEspacio_id && (
+                            <div className="invalid-feedback">{formErrors.tipoEspacio_id}</div>
+                          )}
                         </div>
                       </div>
 
@@ -261,10 +344,13 @@ const EspaciosRegistrar = () => {
                             value={formData.nombre}
                             onChange={handleChange}
                             required
-                            className="form-control"
+                            className={`form-control ${formErrors.nombre ? 'is-invalid' : ''}`}
                             placeholder="Ingrese el nombre del espacio"
                             maxLength={100}
                           />
+                          {formErrors.nombre && (
+                            <div className="invalid-feedback">{formErrors.nombre}</div>
+                          )}
                         </div>
                       </div>
 
@@ -277,11 +363,14 @@ const EspaciosRegistrar = () => {
                             value={formData.descripcion}
                             onChange={handleChange}
                             required
-                            className="form-control"
+                            className={`form-control ${formErrors.descripcion ? 'is-invalid' : ''}`}
                             rows={3}
                             placeholder="Describa las características del espacio"
                             maxLength={500}
                           />
+                          {formErrors.descripcion && (
+                            <div className="invalid-feedback">{formErrors.descripcion}</div>
+                          )}
                         </div>
                       </div>
 
@@ -299,9 +388,12 @@ const EspaciosRegistrar = () => {
                               required
                               min="0"
                               step="0.01"
-                              className="form-control"
+                              className={`form-control ${formErrors.precio ? 'is-invalid' : ''}`}
                               placeholder="0.00"
                             />
+                            {formErrors.precio && (
+                              <div className="invalid-feedback">{formErrors.precio}</div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -317,43 +409,48 @@ const EspaciosRegistrar = () => {
                             onChange={handleChange}
                             required
                             min="1"
-                            className="form-control"
+                            className={`form-control ${formErrors.capacidad ? 'is-invalid' : ''}`}
                             placeholder="Número de personas"
                           />
+                          {formErrors.capacidad && (
+                            <div className="invalid-feedback">{formErrors.capacidad}</div>
+                          )}
                         </div>
                       </div>
 
                       <div className="col-md-6">
                         <div className="form-group local-forms">  
                           <label htmlFor="bano">Baño *</label>
-                          <select
-                            id="bano"
-                            name="bano"
-                            value={formData.bano}
-                            onChange={handleChange}
-                            required
-                            className="form-select"
-                          >
-                            <option value="">Seleccione tipo de baño</option>
-                            <option value="propio">Propio</option>
-                            <option value="compartido">Compartido</option>
-                          </select>
+                          <Select
+                            classNamePrefix="select"
+                            options={[
+                              { value: 'propio', label: 'Propio' }, 
+                              { value: 'compartido', label: 'Compartido' }
+                            ]}
+                            value={formData.bano ? 
+                              { value: formData.bano, label: formData.bano === 'propio' ? 'Propio' : 'Compartido' } : 
+                              null}
+                            onChange={(selected) => {
+                              handleChange({ target: { name: 'bano', value: selected?.value } });
+                              handleSelectChange(selected, 'bano');
+                            }}
+                            placeholder="Seleccione si tiene baño"
+                          />
+                          {formErrors.bano && (
+                            <div className="invalid-feedback">{formErrors.bano}</div>
+                          )}
                         </div>
                       </div>
 
                       <div className="col-md-6">
                         <div className="form-group local-forms">  
                           <label htmlFor="estado">Estado *</label>
-                          <select
-                            id="estado"
-                            name="estado"
-                            value="0"
-                            className="form-select"
+                          <input
+                            type="text"
+                            className="form-control"
+                            value="Disponible"
                             disabled
-                          >
-                            <option value="0">Disponible</option>
-                            <option value="1">Ocupado</option>
-                          </select>
+                          />
                           <input 
                             type="hidden" 
                             name="estado" 
@@ -369,7 +466,7 @@ const EspaciosRegistrar = () => {
                         <button 
                           type="button" 
                           className="btn btn-secondary me-2" 
-                          onClick={() => navigate('/espacios')}
+                          onClick={handleCancel}
                         >
                           Cancelar
                         </button>

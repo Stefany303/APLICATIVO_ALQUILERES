@@ -412,7 +412,7 @@ const InquilinosRegistrar = () => {
   return (
     <>
       <Header />
-      <Sidebar id='menu-item3' id1='menu-items3' activeClassName='inquilinos'/>
+      <Sidebar id='menu-item3' id1='menu-items3' activeClassName='inquilinos-registrar'/>
         <div className="page-wrapper">
           <div className="content">
             <div className="page-header">

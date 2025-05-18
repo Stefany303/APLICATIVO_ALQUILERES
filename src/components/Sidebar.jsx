@@ -184,7 +184,7 @@ const Sidebar = (props) => {
                   <ul style={{ display: sidebar === 'Espacios' ? 'block' : 'none' }} className="menu-items2">
               
                     <li>
-                      <Link className={props?.activeClassName === 'espacios-anadir' ? 'active' : ''} to="/espacios-anadir">Registrar Espacios</Link>
+                      <Link className={props?.activeClassName === 'espacios-registrar' ? 'active' : ''} to="/espacios-anadir">Registrar Espacios</Link>
                     </li>
                    
                     <li>
@@ -212,9 +212,7 @@ const Sidebar = (props) => {
                     <li>
                       <Link className={props?.activeClassName === 'inquilinos-pago' ? 'active' : ''} to="/inquilinos-pago">Registrar Pago </Link>
                     </li>
-                    <li>
-                      <Link className={props?.activeClassName === 'inquilinos-contrato' ? 'active' : ''} to="/employeesalary">Detalle de contrato</Link>
-                    </li>
+                    
                   </ul>
                 </li>
                 

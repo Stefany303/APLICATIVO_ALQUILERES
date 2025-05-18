@@ -80,7 +80,7 @@ const PersonaRegistrar = () => {
   return (
     <div>
       <Header />
-      <Sidebar id="menu-item2" id1="menu-items2" activeClassName="persona-registrar" />
+      <Sidebar id="menu-item7" id1="menu-items7" activeClassName="persona-registrar" />
       <>
     <div className="page-wrapper">
       <div className="content">
