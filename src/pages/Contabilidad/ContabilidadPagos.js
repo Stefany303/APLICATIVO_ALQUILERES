@@ -16,7 +16,7 @@ import pagoService from '../../services/pagoService';
 import documentoService from '../../services/documentoService';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import moment from 'moment';
-
+import "../../assets/styles/select-components.css";
 const ContabilidadPagos = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1009,29 +1009,6 @@ const ContabilidadPagos = () => {
     },
   ];
 
-  // Personalización del DataTable
-  const customStyles = {
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-    control: (base, state) => ({
-      ...base,
-      borderColor: state.isFocused ? "#2e37a4" : "rgba(46, 55, 164, 0.1)",
-      boxShadow: state.isFocused ? "0 0 0 1px #2e37a4" : "none",
-      "&:hover": {
-        borderColor: "#2e37a4",
-      },
-      borderRadius: "10px",
-      fontSize: "14px",
-      minHeight: "45px",
-    }),
-    dropdownIndicator: (base, state) => ({
-      ...base,
-      transform: state.selectProps.menuIsOpen ? "rotate(-180deg)" : "rotate(0)",
-      transition: "250ms",
-      width: "35px",
-      height: "35px",
-    }),
-  };
-
   const paginationComponentOptions = {
     rowsPerPageText: 'Filas por página:',
     rangeSeparatorText: 'de',
@@ -1103,14 +1080,16 @@ const ContabilidadPagos = () => {
                     <div className="col-12 col-md-4">
                       <div className="form-group">
                         <label>Buscar por</label>
-                        <select 
-                          className="form-select"
-                          value={searchType}
-                          onChange={(e) => setSearchType(e.target.value)}
-                        >
-                          <option value="dni">DNI</option>
-                          <option value="nombre">Nombre</option>
-                        </select>
+                        <Select
+                          options={[
+                            { value: 'dni', label: 'DNI' },
+                            { value: 'nombre', label: 'Nombre' }
+                          ]}
+                          value={{ value: searchType, label: searchType === 'dni' ? 'DNI' : 'Nombre' }}
+                          onChange={(selected) => setSearchType(selected.value)}
+                          placeholder="Seleccionar tipo de búsqueda"
+                          classNamePrefix="select"
+                        />
                       </div>
                     </div>
                     
@@ -1296,10 +1275,10 @@ const ContabilidadPagos = () => {
                         name="metodoPago"
                         options={metodosPago}
                         onChange={handleSelectChange}
-                        styles={customStyles}
                         placeholder="Seleccionar método de pago"
                         required
                         value={metodosPago.find(m => m.value === formData.metodoPago) || null}
+                        classNamePrefix="select"
                       />
                     </div>
                   </div>
@@ -1311,10 +1290,10 @@ const ContabilidadPagos = () => {
                         name="estado"
                         options={estadosPago}
                         onChange={handleSelectChange}
-                        styles={customStyles}
                         placeholder="Seleccionar estado"
                         required
                         value={estadosPago.find(e => e.value === formData.estado) || null}
+                        classNamePrefix="select"
                       />
                     </div>
                   </div>
@@ -1453,10 +1432,10 @@ const ContabilidadPagos = () => {
                         name="metodoPago"
                         options={metodosPago}
                         onChange={handleSelectChange}
-                        styles={customStyles}
                         placeholder="Seleccionar método de pago"
                         required
                         value={metodosPago.find(m => m.value === formData.metodoPago) || null}
+                        classNamePrefix="select"
                       />
                     </div>
                   </div>
@@ -1468,10 +1447,10 @@ const ContabilidadPagos = () => {
                         name="estado"
                         options={estadosPago}
                         onChange={handleSelectChange}
-                        styles={customStyles}
                         placeholder="Seleccionar estado"
                         required
                         value={estadosPago.find(e => e.value === formData.estado) || null}
+                        classNamePrefix="select"
                       />
                     </div>
                   </div>

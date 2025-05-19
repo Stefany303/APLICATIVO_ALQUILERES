@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import '../../assets/styles/table-styles.css';
+import '../../assets/styles/select-components.css';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import Sidebar from "../../components/Sidebar";
 import { plusicon, refreshicon, searchnormal, pdficon, pdficon3, pdficon4 } from '../../components/imagepath';
 import { FiChevronRight } from "react-icons/fi";
 import { onShowSizeChange, itemRender } from '../../components/Pagination';
-import { Table, Select, DatePicker, message, Spin, Modal, Button, Form, Input, DatePicker as AntDatePicker } from 'antd';
+import { Table, DatePicker, message, Spin, Modal, Button, Form, Input, DatePicker as AntDatePicker } from 'antd';
+import Select from 'react-select';
 import { useAuth } from "../../utils/AuthContext";
 import contratoService from "../../services/contratoService";
 import inmuebleService from "../../services/inmuebleService";
@@ -480,14 +482,14 @@ const ContratoRegistros = () => {
                                 <label>Inmueble</label>
                                 <Select
                                   placeholder="Seleccionar inmueble"
-                                  allowClear
-                                  style={{ width: '100%' }}
-                                  value={selectedInmueble}
-                                  onChange={handleInmuebleChange}
+                                  isClearable
+                                  value={selectedInmueble ? { value: selectedInmueble, label: inmuebles.find(i => i.id === selectedInmueble)?.nombre } : null}
+                                  onChange={(option) => handleInmuebleChange(option?.value)}
                                   options={inmuebles.map(inmueble => ({
                                     value: inmueble.id,
                                     label: inmueble.nombre
                                   }))}
+                                  classNamePrefix="select"
                                 />
                               </div>
                             </div>
@@ -496,15 +498,15 @@ const ContratoRegistros = () => {
                                 <label>Piso</label>
                                 <Select
                                   placeholder="Seleccionar piso"
-                                  allowClear
-                                  style={{ width: '100%' }}
-                                  value={selectedPiso}
-                                  onChange={handlePisoChange}
+                                  isClearable
+                                  value={selectedPiso ? { value: selectedPiso, label: pisos.find(p => p.id === selectedPiso)?.nombre } : null}
+                                  onChange={(option) => handlePisoChange(option?.value)}
                                   options={pisos.map(piso => ({
                                     value: piso.id,
                                     label: piso.nombre
                                   }))}
-                                  disabled={!selectedInmueble}
+                                  isDisabled={!selectedInmueble}
+                                  classNamePrefix="select"
                                 />
                               </div>
                             </div>
@@ -513,15 +515,15 @@ const ContratoRegistros = () => {
                                 <label>Estado del contrato</label>
                                 <Select
                                   placeholder="Seleccionar estado"
-                                  allowClear
-                                  style={{ width: '100%' }}
-                                  value={selectedEstado}
-                                  onChange={handleEstadoChange}
+                                  isClearable
+                                  value={selectedEstado ? { value: selectedEstado, label: selectedEstado.charAt(0).toUpperCase() + selectedEstado.slice(1) } : null}
+                                  onChange={(option) => handleEstadoChange(option?.value)}
                                   options={[
                                     { value: 'activo', label: 'Activo' },
                                     { value: 'inactivo', label: 'Inactivo' },
                                     { value: 'finalizado', label: 'Finalizado' }
                                   ]}
+                                  classNamePrefix="select"
                                 />
                               </div>
                             </div>
@@ -763,11 +765,15 @@ const ContratoRegistros = () => {
                   label="Estado"
                   rules={[{ required: true, message: 'Por favor seleccione el estado' }]}
                 >
-                  <Select>
-                    <Select.Option value="activo">Activo</Select.Option>
-                    <Select.Option value="inactivo">Inactivo</Select.Option>
-                    <Select.Option value="finalizado">Finalizado</Select.Option>
-                  </Select>
+                  <Select
+                    placeholder="Seleccionar estado"
+                    options={[
+                      { value: 'activo', label: 'Activo' },
+                      { value: 'inactivo', label: 'Inactivo' },
+                      { value: 'finalizado', label: 'Finalizado' }
+                    ]}
+                    classNamePrefix="select"
+                  />
                 </Form.Item>
               </div>
               
