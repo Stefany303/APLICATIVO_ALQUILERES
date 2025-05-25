@@ -1,5 +1,5 @@
 import api from './api';
-import { API_URL, getAuthToken } from './authService';
+import { API_URL } from './authService';
 
 const documentoService = {
   // Obtener todos los documentos
@@ -38,6 +38,12 @@ const documentoService = {
   // Crear un documento usando fetch directamente
   crearDocumento: async (documento) => {
     try {
+      // Obtener el token de autenticación
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+
       // Crear un objeto simple con los datos exactos
       const documentoEnviar = {
         nombre: documento.nombre,
@@ -50,12 +56,12 @@ const documentoService = {
       const url = `${API_URL}/documentos`;
       console.log('URL:', url);
 
-      // Usar fetch en lugar de axios
+      // Usar fetch con el token en el header
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': getAuthToken() || ''
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(documentoEnviar)
       });
@@ -77,8 +83,27 @@ const documentoService = {
   // Actualizar un documento
   actualizarDocumento: async (id, documento) => {
     try {
-      const response = await api.put(`${API_URL}/documentos/${id}`, documento);
-      return response.data;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+
+      const response = await fetch(`${API_URL}/documentos/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(documento)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Error ${response.status}: ${errorData.mensaje || response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('Error al actualizar el documento:', error);
       throw error;
@@ -88,10 +113,55 @@ const documentoService = {
   // Eliminar un documento
   eliminarDocumento: async (id) => {
     try {
-      const response = await api.delete(`${API_URL}/documentos/${id}`);
-      return response.data;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+
+      const response = await fetch(`${API_URL}/documentos/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Error ${response.status}: ${errorData.mensaje || response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('Error al eliminar el documento:', error);
+      throw error;
+    }
+  },
+
+  // Obtener documentos por documentable_id y documentable_type
+  obtenerDocumentosPorTipo: async (documentable_id, documentable_type) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+
+      const response = await fetch(`${API_URL}/documentos/documentable/${documentable_id}/${documentable_type}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Error ${response.status}: ${errorData.mensaje || response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error al obtener los documentos:', error);
       throw error;
     }
   },
@@ -113,7 +183,13 @@ const documentoService = {
       console.log('- Tipo:', documentable_type);
       console.log('- Opciones:', options);
 
-      // Agregar el ID y el tipo al FormData en lugar de usar headers personalizados
+      // Obtener el token de autenticación
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+
+      // Agregar el ID y el tipo al FormData
       const formData = new FormData();
       formData.append('archivo', file);
       formData.append('documentable_id', documentable_id.toString());
@@ -121,19 +197,16 @@ const documentoService = {
       
       // Especificar la carpeta destino basada en el tipo de documento
       if (documentable_type === 'gasto') {
-        // Para gastos, guardar en public/documentos/gasto
         formData.append('carpetaDestino', 'documentos/gasto');
-        console.log('Documento de gasto: usando carpeta específica para gastos');
       } else if (documentable_type === 'pago') {
-        // Para pagos, guardar en public/documentos/pago
         formData.append('carpetaDestino', 'documentos/pago');
-        console.log('Documento de pago: usando carpeta específica para pagos');
-      } else {
-        // Para otros tipos, usar la carpeta común si se especifica
-        if (options.usarCarpetaComun) {
-          formData.append('usarCarpetaComun', 'true');
-          console.log('Documento de otro tipo: usando carpeta común');
-        }
+      } else if (documentable_type === 'contrato') {
+        formData.append('carpetaDestino', 'documentos/contrato');
+      }
+
+      // Si se especifica usar carpeta común
+      if (options.usarCarpetaComun) {
+        formData.append('usarCarpetaComun', 'true');
       }
 
       console.log('Contenido del FormData:');
@@ -141,18 +214,16 @@ const documentoService = {
         console.log(pair[0] + ': ' + (pair[0] === 'archivo' ? 'Archivo presente' : pair[1]));
       }
 
-      console.log(`Enviando solicitud a: ${API_URL}/documentos/upload`);
-      
-      // Usamos solo la cabecera de Authorization, sin las personalizadas
+      // Enviar la solicitud al servidor
       const response = await fetch(`${API_URL}/documentos/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': getAuthToken() || ''
+          'Authorization': `Bearer ${token}`
         },
         body: formData
       });
 
-      // Log de la respuesta HTTP antes de procesarla
+      // Log de la respuesta HTTP
       console.log('Respuesta HTTP:', response.status, response.statusText);
       
       const responseData = await response.text();
@@ -166,15 +237,115 @@ const documentoService = {
         throw new Error(`Error al procesar la respuesta del servidor: ${responseData}`);
       }
 
-      if (!response.ok) {
+      if (!response.ok || !data.ruta) {
         console.error('Error detallado del servidor:', data);
-        throw new Error(`Error ${response.status}: ${data.mensaje || data.error || response.statusText}`);
+        throw new Error(data.mensaje || data.error || 'Error al subir el archivo');
       }
 
-      console.log('Respuesta del backend:', data);
       return data;
     } catch (error) {
       console.error('Error al subir el archivo:', error);
+      throw error;
+    }
+  },
+
+  // Obtener la URL completa para ver un documento
+  getDocumentUrl: (rutaRelativa) => {
+    if (!rutaRelativa) return null;
+    return `${API_URL}/documentos/ver/${rutaRelativa}`;
+  },
+
+  // Obtener la URL completa para descargar un documento
+  getDownloadUrl: (rutaRelativa) => {
+    if (!rutaRelativa) return null;
+    return `${API_URL}/documentos/descargar/${rutaRelativa}`;
+  },
+
+  // Ver documento
+  verDocumento: async (rutaRelativa) => {
+    try {
+      if (!rutaRelativa) {
+        throw new Error('Ruta del documento no disponible');
+      }
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+
+      const url = `${API_URL}/documentos/ver/${rutaRelativa}`;
+      console.log('URL para ver documento:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Abrir el documento en una nueva pestaña con el token en la URL
+      window.open(`${url}?token=${token}`, '_blank');
+      return true;
+    } catch (error) {
+      console.error('Error al ver documento:', error);
+      throw error;
+    }
+  },
+
+  // Descargar documento
+  descargarDocumento: async (rutaRelativa, nombreArchivo) => {
+    try {
+      if (!rutaRelativa) {
+        throw new Error('Ruta del documento no disponible');
+      }
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+
+      console.log('Iniciando descarga:', { rutaOriginal: rutaRelativa, nombreArchivo });
+      const url = `${API_URL}/documentos/descargar/${rutaRelativa}`;
+      console.log('URL de descarga:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.mensaje || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Obtener el blob del archivo
+      const blob = await response.blob();
+      
+      // Crear URL del blob
+      const downloadUrl = window.URL.createObjectURL(blob);
+      
+      // Crear un elemento <a> temporal
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = nombreArchivo || 'documento.pdf';
+      
+      // Agregar al DOM, hacer clic y remover
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Liberar la URL del blob
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      return true;
+    } catch (error) {
+      console.error('Error al descargar documento:', error);
       throw error;
     }
   }

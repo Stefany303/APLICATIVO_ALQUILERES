@@ -93,6 +93,20 @@ const contratoService = {
       console.error('Error al obtener espacios disponibles:', error);
       throw error;
     }
+  },
+
+  // Función para activar un contrato
+  activarContrato: async (id) => {
+    try {
+      // Enviamos el estado 'activo' en el cuerpo de la petición
+      const response = await api.put(`/contratos/${id}`, {
+        estado: 'activo'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error al activar el contrato:', error);
+      throw error;
+    }
   }
 };
 

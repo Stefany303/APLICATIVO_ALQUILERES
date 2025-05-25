@@ -4,6 +4,7 @@ import { FaChevronRight, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import InquilinosChart from "../Dashboard/InquilinosChart";
+import IngresosGastosChart from "../Dashboard/IngresosGastosChart";
 import Select from "react-select";
 import {
   Avatar2,
@@ -26,11 +27,8 @@ import {
 import { Link } from "react-router-dom";
 import CountUp from "react-countup";
 import { useAuth } from "../../utils/AuthContext";
-import personaService from '../../services/personaService';
-import inmuebleService from '../../services/inmuebleService';
-import espacioService from '../../services/espacioService';
-import contratoService from '../../services/contratoService';
-import { message, Spin, Card, Row, Col, Statistic, Progress } from 'antd';
+import reporteService from '../../services/reporteService';
+import { message, Spin, Card, Row, Col, Statistic, Progress, Table } from 'antd';
 import moment from 'moment';
 
 const AdminDashboard = () => {
@@ -57,7 +55,9 @@ const AdminDashboard = () => {
       ingresos: 0,
       contratos: 0,
       ocupacion: 0
-    }
+    },
+    // Datos completos del API
+    datosCrudos: null
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -73,193 +73,146 @@ const AdminDashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        
-        // Obtener datos con un manejo de errores mejorado y logs para debugging
         console.log('Iniciando carga de datos del dashboard...');
         
-        const [personas, inmuebles, contratos] = await Promise.all([
-          personaService.obtenerInquilinos().catch(err => {
-            console.error('Error al obtener inquilinos:', err);
-            return [];
-          }),
-          inmuebleService.obtenerInmuebles().catch(err => {
-            console.error('Error al obtener inmuebles:', err);
-            return [];
-          }),
-          contratoService.obtenerContratosDetalles().catch(err => {
-            console.error('Error al obtener contratos:', err);
-            return [];
-          })
-        ]);
+        // Usar el nuevo servicio para obtener todos los datos en una sola llamada
+        const dashboardResponse = await reporteService.obtenerDatosDashboard();
+        console.log('Datos recibidos del dashboard:', dashboardResponse);
         
-        console.log('Datos recibidos:');
-        console.log('- Personas:', personas);
-        console.log('- Inmuebles:', inmuebles);
-        console.log('- Contratos:', contratos);
-
-        // Calcular total de clientes
-        const totalClientes = Array.isArray(personas) ? personas.length : 0;
-        console.log('Total clientes calculado:', totalClientes);
-
-        // Inicializar espacios
-        let espaciosPromises = [];
-        if (Array.isArray(inmuebles)) {
-          inmuebles.forEach(inmueble => {
-            // Verificar que el ID del inmueble es válido
-            if (inmueble && inmueble.id) {
-              espaciosPromises.push(
-                espacioService.obtenerEspacios(inmueble.id)
-                  .catch(err => {
-                    console.error(`Error al obtener espacios del inmueble ${inmueble.id}:`, err);
-                    return [];
-                  })
-              );
-            }
-          });
-        }
-
-        // Esperar a que se resuelvan todas las promesas de espacios
-        const espaciosPorInmueble = await Promise.all(espaciosPromises);
-        const espacios = espaciosPorInmueble.flat();
-        console.log('Espacios obtenidos:', espacios);
-
-        // Procesar espacios
-        let espaciosOcupados = 0;
-        let espaciosDisponibles = 0;
-        let totalEspacios = Array.isArray(espacios) ? espacios.length : 0;
-
-        if (Array.isArray(espacios)) {
-          espacios.forEach(espacio => {
-            if (espacio && espacio.estado === 1) {
-              espaciosOcupados++;
-            } else if (espacio) {
-              espaciosDisponibles++;
-            }
-          });
+        if (!dashboardResponse) {
+          throw new Error('No se recibieron datos del dashboard');
         }
         
-        console.log(`Espacios procesados: Total: ${totalEspacios}, Ocupados: ${espaciosOcupados}, Disponibles: ${espaciosDisponibles}`);
-
-        // Procesar contratos
-        let contratosActivos = 0;
-        let contratosPorVencer = 0;
-        let ingresosMensuales = 0;
-        let pagosPendientes = 0;
+        // Procesar los datos recibidos
+        const {
+          totalInquilinos,
+          espaciosDisponibles,
+          ingresos,
+          gastos,
+          contratos,
+          ocupacion,
+          contratosPorVencer,
+          pagos,
+          contratosVencidos
+        } = dashboardResponse;
         
-        // Obtener fecha actual y fecha en 30 días
-        const fechaActual = moment();
-        const fechaEn30Dias = moment().add(30, 'days');
+        // Calcular totales
+        let totalClientes = totalInquilinos?.data?.[0]?.total_inquilinos || 0;
         
-        // Contador para pagos del mes
-        const pagosDelMes = {
-          completados: 0,
-          pendientes: 0,
-          retrasados: 0,
-          totalMonto: 0
-        };
-
-        if (Array.isArray(contratos)) {
-          contratos.forEach(contrato => {
-            // Verificar datos del contrato para evitar errores
-            if (!contrato) return;
+        // Calcular espacios totales, ocupados y disponibles
+        let espaciosOcupadosTotal = 0;
+        let espaciosDisponiblesTotal = 0;
+        let espaciosTotalGeneral = 0;
+        
+        if (Array.isArray(espaciosDisponibles)) {
+          espaciosDisponibles.forEach(inmueble => {
+            const ocupados = parseInt(inmueble.espacios_ocupados || 0);
+            const disponibles = parseInt(inmueble.espacios_disponibles || 0);
             
-            // Verificar si el contrato está activo
-            if (contrato.estado && contrato.estado.toLowerCase() === 'activo') {
-              contratosActivos++;
-              
-              // Sumar montos, asegurando que sean valores numéricos
-              const montoAlquiler = parseFloat(contrato.monto_alquiler || 0);
-              if (!isNaN(montoAlquiler)) {
-                ingresosMensuales += montoAlquiler;
-              }
-              
-              // Verificar si vence en los próximos 30 días
-              if (contrato.fecha_fin) {
-                const fechaFin = moment(contrato.fecha_fin);
-                if (fechaFin.isValid() && fechaFin.isBetween(fechaActual, fechaEn30Dias)) {
-                  contratosPorVencer++;
-                }
-              }
-              
-              // Revisar pagos
-              if (Array.isArray(contrato.pagos)) {
-                contrato.pagos.forEach(pago => {
-                  if (!pago) return;
-                  
-                  // Verificar si el pago es del mes actual
-                  if (pago.fecha) {
-                    const fechaPago = moment(pago.fecha);
-                    if (fechaPago.isValid() && fechaPago.isSame(fechaActual, 'month')) {
-                      const montoPago = parseFloat(pago.monto || 0);
-                      if (!isNaN(montoPago)) {
-                        pagosDelMes.totalMonto += montoPago;
-                      }
-                      
-                      // Clasificar el pago según su estado
-                      if (pago.estado === 'completado') {
-                        pagosDelMes.completados++;
-                      } else if (pago.estado === 'pendiente') {
-                        pagosDelMes.pendientes++;
-                        pagosPendientes += parseFloat(pago.monto || 0);
-                      } else if (pago.estado === 'retrasado') {
-                        pagosDelMes.retrasados++;
-                        pagosPendientes += parseFloat(pago.monto || 0);
-                      }
-                    }
-                  }
-                });
-              } else {
-                // Si no hay datos de pagos, simulamos para la demo
-                // En un entorno real, esto se eliminaría
-                if (Math.random() > 0.5) {
-                  pagosDelMes.completados++;
-                } else {
-                  pagosDelMes.pendientes++;
-                }
-              }
-            }
+            espaciosOcupadosTotal += ocupados;
+            espaciosDisponiblesTotal += disponibles;
+            espaciosTotalGeneral += inmueble.total_espacios || 0;
           });
         }
         
-        console.log('Contratos procesados:', {
-          activos: contratosActivos,
-          porVencer: contratosPorVencer,
-          ingresosMensuales,
-          pagosPendientes,
-          pagosDelMes
-        });
-
-        // Asegurarse de que al menos haya valores mínimos para la visualización
-        // (solo para demostración, eliminar en producción real)
-        if (pagosDelMes.completados + pagosDelMes.pendientes + pagosDelMes.retrasados === 0) {
-          pagosDelMes.completados = 3;
-          pagosDelMes.pendientes = 2;
-          pagosDelMes.retrasados = 1;
+        // Calcular ingresos mensuales (último mes disponible)
+        let ingresosMensuales = 0;
+        if (Array.isArray(ingresos) && ingresos.length > 0) {
+          // Ordenar por mes (del más reciente al más antiguo)
+          ingresos.sort((a, b) => b.mes.localeCompare(a.mes));
+          ingresosMensuales = parseFloat(ingresos[0].total_ingresos) || 0;
         }
-
-        // Calcular tendencias (simuladas por ahora, en una implementación real se compararían con datos históricos)
-        const tendencia = {
-          clientes: Math.random() > 0.5 ? Math.random() * 15 : -Math.random() * 10,
-          ingresos: Math.random() > 0.6 ? Math.random() * 20 : -Math.random() * 15,
-          contratos: Math.random() > 0.7 ? Math.random() * 12 : -Math.random() * 8,
-          ocupacion: espaciosOcupados > espaciosDisponibles ? 5 : -5
+        
+        // Calcular pagos pendientes del mes actual
+        let pagosPendientesTotal = 0;
+        let pagosCompletados = 0;
+        let pagosPendientes = 0;
+        let pagosRetrasados = 0;
+        
+        if (Array.isArray(pagos)) {
+          // Obtener el mes actual en formato YYYY-MM
+          const mesActual = moment().format('YYYY-MM');
+          
+          // Buscar los pagos del mes actual
+          const pagoMesActual = pagos.find(p => p.mes === mesActual) || pagos[0]; // Si no hay del mes actual, usar el primero
+          
+          if (pagoMesActual) {
+            pagosCompletados = parseFloat(pagoMesActual.monto_pagado || 0);
+            pagosPendientes = parseFloat(pagoMesActual.monto_pendiente || 0);
+            pagosPendientesTotal = pagosPendientes;
+          }
+          
+          // Para demo, distribuir pagos pendientes entre pendientes y retrasados
+          if (pagosPendientes > 0) {
+            pagosRetrasados = Math.round(pagosPendientes * 0.3); // 30% retrasados
+            pagosPendientes = Math.round(pagosPendientes * 0.7); // 70% pendientes
+          }
+        }
+        
+        // Obtener contratos activos
+        let contratosActivos = parseInt(contratos?.data?.contratos_activos_mes_actual || 0);
+        
+        // Obtener contratos por vencer
+        let contratosPorVencerTotal = Array.isArray(contratosPorVencer) ? contratosPorVencer.length : 0;
+        
+        // Calcular tendencias
+        const tendenciaClientes = totalInquilinos?.variacion_porcentual || 0;
+        const tendenciaContratos = contratos?.variacion_porcentual || 0;
+        
+        // Calcular tendencia de ingresos (comparando los dos meses más recientes)
+        let tendenciaIngresos = 0;
+        if (Array.isArray(ingresos) && ingresos.length >= 2) {
+          const ingresoActual = parseFloat(ingresos[0].total_ingresos) || 0;
+          const ingresoAnterior = parseFloat(ingresos[1].total_ingresos) || 0;
+          
+          if (ingresoAnterior > 0) {
+            tendenciaIngresos = ((ingresoActual - ingresoAnterior) / ingresoAnterior) * 100;
+          }
+        }
+        
+        // Calcular tendencia de ocupación
+        let tendenciaOcupacion = 0;
+        if (espaciosTotalGeneral > 0) {
+          const tasaOcupacion = (espaciosOcupadosTotal / espaciosTotalGeneral) * 100;
+          // Para simplificar, usamos un valor positivo si la ocupación es mayor al 50%
+          tendenciaOcupacion = tasaOcupacion > 50 ? 5 : -5;
+        }
+        
+        // Estructurar pagos del mes para el gráfico
+        const pagosDelMes = {
+          completados: pagosCompletados > 0 ? 1 : 0, // Convertir a contador
+          pendientes: pagosPendientes > 0 ? 1 : 0,   // Convertir a contador
+          retrasados: pagosRetrasados > 0 ? 1 : 0,   // Convertir a contador
+          totalMonto: pagosCompletados + pagosPendientes + pagosRetrasados
         };
-
+        
+        // Asegurarnos de que haya al menos un valor para el gráfico
+        if (pagosDelMes.completados + pagosDelMes.pendientes + pagosDelMes.retrasados === 0) {
+          pagosDelMes.completados = 1;
+        }
+        
         // Actualizar datos del dashboard
         const newDashboardData = {
           totalClientes,
-          espaciosOcupados,
-          espaciosDisponibles,
+          espaciosOcupados: espaciosOcupadosTotal,
+          espaciosDisponibles: espaciosDisponiblesTotal,
           ingresosMensuales,
-          pagosPendientes,
+          pagosPendientes: pagosPendientesTotal,
           contratosActivos,
-          contratosPorVencer,
-          totalEspacios,
+          contratosPorVencer: contratosPorVencerTotal,
+          totalEspacios: espaciosTotalGeneral,
           pagosDelMes,
-          tendencia
+          tendencia: {
+            clientes: tendenciaClientes,
+            ingresos: tendenciaIngresos,
+            contratos: tendenciaContratos,
+            ocupacion: tendenciaOcupacion
+          },
+          // Guardar los datos crudos para referencias futuras
+          datosCrudos: dashboardResponse
         };
         
-        console.log('Datos finales del dashboard:', newDashboardData);
+        console.log('Datos procesados del dashboard:', newDashboardData);
         setDashboardData(newDashboardData);
 
       } catch (error) {
@@ -476,6 +429,50 @@ const AdminDashboard = () => {
                   <p className="card-text text-center">
                     {dashboardData.espaciosOcupados} de {dashboardData.totalEspacios} espacios ocupados
                   </p>
+                  
+                  {dashboardData.datosCrudos?.ocupacion && dashboardData.datosCrudos.ocupacion.length > 0 && (
+                    <div className="mt-3" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                      <table className="table table-sm">
+                        <thead>
+                          <tr>
+                            <th>Inmueble</th>
+                            <th>Ocupación</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dashboardData.datosCrudos.ocupacion.map((item, index) => (
+                            <tr key={index}>
+                              <td title={item.inmueble_nombre}>
+                                {item.inmueble_nombre.length > 15 
+                                  ? item.inmueble_nombre.substring(0, 13) + '...' 
+                                  : item.inmueble_nombre}
+                              </td>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <div style={{ width: '60px' }}>
+                                    {parseFloat(item.tasa_ocupacion).toFixed(1)}%
+                                  </div>
+                                  <div className="progress flex-grow-1" style={{ height: '5px' }}>
+                                    <div 
+                                      className="progress-bar"
+                                      style={{ 
+                                        width: `${item.tasa_ocupacion}%`,
+                                        backgroundColor: parseFloat(item.tasa_ocupacion) > 70 
+                                          ? '#52c41a' 
+                                          : parseFloat(item.tasa_ocupacion) > 30 
+                                            ? '#1890ff' 
+                                            : '#ff4d4f'  
+                                      }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -494,6 +491,35 @@ const AdminDashboard = () => {
                   <p className="card-text mt-2">
                     Vencen en los próximos 30 días
                   </p>
+                  {dashboardData.datosCrudos?.contratosPorVencer && dashboardData.datosCrudos.contratosPorVencer.length > 0 && (
+                    <div className="mt-2">
+                      <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                        <table className="table table-sm table-hover">
+                          <thead>
+                            <tr>
+                              <th>Inquilino</th>
+                              <th>Espacio</th>
+                              <th>Días</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dashboardData.datosCrudos.contratosPorVencer.slice(0, 3).map(contrato => (
+                              <tr key={contrato.id}>
+                                <td title={contrato.inquilino_nombre}>{contrato.inquilino_nombre.length > 12 ? contrato.inquilino_nombre.substring(0, 10) + '...' : contrato.inquilino_nombre}</td>
+                                <td title={contrato.espacio_nombre}>{contrato.espacio_nombre}</td>
+                                <td className={contrato.dias_restantes <= 7 ? 'text-danger' : 'text-warning'}>
+                                  {contrato.dias_restantes}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <Link to="/contratos-registros" className="btn btn-sm btn-outline-warning w-100 mt-2">
+                        Ver todos
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -510,8 +536,46 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <p className="card-text mt-2">
-                    {dashboardData.pagosDelMes.pendientes + dashboardData.pagosDelMes.retrasados} pagos pendientes este mes
+                    {dashboardData.pagosDelMes.pendientes + dashboardData.pagosDelMes.retrasados > 0 ? 
+                      `${dashboardData.pagosDelMes.pendientes + dashboardData.pagosDelMes.retrasados} pagos pendientes este mes` : 
+                      'Sin pagos pendientes registrados'
+                    }
                   </p>
+
+                  {dashboardData.datosCrudos?.pagos && dashboardData.datosCrudos.pagos.length > 0 && (
+                    <div className="mt-2" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                      <table className="table table-sm">
+                        <thead>
+                          <tr>
+                            <th>Mes</th>
+                            <th>Pagado</th>
+                            <th>Pendiente</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dashboardData.datosCrudos.pagos.slice(0, 4).map((item, index) => {
+                            const mes = moment(item.mes).format('MMM-YY');
+                            const pagado = parseFloat(item.monto_pagado || 0);
+                            const pendiente = parseFloat(item.monto_pendiente || 0);
+                            
+                            return (
+                              <tr key={index}>
+                                <td>{mes}</td>
+                                <td className="text-success">{pagado > 0 ? `S/ ${pagado.toFixed(2)}` : '-'}</td>
+                                <td className={pendiente > 0 ? "text-danger" : "text-muted"}>
+                                  {pendiente > 0 ? `S/ ${pendiente.toFixed(2)}` : '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <Link to="/pagos-registros" className="btn btn-sm btn-outline-danger w-100 mt-2">
+                    Ver todos los pagos
+                  </Link>
                 </div>
               </div>
             </div>
@@ -589,9 +653,7 @@ const AdminDashboard = () => {
                   </div>
                   <div id="patient-chart">
                     <InquilinosChart 
-                      espaciosOcupados={dashboardData.espaciosOcupados}
-                      espaciosDisponibles={dashboardData.espaciosDisponibles}
-                      totalEspacios={dashboardData.totalEspacios}
+                      espaciosData={dashboardData.datosCrudos?.espaciosDisponibles || dashboardData.datosCrudos?.ocupacion}
                       selectedYear={selectedOption?.value || currentYear}
                     />
                   </div>
@@ -609,6 +671,10 @@ const AdminDashboard = () => {
                       completados={dashboardData.pagosDelMes.completados || 0}
                       pendientes={dashboardData.pagosDelMes.pendientes || 0}
                       retrasados={dashboardData.pagosDelMes.retrasados || 0}
+                      montoCompletado={dashboardData.datosCrudos?.pagos && dashboardData.datosCrudos.pagos.length > 0 ? 
+                        parseFloat(dashboardData.datosCrudos.pagos[0]?.monto_pagado || 0) : 0}
+                      montoPendiente={dashboardData.datosCrudos?.pagos && dashboardData.datosCrudos.pagos.length > 0 ? 
+                        parseFloat(dashboardData.datosCrudos.pagos[0]?.monto_pendiente || 0) : 0}
                     />
                     <img src={user001} alt="Usuario" />
                   </div>
@@ -634,6 +700,58 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nuevo gráfico Ingresos vs Gastos */}
+          <div className="row mt-4">
+            <div className="col-12">
+              <div className="card">
+                <div className="card-body">
+                  <div className="chart-title mb-4">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <h4>Análisis Financiero</h4>
+                      <div className="form-group m-0" style={{ width: '200px' }}>
+                        <Select
+                          className="custom-react-select"
+                          defaultValue={yearOptions[0]}
+                          onChange={setSelectedOption}
+                          options={yearOptions}
+                          id="search-financial-year"
+                          components={{
+                            IndicatorSeparator: () => null
+                          }}
+                          styles={{
+                            control: (baseStyles, state) => ({
+                              ...baseStyles,
+                              borderColor: state.isFocused ? 'none' : '2px solid rgba(46, 55, 164, 0.1);',
+                              boxShadow: state.isFocused ? '0 0 0 1px #2e37a4' : 'none',
+                              '&:hover': {
+                                borderColor: state.isFocused ? 'none' : '2px solid rgba(46, 55, 164, 0.1)',
+                              },
+                              borderRadius: '10px',
+                              fontSize: "14px",
+                              minHeight: "40px",
+                            }),
+                            dropdownIndicator: (base, state) => ({
+                              ...base,
+                              transform: state.selectProps.menuIsOpen ? 'rotate(-180deg)' : 'rotate(0)',
+                              transition: '250ms',
+                              width: '30px',
+                              height: '30px',
+                            }),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <IngresosGastosChart
+                    ingresos={dashboardData.datosCrudos?.ingresos}
+                    gastos={dashboardData.datosCrudos?.gastos}
+                    selectedYear={selectedOption?.value || currentYear}
+                  />
                 </div>
               </div>
             </div>

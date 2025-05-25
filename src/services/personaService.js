@@ -45,6 +45,21 @@ const personaService = {
     }
   },
 
+  // Obtener una persona por documento (DNI, RUC, etc.)
+  obtenerPersonaPorDocumento: async (documento) => {
+    try {
+      const response = await api.get(`/personas/dni/${documento}`);
+      return response.data;
+    } catch (error) {
+      // Si es 404, significa que no existe la persona
+      if (error.response && error.response.status === 404) {
+        return null;
+      }
+      console.error('Error al buscar persona por documento:', error);
+      throw error;
+    }
+  },
+
   // Crear una nueva persona (protegido, solo administradores)
   crearPersona: async (personaData) => {
     try {

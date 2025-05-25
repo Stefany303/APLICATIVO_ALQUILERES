@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import Header from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
-import { DatePicker, Modal } from "antd";
+import { DatePicker, Modal, Button } from "antd";
+import { message } from "antd";
 import { FiChevronRight, FiSearch, FiX, FiRefreshCw, FiDollarSign, FiEdit, FiEye, FiFileText, FiImage, FiDownload } from "react-icons/fi";
 import Select from "react-select";
 import DataTable from 'react-data-table-component';
@@ -48,6 +49,11 @@ const ContabilidadPagos = () => {
   const [modalEditVisible, setModalEditVisible] = useState(false);
   const [modalViewVisible, setModalViewVisible] = useState(false);
   const [pagoVisualizando, setPagoVisualizando] = useState(null);
+  const [modalRegistroVisible, setModalRegistroVisible] = useState(false);
+  const [pagoARegistrar, setPagoARegistrar] = useState(null);
+  const [comprobanteFile, setComprobanteFile] = useState(null);
+  const [loadingRegistro, setLoadingRegistro] = useState(false);
+  const [metodoPagoRegistro, setMetodoPagoRegistro] = useState(null);
 
   const metodosPago = [
     { value: 'efectivo', label: 'Efectivo' },
@@ -64,6 +70,12 @@ const ContabilidadPagos = () => {
     { value: 'vencido', label: 'Vencido' }
   ];
 
+  const tiposPago = [
+    { value: 'alquiler', label: 'Alquiler' },
+    { value: 'mantenimiento', label: 'Mantenimiento' },
+    { value: 'servicios', label: 'Servicios' },
+    { value: 'otros', label: 'Otros' }
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -937,6 +949,102 @@ const ContabilidadPagos = () => {
     }
   };
 
+  // Función para manejar el registro de pago
+  const handleRegistrarPago = (pago) => {
+    setPagoARegistrar(pago);
+    setComprobanteFile(null);
+    setMetodoPagoRegistro(pago.metodo_pago || null);
+    setModalRegistroVisible(true);
+  };
+
+  // Función para manejar el cambio del archivo de comprobante
+  const handleComprobanteChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setComprobanteFile(file);
+    }
+  };
+
+  // Función para manejar el envío del registro de pago
+  const handleSubmitRegistro = async (e) => {
+    e.preventDefault();
+    
+    if (!pagoARegistrar) {
+      message.error('No se ha seleccionado ningún pago');
+      return;
+    }
+
+    if (!comprobanteFile) {
+      message.error('Debe subir un comprobante de pago');
+      return;
+    }
+
+    // Verificar que el archivo sea PDF
+    if (comprobanteFile.type !== 'application/pdf') {
+      message.error('Solo se permiten archivos PDF');
+      return;
+    }
+
+    if (!metodoPagoRegistro) {
+      message.error('Debe seleccionar el método de pago');
+      return;
+    }
+
+    try {
+      setLoadingRegistro(true);
+      message.loading('Registrando pago...', 0);
+
+      // Subir el comprobante
+      const respuestaArchivo = await documentoService.subirArchivo(
+        comprobanteFile,
+        pagoARegistrar.id,
+        'pago',
+        { carpetaDestino: 'documentos/pago' }
+      );
+
+      if (!respuestaArchivo || !respuestaArchivo.ruta) {
+        throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
+      }
+
+      // Registrar el documento en la base de datos
+      const documentoData = {
+        nombre: comprobanteFile.name,
+        ruta: respuestaArchivo.ruta,
+        documentable_id: pagoARegistrar.id,
+        documentable_type: 'pago'
+      };
+
+      await documentoService.crearDocumento(documentoData);
+
+      // Actualizar el estado del pago a pagado y el método de pago
+      await pagoService.actualizarPago(pagoARegistrar.id, {
+        estado: 'pagado',
+        fecha_real_pago: new Date().toISOString().split('T')[0],
+        metodo_pago: metodoPagoRegistro
+      });
+
+      message.destroy();
+      message.success('Pago registrado correctamente');
+      setModalRegistroVisible(false);
+      setComprobanteFile(null);
+      setMetodoPagoRegistro(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      // Actualizar la lista de pagos
+      const pagosActualizados = await pagoService.obtenerPagos();
+      setPagos(Array.isArray(pagosActualizados) ? pagosActualizados : []);
+
+    } catch (error) {
+      message.destroy();
+      console.error('Error al registrar el pago:', error);
+      message.error(`Error al registrar el pago: ${error.message}`);
+    } finally {
+      setLoadingRegistro(false);
+    }
+  };
+
   // Configuración de columnas para DataTable
   const columns = [
     {
@@ -982,9 +1090,10 @@ const ContabilidadPagos = () => {
         <div className="actions">
           <button
             type="button"
-            className="btn btn-sm btn-primary me-1"
-            onClick={() => seleccionarPago(row)}
-            title="Pagar"
+            className="btn btn-sm btn-success me-1"
+            onClick={() => handleRegistrarPago(row)}
+            title="Registrar Pago"
+            disabled={row.estado === 'pagado'}
           >
             <FiDollarSign />
           </button>
@@ -1014,6 +1123,67 @@ const ContabilidadPagos = () => {
     rangeSeparatorText: 'de',
     selectAllRowsItem: true,
     selectAllRowsItemText: 'Todos',
+  };
+
+  // Función para validar la existencia del documento
+  const validarDocumento = async (rutaDocumento) => {
+    if (!rutaDocumento) {
+      alert('La ruta del documento no está disponible');
+      return false;
+    }
+
+    try {
+      const existeArchivo = await verificarExistenciaArchivo(rutaDocumento);
+      if (!existeArchivo) {
+        alert('El documento no existe o no está accesible');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error al validar el documento:', error);
+      alert('Error al verificar el documento');
+      return false;
+    }
+  };
+
+  // Utilidad para extraer la ruta relativa de un documento
+  const getRutaRelativa = (ruta) => {
+    if (!ruta) return '';
+    // Si la ruta es absoluta, extrae solo la parte después de /documentos/
+    const idx = ruta.indexOf('/documentos/');
+    if (idx !== -1) {
+      return ruta.substring(idx + 1); // sin el primer slash
+    }
+    // Si ya es relativa, la retorna igual
+    return ruta.replace(/^\//, '');
+  };
+
+  // Función para ver documento directamente usando el servicio
+  const handleViewDocument = async (rutaDocumento) => {
+    try {
+      if (!rutaDocumento) {
+        throw new Error('Ruta del documento no disponible');
+      }
+      const rutaRelativa = getRutaRelativa(rutaDocumento);
+      await documentoService.verDocumento(rutaRelativa);
+    } catch (error) {
+      console.error('Error al abrir documento:', error);
+      message.error('Error al abrir el documento: ' + error.message);
+    }
+  };
+
+  // Función para descargar documento directamente usando el servicio
+  const handleDownloadDocument = async (rutaDocumento, nombreArchivo) => {
+    try {
+      if (!rutaDocumento) {
+        throw new Error('Ruta del documento no disponible');
+      }
+      const rutaRelativa = getRutaRelativa(rutaDocumento);
+      await documentoService.descargarDocumento(rutaRelativa, nombreArchivo);
+    } catch (error) {
+      console.error('Error al descargar el documento:', error);
+      message.error('Error al descargar el documento: ' + error.message);
+    }
   };
 
   if (loading) {
@@ -1563,7 +1733,7 @@ const ContabilidadPagos = () => {
                     </div>
                   )}
                   
-                  {!loadingDoc && documento ? (
+                  {!loadingDoc && documento && !documentoError ? (
                     <div className="document-container p-3 border rounded">
                       <div className="d-flex align-items-center justify-content-between mb-3">
                         <div className="document-info d-flex align-items-center">
@@ -1576,80 +1746,150 @@ const ContabilidadPagos = () => {
                           </span>
                           <span className="document-name">
                             {documento.nombre}
-                            {documentoError && (
-                              <span className="text-danger ms-2">(No disponible)</span>
-                            )}
                           </span>
                         </div>
                         <div className="document-actions">
-                          <button 
-                            type="button" 
-                            className="btn btn-sm btn-outline-primary me-2"
-                            onClick={() => descargarDocumento(documento.ruta, documento.nombre)}
-                            disabled={documentoError}
+                          <Button 
+                            type="default"
+                            icon={<FiDownload className="me-1" />} 
+                            className="me-2"
+                            onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
+                            size="small"
                           >
-                            <FiDownload className="me-1" /> Descargar
-                          </button>
-                          <button 
-                            type="button" 
-                            className="btn btn-sm btn-primary"
-                            onClick={() => abrirDocumentoEnNuevaVentana(documento.ruta)}
-                            disabled={documentoError}
+                            Descargar
+                          </Button>
+                          <Button 
+                            type="primary"
+                            icon={<FiEye className="me-1" />} 
+                            onClick={() => handleViewDocument(documento.ruta)}
+                            size="small"
                           >
-                            <FiEye className="me-1" /> Ver documento
-                          </button>
+                            Ver documento
+                          </Button>
                         </div>
                       </div>
-                      
-                      {/* Mensaje de error si el documento no está disponible */}
-                      {documentoError && (
-                        <div className="alert alert-danger">
-                          <p className="mb-0"><strong>Error:</strong> El documento no se encuentra disponible o no puede ser accedido.</p>
-                          <p className="mb-0 mt-2">Posibles causas:</p>
-                          <ul className="mb-0">
-                            <li>El documento no ha sido subido correctamente</li>
-                            <li>La ruta del documento es incorrecta</li>
-                            <li>No tienes permisos para acceder al documento</li>
-                          </ul>
-                          <p className="mt-2 mb-0">Rutas intentadas:</p>
-                          <ul className="mb-0">
-                            <li><code>{documento.ruta}</code></li>
-                            <li><code>{window.location.origin}/PUBLIC/PAGO/1/pago_{pagoVisualizando.id}.pdf</code></li>
-                            <li><code>{window.location.origin}/public/pago/1/pago_{pagoVisualizando.id}.pdf</code></li>
-                          </ul>
-                        </div>
-                      )}
-                      
-                      {/* Vista previa del documento (solo para imágenes y si no hay error) */}
-                      {documento.tipo === 'imagen' && !documentoError && (
-                        <div className="document-preview text-center">
-                          <img 
-                            src={documento.ruta} 
-                            alt="Comprobante de pago" 
-                            className="img-fluid border rounded" 
-                            style={{ maxHeight: '400px' }} 
-                            onError={() => setDocumentoError(true)}
-                          />
-                        </div>
-                      )}
                     </div>
                   ) : !loadingDoc && (
-                    <div className="alert alert-warning">
+                    <div className="alert alert-info">
                       <FiFileText className="me-2" /> No hay documento adjunto para este pago.
-                      <p className="mt-2 mb-0">
-                        <small>Ubicaciones intentadas:</small>
-                        <ul className="mt-1 mb-0">
-                          <li><small>PUBLIC/PAGO/1/pago_{pagoVisualizando.id}.pdf</small></li>
-                          <li><small>public/pago/1/pago_{pagoVisualizando.id}.pdf</small></li>
-                          <li><small>PUBLIC/PAGO/1/{pagoVisualizando.id}.pdf</small></li>
-                          <li><small>public/pago/1/{pagoVisualizando.id}.pdf</small></li>
-                          <li><small>PUBLIC/PAGO/{pagoVisualizando.id}</small></li>
-                        </ul>
-                      </p>
                     </div>
                   )}
                 </div>
               </div>
+            )}
+          </Modal>
+
+          {/* Modal de Registro de Pago */}
+          <Modal
+            title={<><FiDollarSign className="me-2" /> Registrar Pago</>}
+            open={modalRegistroVisible}
+            onCancel={() => {
+              setModalRegistroVisible(false);
+              setComprobanteFile(null);
+              setMetodoPagoRegistro(null);
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+            }}
+            footer={null}
+            width={600}
+            destroyOnClose={true}
+            centered
+            maskClosable={false}
+          >
+            {pagoARegistrar && (
+              <form onSubmit={handleSubmitRegistro}>
+                <div className="row">
+                  <div className="col-12 mb-3">
+                    <div className="form-group">
+                      <label>Inquilino</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        readOnly
+                        value={`${pagoARegistrar.inquilino_nombre || ''} ${pagoARegistrar.inquilino_apellido || ''}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-12 mb-3">
+                    <div className="form-group">
+                      <label>Monto</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        readOnly
+                        value={pagoARegistrar.monto}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-12 mb-3">
+                    <div className="form-group">
+                      <label>Método de Pago <span className="text-danger">*</span></label>
+                      <Select
+                        name="metodoPago"
+                        options={metodosPago}
+                        onChange={option => setMetodoPagoRegistro(option.value)}
+                        value={metodosPago.find(m => m.value === metodoPagoRegistro) || null}
+                        placeholder="Seleccionar método de pago"
+                        classNamePrefix="select"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-12 mb-3">
+                    <div className="form-group">
+                      <label>Comprobante de Pago <span className="text-danger">*</span></label>
+                      <input
+                        type="file"
+                        className="form-control"
+                        onChange={handleComprobanteChange}
+                        ref={fileInputRef}
+                        accept=".pdf"
+                        required
+                      />
+                      <small className="form-text text-muted">
+                        Suba el comprobante de pago en formato PDF
+                      </small>
+                    </div>
+                  </div>
+
+                  <div className="col-12">
+                    <div className="d-flex justify-content-end gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setModalRegistroVisible(false);
+                          setComprobanteFile(null);
+                          setMetodoPagoRegistro(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                          }
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={loadingRegistro || !comprobanteFile}
+                      >
+                        {loadingRegistro ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Registrando...
+                          </>
+                        ) : (
+                          'Registrar Pago'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
             )}
           </Modal>
         </div>

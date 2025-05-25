@@ -52,11 +52,13 @@ const ContabilidadGastos = () => {
     { value: 'OTROS', label: 'Otros' }
   ];
 
+  /* Estado de gasto no implementado en la base de datos todavía
   const estadosGasto = [
     { value: 'PENDIENTE', label: 'Pendiente' },
     { value: 'PAGADO', label: 'Pagado' },
     { value: 'CANCELADO', label: 'Cancelado' }
   ];
+  */
 
   useEffect(() => {
     const fetchData = async () => {
@@ -452,37 +454,50 @@ const ContabilidadGastos = () => {
     setModalViewVisible(true);
   };
 
-  // Función para descargar directamente el documento
-  const descargarDocumento = async (ruta, nombreArchivo) => {
+  // Función para validar la existencia del documento
+  const validarDocumento = async (rutaDocumento) => {
+    if (!rutaDocumento) {
+      alert('La ruta del documento no está disponible');
+      return false;
+    }
+
     try {
-      // Verificar que el documento existe
-      const existeArchivo = await verificarExistenciaArchivo(ruta);
-      
+      const existeArchivo = await verificarExistenciaArchivo(rutaDocumento);
       if (!existeArchivo) {
-        alert('No se puede descargar el documento porque no existe o no está accesible.');
+        alert('El documento no existe o no está accesible');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error al validar el documento:', error);
+      alert('Error al verificar el documento');
+      return false;
+    }
+  };
+
+  // Función para ver documento directamente usando el servicio
+  const handleViewDocument = async (rutaDocumento) => {
+    try {
+      if (!(await validarDocumento(rutaDocumento))) {
         return;
       }
-      
-      // Obtener el contenido del archivo
-      const response = await fetch(ruta);
-      const blob = await response.blob();
-      
-      // Crear URL para el blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Crear un enlace oculto y simular clic
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = nombreArchivo; // Nombre de archivo sugerido para la descarga
-      document.body.appendChild(link);
-      link.click();
-      
-      // Limpiar
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
+      await documentoService.verDocumento(rutaDocumento);
+    } catch (error) {
+      console.error('Error al ver el documento:', error);
+      alert('Error al abrir el documento. Por favor, intente descargarlo.');
+    }
+  };
+
+  // Función para descargar documento directamente usando el servicio
+  const handleDownloadDocument = async (rutaDocumento, nombreArchivo) => {
+    try {
+      if (!(await validarDocumento(rutaDocumento))) {
+        return;
+      }
+      await documentoService.descargarDocumento(rutaDocumento, nombreArchivo);
     } catch (error) {
       console.error('Error al descargar el documento:', error);
-      alert('Ha ocurrido un error al intentar descargar el documento. Consulta la consola para más detalles.');
+      alert('Error al descargar el documento. Por favor, intente más tarde.');
     }
   };
 
@@ -1048,47 +1063,46 @@ const ContabilidadGastos = () => {
                         )}
                       </span>
                     </div>
-                    <div className="document-actions">
-                      <button 
-                        type="button" 
-                        className="btn btn-sm btn-outline-primary me-2"
-                        onClick={() => descargarDocumento(documento.ruta, documento.nombre)}
-                        disabled={documentoError}
-                      >
-                        <FiDownload className="me-1" /> Descargar
-                      </button>
-                      <button 
-                        type="button" 
-                        className="btn btn-sm btn-primary"
-                        onClick={() => abrirDocumentoEnNuevaVentana(documento.ruta)}
-                        disabled={documentoError}
-                      >
-                        <FiEye className="me-1" /> Ver documento
-                      </button>
-                    </div>
+                    {!documentoError && (
+                      <div className="document-actions">
+                        <button 
+                          type="button" 
+                          className="btn btn-sm btn-outline-primary me-2"
+                          onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
+                        >
+                          <FiDownload className="me-1" /> Descargar
+                        </button>
+                        <button 
+                          type="button" 
+                          className="btn btn-sm btn-primary"
+                          onClick={() => handleViewDocument(documento.ruta)}
+                        >
+                          <FiEye className="me-1" /> Ver documento
+                        </button>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Mensaje de error si el documento no está disponible */}
                   {documentoError && (
-                    <div className="alert alert-danger">
-                      <p className="mb-0"><strong>Error:</strong> El documento no se encuentra disponible o no puede ser accedido.</p>
-                      <p className="mb-0 mt-2">Posibles causas:</p>
-                      <ul className="mb-0">
-                        <li>El documento no ha sido subido correctamente</li>
-                        <li>La ruta del documento es incorrecta</li>
+                    <div className="alert alert-warning">
+                      <p className="mb-0">
+                        <i className="fas fa-exclamation-triangle me-2"></i>
+                        El documento no se encuentra disponible en estos momentos.
+                      </p>
+                      <p className="small mb-0 mt-2">
+                        Esto puede deberse a que:
+                      </p>
+                      <ul className="small mb-0">
+                        <li>El documento fue eliminado o movido</li>
                         <li>No tienes permisos para acceder al documento</li>
-                      </ul>
-                      <p className="mt-2 mb-0">Rutas intentadas:</p>
-                      <ul className="mb-0">
-                        <li><code>{documento.ruta}</code></li>
-                        <li><code>{window.location.origin}/PUBLIC/GASTO/1/gasto_{gastoVisualizando.id}.pdf</code></li>
-                        <li><code>{window.location.origin}/public/gasto/1/gasto_{gastoVisualizando.id}.pdf</code></li>
+                        <li>La ruta del documento es incorrecta</li>
                       </ul>
                     </div>
                   )}
                 </div>
               ) : !loadingDoc && (
-                <div className="alert alert-warning">
+                <div className="alert alert-info">
                   <FiFileText className="me-2" /> No hay documento adjunto para este gasto.
                 </div>
               )}

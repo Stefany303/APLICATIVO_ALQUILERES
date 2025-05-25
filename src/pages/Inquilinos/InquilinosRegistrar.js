@@ -9,28 +9,34 @@ import inmuebleService from '../../services/inmuebleService';
 import contratoService from '../../services/contratoService';
 import espacioService from '../../services/espacioService';
 import pagoService from '../../services/pagoService';
+import personaService from '../../services/personaService';
+import api from '../../services/api';
+import { API_URL, getAuthToken } from '../../services/authService';
 import { useAuth } from "../../utils/AuthContext";
 
 const InquilinosRegistrar = () => {
   const { user, estaAutenticado } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [verificandoDocumento, setVerificandoDocumento] = useState(false);
   const [error, setError] = useState(null);
   const [inmuebles, setInmuebles] = useState([]);
   const [pisos, setPisos] = useState([]);
   const [espacios, setEspacios] = useState([]);
+  const [inquilinoExistente, setInquilinoExistente] = useState(null);
+  const [documentoVerificado, setDocumentoVerificado] = useState(false);
   
   // Obtener la fecha actual en formato YYYY-MM-DD para prellenar la fecha de inicio
   const fechaActual = new Date().toISOString().split('T')[0];
   
   const [formData, setFormData] = useState({
+    documento: '',
+    tipoDocumento: 'DNI',
     nombre: '',
     apellido: '',
     email: '',
     telefono: '',
     direccion: '',
-    documento: '',
-    tipoDocumento: 'DNI',
     inmuebleId: '',
     pisoId: '',
     espacioId: '',
@@ -42,12 +48,12 @@ const InquilinosRegistrar = () => {
   });
   const [step, setStep] = useState(1);
   const [formErrors, setFormErrors] = useState({
+    documento: '',
+    tipoDocumento: '',
     nombre: '',
     apellido: '',
     email: '',
     telefono: '',
-    documento: '',
-    tipoDocumento: '',
     inmuebleId: '',
     pisoId: '',
     espacioId: '',
@@ -142,13 +148,92 @@ const InquilinosRegistrar = () => {
     cargarEspacios();
   }, [formData.pisoId, formData.inmuebleId]);
 
-  // Agregar log para verificar el estado de espacios
-  useEffect(() => {
-    console.log('Estado actual de espacios:', espacios);
-  }, [espacios]);
+  // Verificar si existe un inquilino con el documento ingresado
+  const verificarDocumento = async (documento) => {
+    if (!documento || documento.length < 8) {
+      return;
+    }
+
+    try {
+      setVerificandoDocumento(true);
+      const resultado = await personaService.obtenerPersonaPorDocumento(documento);
+      
+      if (resultado && resultado.id) {
+        console.log('Inquilino encontrado:', resultado);
+        setInquilinoExistente(resultado);
+        
+        // Actualizar el formulario con los datos del inquilino
+        setFormData(prevData => ({
+          ...prevData,
+          nombre: resultado.nombre || '',
+          apellido: resultado.apellido || '',
+          email: resultado.email || '',
+          telefono: resultado.telefono || '',
+          direccion: resultado.direccion || '',
+          documento: resultado.dni || documento
+        }));
+        
+        Swal.fire({
+          title: '¡Inquilino encontrado!',
+          text: `Se ha encontrado un inquilino registrado con el documento ${documento}. Sus datos han sido cargados automáticamente.`,
+          icon: 'success',
+          confirmButtonText: 'Continuar con el contrato'
+        });
+        
+        setDocumentoVerificado(true);
+      } else {
+        console.log('No se encontró inquilino con el documento:', documento);
+        setInquilinoExistente(null);
+        setDocumentoVerificado(true);
+        
+        Swal.fire({
+          title: 'Inquilino nuevo',
+          text: 'No se encontró un inquilino con este documento. Por favor, complete los datos para registrar un nuevo inquilino.',
+          icon: 'info',
+          confirmButtonText: 'Continuar con el registro'
+        });
+      }
+    } catch (error) {
+      console.error('Error al verificar documento:', error);
+      setInquilinoExistente(null);
+      setDocumentoVerificado(true);
+      
+      Swal.fire({
+        title: 'Inquilino nuevo',
+        text: 'No se encontró un inquilino con este documento. Por favor, complete los datos para registrar un nuevo inquilino.',
+        icon: 'info',
+        confirmButtonText: 'Continuar con el registro'
+      });
+    } finally {
+      setVerificandoDocumento(false);
+    }
+  };
+
+  // Manejar evento de verificación al presionar Enter en el campo de documento
+  const handleDocumentoKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      verificarDocumento(formData.documento);
+    }
+  };
+
+  // Manejar evento de verificación al perder el foco del campo de documento
+  const handleDocumentoBlur = () => {
+    if (formData.documento && !documentoVerificado) {
+      verificarDocumento(formData.documento);
+    }
+  };
 
   const validateField = (name, value) => {
     switch (name) {
+      case 'documento':
+        if (!value) return 'El documento es requerido';
+        if (!/^\d+$/.test(value)) return 'El documento debe contener solo números';
+        if (value.length < 8) return 'El documento debe tener al menos 8 dígitos';
+        if (value.length > 20) return 'El documento no puede tener más de 20 dígitos';
+        return '';
+      case 'tipoDocumento':
+        return value ? '' : 'El tipo de documento es requerido';
       case 'nombre':
         return value ? '' : 'El nombre es requerido';
       case 'apellido':
@@ -163,13 +248,6 @@ const InquilinosRegistrar = () => {
         if (telefonoLimpio.length < 9) return 'El teléfono debe contener al menos 9 dígitos';
         if (telefonoLimpio.length > 12) return 'El teléfono no puede tener más de 12 dígitos';
         return '';
-      case 'documento':
-        if (!value) return 'El documento es requerido';
-        if (!/^\d+$/.test(value)) return 'El documento debe contener solo números';
-        if (value.length > 20) return 'El documento no puede tener más de 20 dígitos';
-        return '';
-      case 'tipoDocumento':
-        return value ? '' : 'El tipo de documento es requerido';
       default:
         return '';
     }
@@ -177,6 +255,12 @@ const InquilinosRegistrar = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Si se está modificando el documento, resetear la verificación
+    if (name === 'documento') {
+      setDocumentoVerificado(false);
+      setInquilinoExistente(null);
+    }
     
     // Limitar la longitud de los campos numéricos
     if (name === 'telefono') {
@@ -236,8 +320,14 @@ const InquilinosRegistrar = () => {
   };
 
   const handleNext = () => {
+    // Si el documento no ha sido verificado aún, verificarlo primero
+    if (!documentoVerificado && formData.documento) {
+      verificarDocumento(formData.documento);
+      return;
+    }
+    
     // Validar todos los campos del primer paso
-    const camposPrimerPaso = ['nombre', 'apellido', 'email', 'telefono', 'documento', 'tipoDocumento'];
+    const camposPrimerPaso = ['documento', 'tipoDocumento', 'nombre', 'apellido', 'email', 'telefono'];
     let hasErrors = false;
 
     camposPrimerPaso.forEach(campo => {
@@ -324,72 +414,151 @@ const InquilinosRegistrar = () => {
     setError(null);
 
     try {
-      // Crear el inquilino
-      const response = await inquilinoService.crearInquilino(formData);
+      let inquilinoId;
       
-      if (response) {
-        // Actualizar el estado del espacio a ocupado (1)
-        try {
-          // Datos para actualizar el espacio
-          const espacioData = {
-            estado: 1 // 1 = Ocupado
-          };
-          
-          // Actualizar el espacio
-          await espacioService.actualizarEspacio(
-            formData.inmuebleId,
-            formData.pisoId, 
-            formData.espacioId,
-            espacioData
-          );
-          
-          console.log('Espacio actualizado a estado "Ocupado"');
-        } catch (espacioError) {
-          console.error('Error al actualizar estado del espacio:', espacioError);
-          // No interrumpimos el flujo principal si falla esta actualización
-        }
+      // Si ya existe el inquilino, usamos su ID directamente
+      if (inquilinoExistente) {
+        inquilinoId = inquilinoExistente.id;
+        console.log('Usando inquilino existente con ID:', inquilinoId);
+      } else {
+        // Si no existe, creamos un nuevo inquilino
+        console.log('Creando nuevo inquilino...');
+        
+        // Crear la persona (inquilino)
+        const personaData = {
+          nombre: formData.nombre,
+          apellido: formData.apellido,
+          email: formData.email,
+          telefono: formData.telefono,
+          dni: formData.documento,
+          direccion: formData.direccion || '',
+          rol: 'inquilino'
+        };
+        
+        // Obtener el token usando getAuthToken
+        const token = getAuthToken();
+        console.log('Token obtenido:', token);
 
-        await Swal.fire({
-          title: '¡Registro Exitoso!',
-          text: 'El inquilino ha sido registrado correctamente',
-          icon: 'success',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#3085d6',
-          timer: 2000,
-          timerProgressBar: true,
-          showConfirmButton: false
-        });
-        navigate('/inquilinos-registros');
+        if (!token) {
+          throw new Error('No hay token de autenticación disponible');
+        }
+        
+        try {
+          const personaResponse = await api.post(`${API_URL}/personas`, personaData, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          inquilinoId = personaResponse.data.id;
+          console.log('Nuevo inquilino creado con ID:', inquilinoId);
+        } catch (error) {
+          if (error.response?.data?.error?.includes('Duplicate entry') && error.response?.data?.error?.includes('email')) {
+            const emailDuplicado = error.response.data.error.match(/'([^']+)'/)[1];
+            throw new Error(`El email ${emailDuplicado} ya está registrado en el sistema`);
+          } else {
+            throw error;
+          }
+        }
       }
+      
+      // Actualizar el estado del espacio a ocupado (1)
+      try {
+        // Datos para actualizar el espacio
+        const espacioData = {
+          estado: 1 // 1 = Ocupado
+        };
+        
+        // Actualizar el espacio
+        await espacioService.actualizarEspacio(
+          formData.inmuebleId,
+          formData.pisoId, 
+          formData.espacioId,
+          espacioData
+        );
+        
+        console.log('Espacio actualizado a estado "Ocupado"');
+      } catch (espacioError) {
+        console.error('Error al actualizar estado del espacio:', espacioError);
+        // No interrumpimos el flujo principal si falla esta actualización
+      }
+
+      // Crear el contrato
+      const contratoData = {
+        inquilino_id: inquilinoId,
+        espacio_id: parseInt(formData.espacioId),
+        inmueble_id: parseInt(formData.inmuebleId),
+        fecha_inicio: formData.fechaInicio,
+        fecha_fin: formData.fechaFin,
+        monto_alquiler: parseFloat(formData.montoMensual),
+        monto_garantia: parseFloat(formData.deposito || 0),
+        descripcion: formData.observaciones || '',
+        documento: formData.documento,
+        estado: 'inactivo',
+        fecha_pago: formData.fechaInicio
+      };
+      
+      console.log('Creando contrato con datos:', contratoData);
+      
+      // Obtener el token usando getAuthToken
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('No hay token de autenticación disponible');
+      }
+      
+      const contratoResponse = await api.post(`${API_URL}/contratos`, contratoData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('Contrato creado:', contratoResponse.data);
+      
+      // Generar pagos mensuales automáticamente
+      try {
+        await generarPagosMensuales(
+          contratoResponse.data.id,
+          formData.montoMensual,
+          formData.fechaInicio,
+          formData.fechaFin
+        );
+        console.log('Pagos mensuales generados correctamente');
+      } catch (pagosError) {
+        console.error('Error al generar pagos mensuales:', pagosError);
+        // No interrumpimos el flujo principal si falla la generación de pagos
+      }
+
+      await Swal.fire({
+        title: '¡Registro Exitoso!',
+        text: inquilinoExistente 
+          ? 'Se ha creado un nuevo contrato para el inquilino existente' 
+          : 'El inquilino y el contrato han sido registrados correctamente',
+        icon: 'success',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#3085d6',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
+      
+      navigate('/inquilinos-registros');
+
     } catch (error) {
       console.error('Error completo:', error);
       console.error('Error response data:', error.response?.data);
       
-      // Verificar si el error es por email duplicado
-      if (error.response?.data?.error?.includes('Duplicate entry') && error.response?.data?.error?.includes('email')) {
-        const emailDuplicado = error.response.data.error.match(/'([^']+)'/)[1];
-        Swal.fire({
-          title: 'Error',
-          text: `El email ${emailDuplicado} ya está registrado en el sistema`,
-          icon: 'error',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#d33'
-        });
-      } else {
-        // Mostrar el error completo del servidor
-        const errorData = error.response?.data || {};
-        const errorMessage = errorData.error || errorData.message || error.message || 'Error al crear el inquilino. Por favor, intente nuevamente.';
-        
-        Swal.fire({
-          title: 'Error',
-          text: errorMessage,
-          icon: 'error',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#d33'
-        });
-      }
+      // Mostrar el error completo del servidor
+      const errorData = error.response?.data || {};
+      const errorMessage = error.message || errorData.error || errorData.message || 'Error al crear el inquilino o contrato. Por favor, intente nuevamente.';
       
-      setError('Error al crear el inquilino');
+      Swal.fire({
+        title: 'Error',
+        text: errorMessage,
+        icon: 'error',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#d33'
+      });
+      
+      setError('Error al crear el inquilino o contrato');
     } finally {
       setLoading(false);
     }
@@ -456,94 +625,17 @@ const InquilinosRegistrar = () => {
                             <h4>Datos Personales</h4>
                           </div>
                         </div>
-                          
-                          <div className="col-12 col-md-6">
-                          <div className="form-group local-forms">
-                              <label>Nombre <span className="login-danger">*</span></label>
-                              <input
-                                type="text"
-                                className={`form-control ${formErrors.nombre ? 'is-invalid' : ''}`}
-                                name="nombre"
-                                value={formData.nombre}
-                                onChange={handleChange}
-                                required
-                              />
-                              {formErrors.nombre && (
-                                <div className="invalid-feedback d-block">
-                                  {formErrors.nombre}
-                                </div>
-                              )}
-                            </div>
-                          </div>
 
                           <div className="col-12 col-md-6">
                             <div className="form-group local-forms">
-                              <label>Apellido <span className="login-danger">*</span></label>
-                              <input
-                                type="text"
-                                className={`form-control ${formErrors.apellido ? 'is-invalid' : ''}`}
-                                name="apellido"
-                                value={formData.apellido}
-                                onChange={handleChange}
-                                required
-                              />
-                              {formErrors.apellido && (
-                                <div className="invalid-feedback d-block">
-                                  {formErrors.apellido}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="col-12 col-md-6">
-                            <div className="form-group local-forms">
-                              <label>Email <span className="login-danger">*</span></label>
-                                <input
-                                type="email"
-                                className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                              />
-                              {formErrors.email && (
-                                <div className="invalid-feedback d-block">
-                                  {formErrors.email}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="col-12 col-md-6">
-                            <div className="form-group local-forms">
-                              <label>Teléfono <span className="login-danger">*</span></label>
-                              <input
-                                type="tel"
-                                pattern="[0-9]*"
-                                inputMode="numeric"
-                                className={`form-control ${formErrors.telefono ? 'is-invalid' : ''}`}
-                                name="telefono"
-                                value={formData.telefono}
-                                onChange={handleChange}
-                                required
-                                placeholder="Ingrese solo números"
-                              />
-                              {formErrors.telefono && (
-                                <div className="invalid-feedback d-block">
-                                  {formErrors.telefono}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="col-12 col-md-6">
-                          <div className="form-group local-forms">
                               <label>Tipo de Documento <span className="login-danger">*</span></label>
                               <select
-                              className={`form-control ${formErrors.tipoDocumento ? 'is-invalid' : ''}`}
+                                className={`form-control ${formErrors.tipoDocumento ? 'is-invalid' : ''}`}
                                 name="tipoDocumento"
                                 value={formData.tipoDocumento}
                                 onChange={handleChange}
                                 required
+                                disabled={verificandoDocumento || documentoVerificado}
                               >
                                 <option value="">Seleccionar</option>
                                 <option value="DNI">DNI</option>
@@ -556,48 +648,162 @@ const InquilinosRegistrar = () => {
                                 </div>
                               )}
                             </div>
-                          </div>                          
+                          </div>
 
                           <div className="col-12 col-md-6">
                             <div className="form-group local-forms">
                               <label>Documento <span className="login-danger">*</span></label>
-                              <input
-                                type="text"
-                                pattern="[0-9]*"
-                                inputMode="numeric"
-                                className={`form-control ${formErrors.documento ? 'is-invalid' : ''}`}
-                                name="documento"
-                                value={formData.documento}
-                                onChange={handleChange}
-                                required
-                                placeholder="Ingrese solo números"
-                              />
+                              <div className="input-group">
+                                <input
+                                  type="text"
+                                  pattern="[0-9]*"
+                                  inputMode="numeric"
+                                  className={`form-control ${formErrors.documento ? 'is-invalid' : ''}`}
+                                  name="documento"
+                                  value={formData.documento}
+                                  onChange={handleChange}
+                                  onKeyDown={handleDocumentoKeyDown}
+                                  onBlur={handleDocumentoBlur}
+                                  required
+                                  placeholder="Ingrese el documento y presione Enter para verificar"
+                                  disabled={verificandoDocumento}
+                                />
+                                {verificandoDocumento && (
+                                  <button className="btn btn-primary" type="button" disabled>
+                                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Verificando...
+                                  </button>
+                                )}
+                                {!verificandoDocumento && formData.documento && (
+                                  <button 
+                                    className="btn btn-primary" 
+                                    type="button" 
+                                    onClick={() => verificarDocumento(formData.documento)}
+                                  >
+                                    Verificar
+                                  </button>
+                                )}
+                              </div>
                               {formErrors.documento && (
                                 <div className="invalid-feedback d-block">
                                   {formErrors.documento}
                                 </div>
                               )}
+                              {documentoVerificado && inquilinoExistente && (
+                                <div className="mt-2 alert alert-success py-1">
+                                  <strong>Inquilino verificado:</strong> {inquilinoExistente.nombre} {inquilinoExistente.apellido}
+                                  <p className="mb-0 mt-1"><small>Puede continuar con el registro del contrato.</small></p>
+                                </div>
+                              )}
+                              {documentoVerificado && !inquilinoExistente && formData.documento && (
+                                <div className="mt-2 alert alert-info py-1">
+                                  <strong>Inquilino nuevo:</strong> Complete los datos para registrar un nuevo inquilino.
+                                </div>
+                              )}
                             </div>
                           </div>
-
                           
                           <div className="col-12 col-md-6">
                             <div className="form-group local-forms">
-                              <label>Dirección</label>
-                              <input
-                                type="text"
-                                className="form-control"
-                                name="direccion"
-                                value={formData.direccion}
-                                onChange={handleChange}
-                              />
+                                <label>Nombre <span className="login-danger">*</span></label>
+                                <input
+                                  type="text"
+                                  className={`form-control ${formErrors.nombre ? 'is-invalid' : ''}`}
+                                  name="nombre"
+                                  value={formData.nombre}
+                                  onChange={handleChange}
+                                  required
+                                  disabled={verificandoDocumento || inquilinoExistente}
+                                />
+                                {formErrors.nombre && (
+                                  <div className="invalid-feedback d-block">
+                                    {formErrors.nombre}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="col-12 col-md-6">
+                              <div className="form-group local-forms">
+                                <label>Apellido <span className="login-danger">*</span></label>
+                                <input
+                                  type="text"
+                                  className={`form-control ${formErrors.apellido ? 'is-invalid' : ''}`}
+                                  name="apellido"
+                                  value={formData.apellido}
+                                  onChange={handleChange}
+                                  required
+                                  disabled={verificandoDocumento || inquilinoExistente}
+                                />
+                                {formErrors.apellido && (
+                                  <div className="invalid-feedback d-block">
+                                    {formErrors.apellido}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="col-12 col-md-6">
+                              <div className="form-group local-forms">
+                                <label>Email <span className="login-danger">*</span></label>
+                                  <input
+                                  type="email"
+                                  className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
+                                  name="email"
+                                  value={formData.email}
+                                  onChange={handleChange}
+                                  required
+                                  disabled={verificandoDocumento || inquilinoExistente}
+                                />
+                                {formErrors.email && (
+                                  <div className="invalid-feedback d-block">
+                                    {formErrors.email}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="col-12 col-md-6">
+                              <div className="form-group local-forms">
+                                <label>Teléfono <span className="login-danger">*</span></label>
+                                <input
+                                  type="tel"
+                                  pattern="[0-9]*"
+                                  inputMode="numeric"
+                                  className={`form-control ${formErrors.telefono ? 'is-invalid' : ''}`}
+                                  name="telefono"
+                                  value={formData.telefono}
+                                  onChange={handleChange}
+                                  required
+                                  placeholder="Ingrese solo números"
+                                  disabled={verificandoDocumento || inquilinoExistente}
+                                />
+                                {formErrors.telefono && (
+                                  <div className="invalid-feedback d-block">
+                                    {formErrors.telefono}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="col-12 col-md-6">
+                              <div className="form-group local-forms">
+                                <label>Dirección</label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  name="direccion"
+                                  value={formData.direccion}
+                                  onChange={handleChange}
+                                  disabled={verificandoDocumento || inquilinoExistente}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
                         
                         <div className="text-center mt-4">
-                          <button type="button" className="btn btn-primary" onClick={handleNext}>
-                            Siguiente
+                          <button type="button" className="btn btn-primary" onClick={handleNext} disabled={verificandoDocumento}>
+                            {verificandoDocumento ? 'Verificando...' : 'Siguiente'}
                           </button>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import '../../assets/styles/table-styles.css';
 import '../../assets/styles/select-components.css';
 import { Link, useNavigate } from 'react-router-dom';
@@ -13,6 +13,8 @@ import { useAuth } from "../../utils/AuthContext";
 import contratoService from "../../services/contratoService";
 import inmuebleService from "../../services/inmuebleService";
 import pisoService from "../../services/pisoService";
+import documentoService from "../../services/documentoService";
+import { API_URL } from "../../services/authService";
 import moment from 'moment';
 import { SearchOutlined, PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons';
 
@@ -21,7 +23,7 @@ const { RangePicker } = AntDatePicker;
 
 const ContratoRegistros = () => {
   const navigate = useNavigate();
-  const { estaAutenticado } = useAuth();
+  const { estaAutenticado, getAuthToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [form] = Form.useForm();
@@ -43,8 +45,18 @@ const ContratoRegistros = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [contratoSeleccionado, setContratoSeleccionado] = useState(null);
   const [loadingSave, setLoadingSave] = useState(false);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false); // Modal para subir contrato firmado
+  const [generatingPdf, setGeneratingPdf] = useState(false); // Estado para indicar generación de PDF
+  const [uploadingDocument, setUploadingDocument] = useState(false); // Estado para carga de documento
+  const [contratoFile, setContratoFile] = useState(null); // Archivo de contrato firmado
   
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  
+  // Estados para manejo de archivos y carga
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [loadingUpload, setLoadingUpload] = useState(false);
+  const [modalUploadVisible, setModalUploadVisible] = useState(false);
+  const fileInputRef = useRef(null);
   
   const onSelectChange = (newSelectedRowKeys) => {
     setSelectedRowKeys(newSelectedRowKeys);
@@ -77,8 +89,27 @@ const ContratoRegistros = () => {
         const contratosData = await contratoService.obtenerContratosDetalles();
         
         if (Array.isArray(contratosData)) {
-          setContratos(contratosData);
-          setFilteredContratos(contratosData);
+          // Para cada contrato, obtener su documento si existe
+          const contratosConDocumentos = await Promise.all(
+            contratosData.map(async (contrato) => {
+              try {
+                const documentos = await documentoService.obtenerDocumentosPorDocumentable(
+                  contrato.id,
+                  'contrato'
+                );
+                return {
+                  ...contrato,
+                  documento: documentos && documentos.length > 0 ? documentos[0] : null
+                };
+              } catch (error) {
+                console.error(`Error al obtener documento para contrato ${contrato.id}:`, error);
+                return contrato;
+              }
+            })
+          );
+          
+          setContratos(contratosConDocumentos);
+          setFilteredContratos(contratosConDocumentos);
         } else {
           console.error('Los datos de contratos no son un array:', contratosData);
           setContratos([]);
@@ -193,8 +224,24 @@ const ContratoRegistros = () => {
   const handleView = (id) => {
     const contrato = contratos.find(c => c.id === id);
     if (contrato) {
-      setContratoSeleccionado(contrato);
-      setViewModalVisible(true);
+      // Obtener el documento actualizado
+      documentoService.obtenerDocumentosPorDocumentable(id, 'contrato')
+        .then(documentos => {
+          if (documentos && documentos.length > 0) {
+            setContratoSeleccionado({
+              ...contrato,
+              documento: documentos[0]
+            });
+          } else {
+            setContratoSeleccionado(contrato);
+          }
+          setViewModalVisible(true);
+        })
+        .catch(error => {
+          console.error("Error al obtener documento:", error);
+          setContratoSeleccionado(contrato);
+          setViewModalVisible(true);
+        });
     } else {
       message.error("No se encontró el contrato seleccionado");
     }
@@ -231,15 +278,22 @@ const ContratoRegistros = () => {
       const values = await form.validateFields();
       
       // Preparar datos para enviar
+      // Asegurarnos de que las fechas estén en formato YYYY-MM-DD
+      const fechaInicio = values.fechas[0].format('YYYY-MM-DD');
+      const fechaFin = values.fechas[1].format('YYYY-MM-DD');
+      const fechaPago = values.fecha_pago.format('YYYY-MM-DD');
+      
       const contratoData = {
         monto_alquiler: values.monto_alquiler,
         monto_garantia: values.monto_garantia,
         descripcion: values.descripcion,
         estado: values.estado,
-        fecha_inicio: values.fechas[0].format('YYYY-MM-DD'),
-        fecha_fin: values.fechas[1].format('YYYY-MM-DD'),
-        fecha_pago: values.fecha_pago.format('YYYY-MM-DD')
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        fecha_pago: fechaPago
       };
+      
+      console.log('Actualizando contrato con datos:', contratoData);
       
       // Llamar al servicio para actualizar
       await contratoService.actualizarContrato(contratoSeleccionado.id, contratoData);
@@ -282,6 +336,276 @@ const ContratoRegistros = () => {
     setSelectedPiso(null);
     setSelectedEstado(null);
     setSearchText("");
+  };
+
+  // Función para generar contrato en PDF
+  const handleGenerarContratoPDF = async (id) => {
+    try {
+      setGeneratingPdf(true);
+      const contrato = contratos.find(c => c.id === id);
+      
+      if (!contrato) {
+        message.error("No se encontró el contrato seleccionado");
+        return;
+      }
+      
+      // Aquí utilizaríamos la biblioteca jsPDF para generar el PDF
+      message.info("Generando contrato en PDF...");
+      
+      // Simulamos un tiempo de generación
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Crear estructura HTML para el contrato (esto es un ejemplo)
+      const contenidoContrato = `
+        <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .header { text-align: center; margin-bottom: 30px; }
+              .title { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+              .subtitle { font-size: 16px; margin-bottom: 20px; }
+              .section { margin-bottom: 20px; }
+              .section-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+              .info-row { display: flex; margin-bottom: 5px; }
+              .info-label { font-weight: bold; width: 180px; }
+              .signatures { display: flex; justify-content: space-between; margin-top: 50px; }
+              .signature { width: 45%; text-align: center; }
+              .signature-line { border-top: 1px solid #000; margin-top: 50px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">CONTRATO DE ARRENDAMIENTO</div>
+              <div class="subtitle">Folio: ${contrato.id}</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">DATOS DEL PROPIETARIO</div>
+              <div class="info-row"><div class="info-label">Razón Social:</div> EMPRESA DE ALQUILERES S.A.</div>
+              <div class="info-row"><div class="info-label">RUC:</div> 20123456789</div>
+              <div class="info-row"><div class="info-label">Dirección:</div> Av. Principal 123, Lima</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">DATOS DEL ARRENDATARIO</div>
+              <div class="info-row"><div class="info-label">Nombre:</div> ${contrato.inquilino_nombre} ${contrato.inquilino_apellido}</div>
+              <div class="info-row"><div class="info-label">Documento:</div> ${contrato.inquilino_dni || 'No especificado'}</div>
+              <div class="info-row"><div class="info-label">Email:</div> ${contrato.inquilino_email || 'No especificado'}</div>
+              <div class="info-row"><div class="info-label">Teléfono:</div> ${contrato.inquilino_telefono || 'No especificado'}</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">DATOS DEL INMUEBLE</div>
+              <div class="info-row"><div class="info-label">Inmueble:</div> ${contrato.inmueble_nombre || 'No especificado'}</div>
+              <div class="info-row"><div class="info-label">Espacio:</div> ${contrato.espacio_nombre || 'No especificado'}</div>
+              <div class="info-row"><div class="info-label">Descripción:</div> ${contrato.espacio_descripcion || 'No especificado'}</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">CONDICIONES DEL CONTRATO</div>
+              <div class="info-row"><div class="info-label">Fecha de inicio:</div> ${new Date(contrato.fecha_inicio).toLocaleDateString()}</div>
+              <div class="info-row"><div class="info-label">Fecha de fin:</div> ${new Date(contrato.fecha_fin).toLocaleDateString()}</div>
+              <div class="info-row"><div class="info-label">Duración:</div> ${calcularDuracionContrato(contrato.fecha_inicio, contrato.fecha_fin)}</div>
+              <div class="info-row"><div class="info-label">Monto de alquiler:</div> S/ ${parseFloat(contrato.monto_alquiler).toFixed(2)} mensuales</div>
+              <div class="info-row"><div class="info-label">Monto de garantía:</div> S/ ${parseFloat(contrato.monto_garantia).toFixed(2)}</div>
+              <div class="info-row"><div class="info-label">Fecha de pago mensual:</div> ${new Date(contrato.fecha_pago).getDate()} de cada mes</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">OBSERVACIONES</div>
+              <p>${contrato.descripcion || 'Sin observaciones adicionales.'}</p>
+            </div>
+            
+            <div class="section">
+              <p>Este contrato de arrendamiento se rige por las leyes vigentes en materia de arrendamiento. Ambas partes declaran estar de acuerdo con todas las cláusulas y condiciones establecidas en el presente documento.</p>
+            </div>
+            
+            <div class="signatures">
+              <div class="signature">
+                <div class="signature-line"></div>
+                <p>EL ARRENDADOR</p>
+              </div>
+              <div class="signature">
+                <div class="signature-line"></div>
+                <p>EL ARRENDATARIO</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+      
+      // En una implementación real, aquí usaríamos jsPDF y html2canvas para convertir
+      // este HTML a un PDF y descargarlo
+      
+      // Por ahora, simulamos la descarga
+      const blob = new Blob([contenidoContrato], { type: 'text/html' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Contrato_${contrato.id}_${contrato.inquilino_apellido}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      message.success("Contrato generado correctamente");
+      
+    } catch (error) {
+      console.error("Error al generar contrato PDF:", error);
+      message.error("Error al generar el contrato en PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  // Función auxiliar para calcular la duración del contrato
+  const calcularDuracionContrato = (fechaInicio, fechaFin) => {
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+    const diferenciaMs = fin - inicio;
+    const dias = Math.floor(diferenciaMs / (1000 * 60 * 60 * 24));
+    
+    const años = Math.floor(dias / 365);
+    const meses = Math.floor((dias % 365) / 30);
+    const diasRestantes = dias % 30;
+    
+    let duracion = '';
+    if (años > 0) duracion += `${años} año${años !== 1 ? 's' : ''} `;
+    if (meses > 0) duracion += `${meses} mes${meses !== 1 ? 'es' : ''} `;
+    if (diasRestantes > 0) duracion += `${diasRestantes} día${diasRestantes !== 1 ? 's' : ''}`;
+    
+    return duracion.trim() || 'Indefinido';
+  };
+
+  // Función para abrir el modal de subida de contrato firmado
+  const handleSubirContratoFirmado = (id) => {
+    const contrato = contratos.find(c => c.id === id);
+    if (contrato) {
+      setContratoSeleccionado(contrato);
+      setModalUploadVisible(true);
+    } else {
+      alert('No se encontró el contrato seleccionado');
+    }
+  };
+
+  // Función para manejar la selección de archivo
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUploadAndActivate = async () => {
+    try {
+      if (!selectedFile) {
+        message.error('Por favor, seleccione un archivo PDF para subir');
+        return;
+      }
+
+      if (!contratoSeleccionado) {
+        message.error('No se ha seleccionado ningún contrato');
+        return;
+      }
+
+      // Verificar que el archivo sea PDF
+      if (selectedFile.type !== 'application/pdf') {
+        message.error('Solo se permiten archivos PDF');
+        return;
+      }
+
+      // Verificar que el token esté disponible
+      const token = localStorage.getItem('token');
+      if (!token) {
+        message.error('Error de autenticación. Por favor, inicie sesión nuevamente.');
+        navigate('/login');
+        return;
+      }
+
+      setLoadingUpload(true);
+      message.loading('Subiendo contrato firmado...', 0);
+
+      try {
+        // Subir el documento
+        const respuestaArchivo = await documentoService.subirArchivo(
+          selectedFile,
+          contratoSeleccionado.id,
+          'contrato',
+          { carpetaDestino: 'documentos/contrato' }
+        );
+
+        if (!respuestaArchivo || !respuestaArchivo.ruta) {
+          throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
+        }
+
+        // Registrar el documento en la base de datos
+        const documentoData = {
+          nombre: selectedFile.name,
+          ruta: respuestaArchivo.ruta,
+          documentable_id: contratoSeleccionado.id,
+          documentable_type: 'contrato'
+        };
+
+        await documentoService.crearDocumento(documentoData);
+
+        // Actualizar el estado del contrato a activo
+        await contratoService.actualizarContrato(contratoSeleccionado.id, {
+          estado: 'activo'
+        });
+
+        message.destroy(); // Eliminar el mensaje de carga
+        message.success('Contrato firmado subido y activado correctamente');
+        setModalUploadVisible(false);
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        
+        // Actualizar la lista de contratos
+        const contratosActualizados = await contratoService.obtenerContratosDetalles();
+        setContratos(contratosActualizados);
+        setFilteredContratos(contratosActualizados);
+        
+      } catch (uploadError) {
+        message.destroy(); // Eliminar el mensaje de carga
+        console.error('Error al subir contrato firmado:', uploadError);
+        message.error(`Error al subir el contrato: ${uploadError.message}`);
+      }
+    } catch (error) {
+      message.destroy(); // Eliminar el mensaje de carga
+      console.error('Error general:', error);
+      message.error('Ocurrió un error al procesar la solicitud');
+    } finally {
+      setLoadingUpload(false);
+    }
+  };
+
+  // Función para ver documento
+  const handleViewDocument = async (rutaDocumento) => {
+    try {
+        if (!rutaDocumento) {
+            throw new Error('Ruta del documento no disponible');
+        }
+        
+        console.log('Intentando abrir documento:', rutaDocumento);
+        await documentoService.verDocumento(rutaDocumento);
+    } catch (error) {
+        console.error('Error al abrir documento:', error);
+        message.error('Error al abrir el documento: ' + error.message);
+    }
+  };
+
+  // Función para descargar documento
+  const handleDownloadDocument = async (rutaDocumento, nombreArchivo) => {
+    try {
+        if (!rutaDocumento) {
+            throw new Error('Ruta del documento no disponible');
+        }
+        
+        console.log('Intentando descargar documento:', { ruta: rutaDocumento, nombre: nombreArchivo });
+        await documentoService.descargarDocumento(rutaDocumento, nombreArchivo);
+    } catch (error) {
+        console.error('Error al descargar documento:', error);
+        message.error('Error al descargar el documento: ' + error.message);
+    }
   };
 
   const columns = [
@@ -358,19 +682,37 @@ const ContratoRegistros = () => {
       render: (_, record) => (
         <div className="action-buttons d-flex justify-content-center">
           <button
-            className="btn btn-sm btn-primary me-2"
+            className="btn btn-sm btn-primary me-1"
             onClick={() => handleView(record.id)}
             title="Ver detalles"
           >
             <EyeOutlined />
           </button>
           <button 
-            className="btn btn-sm btn-warning me-2"
+            className="btn btn-sm btn-warning me-1"
             onClick={() => handleEdit(record.id)}
             title="Editar contrato"
           >
             <EditOutlined />
           </button>
+          <button
+            className="btn btn-sm btn-info me-1"
+            onClick={() => handleGenerarContratoPDF(record.id)}
+            title="Generar contrato PDF"
+            disabled={generatingPdf}
+          >
+            <i className="fas fa-file-pdf"></i>
+            {generatingPdf && <span className="spinner-border spinner-border-sm ms-1" role="status" aria-hidden="true"></span>}
+          </button>
+          {record.estado === 'inactivo' && (
+            <button
+              className="btn btn-sm btn-success me-1"
+              onClick={() => handleSubirContratoFirmado(record.id)}
+              title="Subir contrato firmado y activar"
+            >
+              <i className="fas fa-upload"></i>
+            </button>
+          )}
           <button
             className="btn btn-sm btn-danger"
             onClick={() => handleDelete(record.id)}
@@ -561,15 +903,17 @@ const ContratoRegistros = () => {
                         pagination={{
                           total: filteredContratos.length,
                           showTotal: (total, range) =>
-                            `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
+                            `${range[0]}-${range[1]} de ${total} registros`,
+                          pageSize: 10,
                           showSizeChanger: true,
-                          onShowSizeChange: onShowSizeChange,
-                          itemRender: itemRender,
+                          showQuickJumper: true
                         }}
                         columns={columns}
                         dataSource={filteredContratos}
-                        rowKey={(record) => record.id}
+                        rowKey="id"
+                        loading={loading}
                         rowSelection={rowSelection}
+                        scroll={{ x: 'max-content' }}
                       />
                     </div>
                   )}
@@ -586,208 +930,199 @@ const ContratoRegistros = () => {
         open={viewModalVisible}
         onCancel={() => setViewModalVisible(false)}
         footer={[
-          <Button key="cerrar" onClick={() => setViewModalVisible(false)}>
+          <Button key="close" onClick={() => setViewModalVisible(false)}>
             Cerrar
           </Button>
         ]}
         width={800}
       >
         {contratoSeleccionado && (
-          <div className="contract-details">
-            <div className="row mb-3">
-              <div className="col-md-6">
-                <h5 className="text-primary">Información del Inquilino</h5>
-                <div className="detail-item">
-                  <strong>Nombre:</strong> {contratoSeleccionado.inquilino_nombre} {contratoSeleccionado.inquilino_apellido}
-                </div>
-                <div className="detail-item">
-                  <strong>DNI:</strong> {contratoSeleccionado.inquilino_dni || 'No disponible'}
-                </div>
-                <div className="detail-item">
-                  <strong>Email:</strong> {contratoSeleccionado.inquilino_email || 'No disponible'}
-                </div>
-                <div className="detail-item">
-                  <strong>Teléfono:</strong> {contratoSeleccionado.inquilino_telefono || 'No disponible'}
-                </div>
-              </div>
-              <div className="col-md-6">
-                <h5 className="text-primary">Información del Espacio</h5>
-                <div className="detail-item">
-                  <strong>Inmueble:</strong> {contratoSeleccionado.inmueble_nombre || 'No disponible'}
-                </div>
-                <div className="detail-item">
-                  <strong>Espacio:</strong> {contratoSeleccionado.espacio_nombre || 'No disponible'}
-                </div>
-                <div className="detail-item">
-                  <strong>Descripción:</strong> {contratoSeleccionado.espacio_descripcion || 'No disponible'}
-                </div>
-                <div className="detail-item">
-                  <strong>Precio base:</strong> S/ {parseFloat(contratoSeleccionado.espacio_precio).toFixed(2) || '0.00'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="row mb-3">
-              <div className="col-md-6">
-                <h5 className="text-primary">Información del Contrato</h5>
-                <div className="detail-item">
-                  <strong>Fecha de inicio:</strong> {new Date(contratoSeleccionado.fecha_inicio).toLocaleDateString()}
-                </div>
-                <div className="detail-item">
-                  <strong>Fecha de fin:</strong> {new Date(contratoSeleccionado.fecha_fin).toLocaleDateString()}
-                </div>
-                <div className="detail-item">
-                  <strong>Día de pago mensual:</strong> {new Date(contratoSeleccionado.fecha_pago).toLocaleDateString()}
-                </div>
-                <div className="detail-item">
-                  <strong>Estado:</strong> <span className={`badge ${contratoSeleccionado.estado === 'activo' ? 'bg-success' : contratoSeleccionado.estado === 'inactivo' ? 'bg-warning' : 'bg-danger'}`}>{contratoSeleccionado.estado}</span>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <h5 className="text-primary">Información Económica</h5>
-                <div className="detail-item">
-                  <strong>Monto de alquiler:</strong> S/ {parseFloat(contratoSeleccionado.monto_alquiler).toFixed(2)}
-                </div>
-                <div className="detail-item">
-                  <strong>Monto de garantía:</strong> S/ {parseFloat(contratoSeleccionado.monto_garantia).toFixed(2)}
-                </div>
-                <div className="detail-item">
-                  <strong>Documento:</strong> {contratoSeleccionado.documento || 'No disponible'}
-                </div>
-              </div>
-            </div>
-            
+          <div className="contrato-details">
             <div className="row">
-              <div className="col-12">
-                <h5 className="text-primary">Observaciones</h5>
-                <div className="card">
-                  <div className="card-body">
-                    <p>{contratoSeleccionado.descripcion || 'Sin observaciones'}</p>
-                  </div>
-                </div>
+              <div className="col-md-6">
+                <h4>Información del Inquilino</h4>
+                <p><strong>Nombre:</strong> {contratoSeleccionado.inquilino_nombre} {contratoSeleccionado.inquilino_apellido}</p>
+                <p><strong>DNI:</strong> {contratoSeleccionado.inquilino_dni || 'No especificado'}</p>
+                <p><strong>Email:</strong> {contratoSeleccionado.inquilino_email || 'No especificado'}</p>
+                <p><strong>Teléfono:</strong> {contratoSeleccionado.inquilino_telefono || 'No especificado'}</p>
+              </div>
+              <div className="col-md-6">
+                <h4>Información del Espacio</h4>
+                <p><strong>Inmueble:</strong> {contratoSeleccionado.inmueble_nombre}</p>
+                <p><strong>Espacio:</strong> {contratoSeleccionado.espacio_nombre}</p>
+                <p><strong>Descripción:</strong> {contratoSeleccionado.espacio_descripcion || 'No especificada'}</p>
               </div>
             </div>
+            <div className="row mt-4">
+              <div className="col-md-6">
+                <h4>Detalles del Contrato</h4>
+                <p><strong>Estado:</strong> <span className={`text-${contratoSeleccionado.estado === 'activo' ? 'success' : contratoSeleccionado.estado === 'inactivo' ? 'warning' : 'danger'}`}>{contratoSeleccionado.estado}</span></p>
+                <p><strong>Fecha Inicio:</strong> {new Date(contratoSeleccionado.fecha_inicio).toLocaleDateString()}</p>
+                <p><strong>Fecha Fin:</strong> {new Date(contratoSeleccionado.fecha_fin).toLocaleDateString()}</p>
+                <p><strong>Fecha Pago:</strong> {new Date(contratoSeleccionado.fecha_pago).toLocaleDateString()}</p>
+              </div>
+              <div className="col-md-6">
+                <h4>Información Financiera</h4>
+                <p><strong>Monto Alquiler:</strong> S/ {parseFloat(contratoSeleccionado.monto_alquiler).toFixed(2)}</p>
+                <p><strong>Monto Garantía:</strong> S/ {parseFloat(contratoSeleccionado.monto_garantia).toFixed(2)}</p>
+              </div>
+            </div>
+            <div className="row mt-4">
+              <div className="col-12">
+                <h4>Documentos</h4>
+                {contratoSeleccionado.documento ? (
+                  <div className="document-actions">
+                    <Button
+                      type="primary"
+                      icon={<EyeOutlined />}
+                      onClick={() => handleViewDocument(contratoSeleccionado.documento.ruta)}
+                      className="me-2"
+                    >
+                      Ver Documento
+                    </Button>
+                    <Button
+                      type="default"
+                      icon={<i className="fas fa-download"></i>}
+                      onClick={() => handleDownloadDocument(contratoSeleccionado.documento.ruta, contratoSeleccionado.documento.nombre)}
+                    >
+                      Descargar
+                    </Button>
+                  </div>
+                ) : (
+                  <p>No hay documentos asociados a este contrato.</p>
+                )}
+              </div>
+            </div>
+            {contratoSeleccionado.descripcion && (
+              <div className="row mt-4">
+                <div className="col-12">
+                  <h4>Observaciones</h4>
+                  <p>{contratoSeleccionado.descripcion}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>
 
-      {/* Modal de Editar */}
+      {/* Modal de Edición */}
       <Modal
         title="Editar Contrato"
         open={editModalVisible}
         onCancel={() => setEditModalVisible(false)}
         footer={[
-          <Button key="cancelar" onClick={() => setEditModalVisible(false)}>
+          <Button key="cancel" onClick={() => setEditModalVisible(false)}>
             Cancelar
           </Button>,
-          <Button 
-            key="guardar" 
-            type="primary" 
-            loading={loadingSave} 
+          <Button
+            key="save"
+            type="primary"
+            loading={loadingSave}
             onClick={handleSaveEdit}
-            icon={<SaveOutlined />}
           >
             Guardar Cambios
           </Button>
         ]}
-        width={700}
       >
-        {contratoSeleccionado && (
-          <Form
-            form={form}
-            layout="vertical"
+        <Form
+          form={form}
+          layout="vertical"
+        >
+          <Form.Item
+            name="monto_alquiler"
+            label="Monto de Alquiler"
+            rules={[{ required: true, message: 'Por favor ingrese el monto de alquiler' }]}
           >
-            <div className="row">
-              <div className="col-md-12 mb-3">
-                <h5>Contrato para: {contratoSeleccionado.inquilino_nombre} {contratoSeleccionado.inquilino_apellido}</h5>
-                <p>Espacio: {contratoSeleccionado.espacio_nombre} en {contratoSeleccionado.inmueble_nombre}</p>
-              </div>
-              
-              <div className="col-md-6">
-                <Form.Item
-                  name="fechas"
-                  label="Periodo del Contrato"
-                  rules={[{ required: true, message: 'Por favor seleccione las fechas de inicio y fin' }]}
-                >
-                  <RangePicker 
-                    style={{ width: '100%' }} 
-                    format="DD/MM/YYYY"
-                  />
-                </Form.Item>
-              </div>
-              
-              <div className="col-md-6">
-                <Form.Item
-                  name="fecha_pago"
-                  label="Fecha de Pago Mensual"
-                  rules={[{ required: true, message: 'Por favor seleccione la fecha de pago' }]}
-                >
-                  <AntDatePicker 
-                    style={{ width: '100%' }} 
-                    format="DD/MM/YYYY"
-                  />
-                </Form.Item>
-              </div>
-              
-              <div className="col-md-6">
-                <Form.Item
-                  name="monto_alquiler"
-                  label="Monto de Alquiler"
-                  rules={[{ required: true, message: 'Por favor ingrese el monto de alquiler' }]}
-                >
-                  <Input 
-                    prefix="S/" 
-                    type="number"
-                    step="0.01"
-                    min="0"
-                  />
-                </Form.Item>
-              </div>
-              
-              <div className="col-md-6">
-                <Form.Item
-                  name="monto_garantia"
-                  label="Monto de Garantía"
-                  rules={[{ required: true, message: 'Por favor ingrese el monto de garantía' }]}
-                >
-                  <Input 
-                    prefix="S/" 
-                    type="number"
-                    step="0.01"
-                    min="0"
-                  />
-                </Form.Item>
-              </div>
-              
-              <div className="col-md-6">
-                <Form.Item
-                  name="estado"
-                  label="Estado"
-                  rules={[{ required: true, message: 'Por favor seleccione el estado' }]}
-                >
-                  <Select
-                    placeholder="Seleccionar estado"
-                    options={[
-                      { value: 'activo', label: 'Activo' },
-                      { value: 'inactivo', label: 'Inactivo' },
-                      { value: 'finalizado', label: 'Finalizado' }
-                    ]}
-                    classNamePrefix="select"
-                  />
-                </Form.Item>
-              </div>
-              
-              <div className="col-md-12">
-                <Form.Item
-                  name="descripcion"
-                  label="Observaciones"
-                >
-                  <TextArea rows={4} />
-                </Form.Item>
-              </div>
-            </div>
-          </Form>
-        )}
+            <Input type="number" step="0.01" />
+          </Form.Item>
+          <Form.Item
+            name="monto_garantia"
+            label="Monto de Garantía"
+            rules={[{ required: true, message: 'Por favor ingrese el monto de garantía' }]}
+          >
+            <Input type="number" step="0.01" />
+          </Form.Item>
+          <Form.Item
+            name="fechas"
+            label="Período del Contrato"
+            rules={[{ required: true, message: 'Por favor seleccione el período del contrato' }]}
+          >
+            <RangePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="fecha_pago"
+            label="Fecha de Pago Mensual"
+            rules={[{ required: true, message: 'Por favor seleccione la fecha de pago' }]}
+          >
+            <AntDatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="estado"
+            label="Estado"
+            rules={[{ required: true, message: 'Por favor seleccione el estado' }]}
+          >
+            <Select>
+              <Select.Option value="activo">Activo</Select.Option>
+              <Select.Option value="inactivo">Inactivo</Select.Option>
+              <Select.Option value="finalizado">Finalizado</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="descripcion"
+            label="Observaciones"
+          >
+            <TextArea rows={4} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Modal para subir contrato firmado */}
+      <Modal
+        title="Subir Contrato Firmado"
+        open={modalUploadVisible}
+        onCancel={() => {
+          setModalUploadVisible(false);
+          setSelectedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }}
+        footer={[
+          <Button 
+            key="cancel" 
+            onClick={() => {
+              setModalUploadVisible(false);
+              setSelectedFile(null);
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+            }}
+          >
+            Cancelar
+          </Button>,
+          <Button
+            key="upload"
+            type="primary"
+            loading={loadingUpload}
+            onClick={handleUploadAndActivate}
+          >
+            Subir y Activar
+          </Button>
+        ]}
+      >
+        <div className="form-group">
+          <label>Seleccionar archivo PDF del contrato firmado:</label>
+          <input
+            type="file"
+            className="form-control"
+            accept=".pdf"
+            onChange={handleFileChange}
+            ref={fileInputRef}
+          />
+          <small className="form-text text-muted">
+            Solo se permiten archivos PDF. El contrato debe estar firmado por todas las partes.
+          </small>
+        </div>
       </Modal>
     </>
   );

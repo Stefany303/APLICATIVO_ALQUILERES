@@ -94,6 +94,116 @@ class ReporteService {
             throw error;
         }
     }
+
+    // Dashboard - Obtener todos los datos en una sola llamada
+    async obtenerDatosDashboard() {
+        try {
+            const response = await api.get('/reportes/dashboard/completo');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener datos del dashboard:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Total de inquilinos por mes
+    async obtenerInquilinosPorMes() {
+        try {
+            const response = await api.get('/reportes/dashboard/inquilinos');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener total de inquilinos por mes:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Espacios disponibles vs ocupados
+    async obtenerEspaciosDisponiblesVsOcupados() {
+        try {
+            const response = await api.get('/reportes/dashboard/espacios');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener espacios disponibles vs ocupados:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Ingresos mensuales
+    async obtenerIngresosMensuales() {
+        try {
+            const response = await api.get('/reportes/dashboard/ingresos');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener ingresos mensuales:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Gastos mensuales
+    async obtenerGastosMensuales() {
+        try {
+            const response = await api.get('/reportes/dashboard/gastos');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener gastos mensuales:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Contratos activos vs mes anterior
+    async obtenerContratosActivos() {
+        try {
+            const response = await api.get('/reportes/dashboard/contratos-activos');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener contratos activos:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Tasa de ocupación por inmueble
+    async obtenerTasaOcupacion() {
+        try {
+            const response = await api.get('/reportes/dashboard/ocupacion');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener tasa de ocupación:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Contratos por vencer
+    async obtenerContratosPorVencer() {
+        try {
+            const response = await api.get('/reportes/dashboard/contratos-por-vencer');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener contratos por vencer:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Pagos pendientes vs pagados por mes
+    async obtenerPagosPendientesVsPagados() {
+        try {
+            const response = await api.get('/reportes/dashboard/pagos');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener pagos pendientes vs pagados:', error);
+            throw error;
+        }
+    }
+
+    // Dashboard - Contratos vencidos vs renovados por mes
+    async obtenerContratosVencidosVsRenovados() {
+        try {
+            const response = await api.get('/reportes/dashboard/contratos-renovados');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener contratos vencidos vs renovados:', error);
+            throw error;
+        }
+    }
 }
 
 export default new ReporteService(); 

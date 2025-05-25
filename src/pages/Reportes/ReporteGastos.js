@@ -1,6 +1,6 @@
 /* eslint-disable react/jsx-no-duplicate-props */
 /* eslint-disable no-unused-vars */
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import { Link } from 'react-router-dom';
@@ -13,6 +13,7 @@ import Select from "react-select";
 import reporteService from '../../services/reporteService';
 import inmuebleService from '../../services/inmuebleService';
 import moment from 'moment';
+import { message } from 'antd';
 
 const ReporteGastos = () => {
     const [inmuebles, setInmuebles] = useState([]);
@@ -64,17 +65,62 @@ const ReporteGastos = () => {
         try {
             // Añadir incluir_estadisticas=true para obtener estadísticas
             const filtrosConEstadisticas = { ...filtros, incluir_estadisticas: 'true' };
-            const response = await reporteService.generarReporteGastos(filtrosConEstadisticas);
             
-            if (response.datos) {
-                setGastos(response.datos);
-                setEstadisticas(response.estadisticas);
-            } else {
-                setGastos(response);
+            let response = null;
+            try {
+                response = await reporteService.generarReporteGastos(filtrosConEstadisticas);
+            } catch (apiError) {
+                console.error('Error en la llamada a la API:', apiError);
+                setGastos([]);
                 setEstadisticas(null);
+                message.error('Error al obtener datos del servidor');
+                setLoading(false);
+                return;
             }
+            
+            // Validar la respuesta
+            if (!response) {
+                console.warn('La respuesta está vacía');
+                setGastos([]);
+                setEstadisticas(null);
+                setLoading(false);
+                return;
+            }
+            
+            console.log('Datos recibidos del servidor:', response);
+            
+            // Extraer los datos según la estructura de la respuesta
+            let datosGastos = [];
+            let datosEstadisticas = null;
+            
+            if (response.datos && Array.isArray(response.datos)) {
+                datosGastos = response.datos;
+                datosEstadisticas = response.estadisticas || null;
+            } else if (Array.isArray(response)) {
+                datosGastos = response;
+            } else if (typeof response === 'object') {
+                // Intentar buscar un array en cualquier propiedad del objeto
+                const posiblesArrays = Object.values(response).filter(val => Array.isArray(val));
+                if (posiblesArrays.length > 0) {
+                    // Usar el primer array encontrado
+                    datosGastos = posiblesArrays[0];
+                    // Buscar posibles estadísticas
+                    const posibleEstadisticas = Object.values(response).find(val => 
+                        val && typeof val === 'object' && !Array.isArray(val) && 'total_registros' in val
+                    );
+                    datosEstadisticas = posibleEstadisticas || null;
+                }
+            }
+            
+            // Actualizar el estado
+            setGastos(datosGastos);
+            setEstadisticas(datosEstadisticas);
+            
         } catch (error) {
-            console.error('Error al generar reporte de gastos:', error);
+            console.error('Error general al generar reporte de gastos:', error);
+            setGastos([]);
+            setEstadisticas(null);
+            message.error('Ocurrió un error inesperado');
         } finally {
             setLoading(false);
         }
@@ -139,8 +185,8 @@ const ReporteGastos = () => {
         {
             title: "Monto",
             dataIndex: "monto",
-            sorter: (a, b) => (a.monto || 0) - (b.monto || 0),
-            render: (monto) => (typeof monto === "number" ? `S/ ${monto.toFixed(2)}` : "N/A")
+            sorter: (a, b) => parseFloat(a.monto || 0) - parseFloat(b.monto || 0),
+            render: (monto) => (monto !== undefined && monto !== null ? `S/ ${parseFloat(monto).toFixed(2)}` : "N/A")
         },
         {
             title: "Método de Pago",
@@ -215,6 +261,31 @@ const ReporteGastos = () => {
         }),
       };
       
+    // Usar useMemo para garantizar que la propiedad dataSource siempre reciba un array válido
+    const datosTabla = useMemo(() => {
+        if (!Array.isArray(gastos)) {
+            console.warn('gastos no es un array:', gastos);
+            return [];
+        }
+        
+        return gastos.map(item => {
+            // Asegurarnos que cada elemento tenga un id único
+            const id = item.id || `gasto-${Math.random().toString(36).substring(2, 9)}`;
+            
+            // Asegurarnos que todos los campos existan y sean del tipo correcto
+            return {
+                ...item,
+                id,
+                monto: parseFloat(item.monto || 0),
+                nombre: item.nombre || 'N/A',
+                metodo_pago: item.metodo_pago || 'N/A',
+                tipo_pago: item.tipo_pago || item.tipo_gasto || 'N/A',
+                descripcion: item.descripcion || 'N/A',
+                creado_en: item.creado_en || null
+            };
+        });
+    }, [gastos]);
+
     return (
         <>
             <Header />
@@ -356,7 +427,7 @@ const ReporteGastos = () => {
                                                         <div className="card bg-light">
                                                             <div className="card-body">
                                                                 <h5 className="card-title">Total Registros</h5>
-                                                                <p className="card-text h4">{estadisticas.total_registros}</p>
+                                                                <p className="card-text h4">{estadisticas.total_registros || 0}</p>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -364,7 +435,7 @@ const ReporteGastos = () => {
                                                         <div className="card bg-light">
                                                             <div className="card-body">
                                                                 <h5 className="card-title">Monto Total</h5>
-                                                                <p className="card-text h4">S/ {estadisticas.total_monto.toFixed(2)}</p>
+                                                                <p className="card-text h4">S/ {parseFloat(estadisticas.total_monto || 0).toFixed(2)}</p>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -374,12 +445,17 @@ const ReporteGastos = () => {
                                                             <div className="card-body">
                                                                 <h5 className="card-title">Distribución por Tipo</h5>
                                                                 <div style={{maxHeight: '100px', overflowY: 'auto'}}>
-                                                                    {Object.entries(estadisticas.gastos_por_tipo).map(([tipo, data]) => (
-                                                                        <div key={tipo} className="d-flex justify-content-between">
-                                                                            <span>{tipo}:</span>
-                                                                            <span>S/ {data.monto_total.toFixed(2)} ({data.cantidad})</span>
-                                                                        </div>
-                                                                    ))}
+                                                                    {estadisticas.gastos_por_tipo && Object.entries(estadisticas.gastos_por_tipo).map(([tipo, data]) => {
+                                                                        if (!data || typeof data !== 'object') return null;
+                                                                        const monto = parseFloat(data.monto_total || 0);
+                                                                        const cantidad = data.cantidad || 0;
+                                                                        return (
+                                                                            <div key={tipo} className="d-flex justify-content-between">
+                                                                                <span>{tipo}:</span>
+                                                                                <span>S/ {monto.toFixed(2)} ({cantidad})</span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -390,16 +466,17 @@ const ReporteGastos = () => {
                                             <div className="table-responsive">
                                                 <Table
                                                     pagination={{
-                                                        total: gastos.length,
+                                                        total: datosTabla.length,
                                                         showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} entradas`,
                                                         showSizeChanger: true, onShowSizeChange: onShowSizeChange, itemRender: itemRender
                                                     }}
                                                     style={{ overflowX: 'auto' }}
                                                     columns={columns}
-                                                    dataSource={gastos}
-                                                    rowKey={record => record.id}
+                                                    dataSource={datosTabla}
+                                                    rowKey="id"
                                                     rowSelection={rowSelection}
                                                     loading={loading}
+                                                    locale={{ emptyText: 'No hay datos disponibles' }}
                                                 />
                                             </div>
                                         </div>
