@@ -873,14 +873,16 @@ const InquilinosRegistrar = () => {
                               >
                                 <option value="">Seleccionar Espacio</option>
                                 {espacios && espacios.length > 0 ? (
-                                  espacios.map(espacio => {
-                                    console.log('Renderizando espacio:', espacio);
-                                    return (
-                                      <option key={espacio.id} value={espacio.id}>
-                                        {`${espacio.nombre} - ${espacio.tipo_espacio} (S/ ${parseFloat(espacio.precio).toFixed(2)})`}
-                                      </option>
-                                    );
-                                  })
+                                  espacios
+                                    .filter(espacio => espacio.estado === 0 || espacio.estado === '0') // Filtrar solo espacios desocupados
+                                    .map(espacio => {
+                                      console.log('Renderizando espacio desocupado:', espacio);
+                                      return (
+                                        <option key={espacio.id} value={espacio.id}>
+                                          {`${espacio.nombre} - ${espacio.tipo_espacio} (S/ ${parseFloat(espacio.precio).toFixed(2)})`}
+                                        </option>
+                                      );
+                                    })
                                 ) : (
                                   <option value="" disabled>No hay espacios disponibles</option>
                                 )}

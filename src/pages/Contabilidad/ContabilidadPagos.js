@@ -1721,60 +1721,62 @@ const ContabilidadPagos = () => {
                   </div>
                 </div>
                 
-                <div className="col-12">
-                  <h5 className="text-primary">Documento Adjunto</h5>
-                  <hr />
-                  {loadingDoc && (
-                    <div className="text-center p-4">
-                      <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Cargando...</span>
-                      </div>
-                      <p className="mt-2">Buscando documento...</p>
-                    </div>
-                  )}
-                  
-                  {!loadingDoc && documento && !documentoError ? (
-                    <div className="document-container p-3 border rounded">
-                      <div className="d-flex align-items-center justify-content-between mb-3">
-                        <div className="document-info d-flex align-items-center">
-                          <span className="document-icon me-3">
-                            {documento.tipo === 'imagen' ? (
-                              <FiImage size={24} className="text-primary" />
-                            ) : (
-                              <FiFileText size={24} className="text-primary" />
-                            )}
-                          </span>
-                          <span className="document-name">
-                            {documento.nombre}
-                          </span>
+                {pagoVisualizando.estado !== 'pendiente' && (
+                  <div className="col-12">
+                    <h5 className="text-primary">Documento Adjunto</h5>
+                    <hr />
+                    {loadingDoc && (
+                      <div className="text-center p-4">
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="visually-hidden">Cargando...</span>
                         </div>
-                        <div className="document-actions">
-                          <Button 
-                            type="default"
-                            icon={<FiDownload className="me-1" />} 
-                            className="me-2"
-                            onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
-                            size="small"
-                          >
-                            Descargar
-                          </Button>
-                          <Button 
-                            type="primary"
-                            icon={<FiEye className="me-1" />} 
-                            onClick={() => handleViewDocument(documento.ruta)}
-                            size="small"
-                          >
-                            Ver documento
-                          </Button>
+                        <p className="mt-2">Buscando documento...</p>
+                      </div>
+                    )}
+                    
+                    {!loadingDoc && documento && !documentoError ? (
+                      <div className="document-container p-3 border rounded">
+                        <div className="d-flex align-items-center justify-content-between mb-3">
+                          <div className="document-info d-flex align-items-center">
+                            <span className="document-icon me-3">
+                              {documento.tipo === 'imagen' ? (
+                                <FiImage size={24} className="text-primary" />
+                              ) : (
+                                <FiFileText size={24} className="text-primary" />
+                              )}
+                            </span>
+                            <span className="document-name">
+                              {documento.nombre}
+                            </span>
+                          </div>
+                          <div className="document-actions">
+                            <Button 
+                              type="default"
+                              icon={<FiDownload className="me-1" />} 
+                              className="me-2"
+                              onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
+                              size="small"
+                            >
+                              Descargar
+                            </Button>
+                            <Button 
+                              type="primary"
+                              icon={<FiEye className="me-1" />} 
+                              onClick={() => handleViewDocument(documento.ruta)}
+                              size="small"
+                            >
+                              Ver documento
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : !loadingDoc && (
-                    <div className="alert alert-info">
-                      <FiFileText className="me-2" /> No hay documento adjunto para este pago.
-                    </div>
-                  )}
-                </div>
+                    ) : !loadingDoc && (
+                      <div className="alert alert-info">
+                        <FiFileText className="me-2" /> No hay documento adjunto para este pago.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </Modal>

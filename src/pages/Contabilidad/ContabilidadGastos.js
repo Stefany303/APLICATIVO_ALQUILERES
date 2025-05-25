@@ -332,6 +332,50 @@ const ContabilidadGastos = () => {
     setModalVisible(true);
   };
 
+  // Función para ver documento directamente usando el servicio
+  const handleViewDocument = async (rutaDocumento) => {
+    try {
+      if (!rutaDocumento) {
+        throw new Error('Ruta del documento no disponible');
+      }
+      
+      // Extraer el nombre del archivo de la ruta completa
+      const nombreArchivo = rutaDocumento.split('/').pop();
+      console.log('Nombre del archivo:', nombreArchivo);
+      
+      // Usar la ruta común documentos/pago/1/
+      const rutaServicio = `documentos/pago/1/${nombreArchivo}`;
+      console.log('Ruta para el servicio:', rutaServicio);
+      
+      await documentoService.verDocumento(rutaServicio);
+    } catch (error) {
+      console.error('Error al ver el documento:', error);
+      alert('Error al abrir el documento. Por favor, intente descargarlo.');
+    }
+  };
+
+  // Función para descargar documento directamente usando el servicio
+  const handleDownloadDocument = async (rutaDocumento, nombreArchivo) => {
+    try {
+      if (!rutaDocumento) {
+        throw new Error('Ruta del documento no disponible');
+      }
+      
+      // Extraer el nombre del archivo de la ruta completa
+      const nombreArchivo = rutaDocumento.split('/').pop();
+      console.log('Nombre del archivo:', nombreArchivo);
+      
+      // Usar la ruta común documentos/pago/1/
+      const rutaServicio = `documentos/pago/1/${nombreArchivo}`;
+      console.log('Ruta para el servicio:', rutaServicio);
+      
+      await documentoService.descargarDocumento(rutaServicio, nombreArchivo);
+    } catch (error) {
+      console.error('Error al descargar el documento:', error);
+      alert('Error al descargar el documento. Por favor, intente más tarde.');
+    }
+  };
+
   // Función para verificar si un archivo existe
   const verificarExistenciaArchivo = async (url) => {
     try {
@@ -396,32 +440,32 @@ const ContabilidadGastos = () => {
           } else {
             console.error(`El documento no existe en la ruta: ${rutaDocumento}`);
             
-            // Intentar buscar en la carpeta común de documentos de gastos
+            // Intentar buscar en la carpeta común donde están realmente guardados
             const baseUrl = window.location.origin;
-            const rutaGastos = `${baseUrl}/documentos/gasto/${documentos[0].nombre}`;
-            const rutaAlternativa = `${baseUrl}/public/documentos/gasto/${documentos[0].nombre}`;
+            const rutaComun = `${baseUrl}/documentos/pago/1/${documentos[0].nombre}`;
+            const rutaComunAlternativa = `${baseUrl}/public/pago/1/${documentos[0].nombre}`;
             
-            console.log(`Intentando con ruta de gastos: ${rutaGastos}`);
-            let existeEnRutaGastos = await verificarExistenciaArchivo(rutaGastos);
+            console.log(`Intentando con ruta común: ${rutaComun}`);
+            let existeEnRutaComun = await verificarExistenciaArchivo(rutaComun);
             
-            if (existeEnRutaGastos) {
-              console.log(`¡Documento encontrado en la carpeta de gastos!`);
+            if (existeEnRutaComun) {
+              console.log(`¡Documento encontrado en la carpeta común!`);
               setDocumento({ 
                 nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
-                ruta: rutaGastos,
+                ruta: rutaComun,
                 tipo: tipoDocumento
               });
               setDocumentoError(false);
             } else {
               // Probar con la ruta alternativa
-              console.log(`Intentando con ruta alternativa: ${rutaAlternativa}`);
-              existeEnRutaGastos = await verificarExistenciaArchivo(rutaAlternativa);
+              console.log(`Intentando con ruta común alternativa: ${rutaComunAlternativa}`);
+              existeEnRutaComun = await verificarExistenciaArchivo(rutaComunAlternativa);
               
-              if (existeEnRutaGastos) {
-                console.log(`¡Documento encontrado en la ruta alternativa!`);
+              if (existeEnRutaComun) {
+                console.log(`¡Documento encontrado en la carpeta común alternativa!`);
                 setDocumento({ 
                   nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
-                  ruta: rutaAlternativa,
+                  ruta: rutaComunAlternativa,
                   tipo: tipoDocumento
                 });
                 setDocumentoError(false);
@@ -472,32 +516,6 @@ const ContabilidadGastos = () => {
       console.error('Error al validar el documento:', error);
       alert('Error al verificar el documento');
       return false;
-    }
-  };
-
-  // Función para ver documento directamente usando el servicio
-  const handleViewDocument = async (rutaDocumento) => {
-    try {
-      if (!(await validarDocumento(rutaDocumento))) {
-        return;
-      }
-      await documentoService.verDocumento(rutaDocumento);
-    } catch (error) {
-      console.error('Error al ver el documento:', error);
-      alert('Error al abrir el documento. Por favor, intente descargarlo.');
-    }
-  };
-
-  // Función para descargar documento directamente usando el servicio
-  const handleDownloadDocument = async (rutaDocumento, nombreArchivo) => {
-    try {
-      if (!(await validarDocumento(rutaDocumento))) {
-        return;
-      }
-      await documentoService.descargarDocumento(rutaDocumento, nombreArchivo);
-    } catch (error) {
-      console.error('Error al descargar el documento:', error);
-      alert('Error al descargar el documento. Por favor, intente más tarde.');
     }
   };
 
@@ -1033,80 +1051,78 @@ const ContabilidadGastos = () => {
               </div>
             </div>
             
-            <div className="col-12">
-              <h5 className="text-primary">Documento Adjunto</h5>
-              <hr />
-              {loadingDoc && (
-                <div className="text-center p-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando...</span>
-                  </div>
-                  <p className="mt-2">Buscando documento...</p>
-                </div>
-              )}
-              
-              {!loadingDoc && documento ? (
-                <div className="document-container p-3 border rounded">
-                  <div className="d-flex align-items-center justify-content-between mb-3">
-                    <div className="document-info d-flex align-items-center">
-                      <span className="document-icon me-3">
-                        {documento.tipo === 'imagen' ? (
-                          <FiImage size={24} className="text-primary" />
-                        ) : (
-                          <FiFileText size={24} className="text-primary" />
-                        )}
-                      </span>
-                      <span className="document-name">
-                        {documento.nombre}
-                        {documentoError && (
-                          <span className="text-danger ms-2">(No disponible)</span>
-                        )}
-                      </span>
+            {documento && (
+              <div className="col-12">
+                <h5 className="text-primary">Documento Adjunto</h5>
+                <hr />
+                {loadingDoc && (
+                  <div className="text-center p-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Cargando...</span>
                     </div>
-                    {!documentoError && (
-                      <div className="document-actions">
-                        <button 
-                          type="button" 
-                          className="btn btn-sm btn-outline-primary me-2"
-                          onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
-                        >
-                          <FiDownload className="me-1" /> Descargar
-                        </button>
-                        <button 
-                          type="button" 
-                          className="btn btn-sm btn-primary"
-                          onClick={() => handleViewDocument(documento.ruta)}
-                        >
-                          <FiEye className="me-1" /> Ver documento
-                        </button>
+                    <p className="mt-2">Buscando documento...</p>
+                  </div>
+                )}
+                
+                {!loadingDoc && (
+                  <div className="document-container p-3 border rounded">
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <div className="document-info d-flex align-items-center">
+                        <span className="document-icon me-3">
+                          {documento.tipo === 'imagen' ? (
+                            <FiImage size={24} className="text-primary" />
+                          ) : (
+                            <FiFileText size={24} className="text-primary" />
+                          )}
+                        </span>
+                        <span className="document-name">
+                          {documento.nombre}
+                          {documentoError && (
+                            <span className="text-danger ms-2">(No disponible)</span>
+                          )}
+                        </span>
+                      </div>
+                      {!documentoError && (
+                        <div className="document-actions">
+                          <button 
+                            type="button" 
+                            className="btn btn-sm btn-outline-primary me-2"
+                            onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
+                          >
+                            <FiDownload className="me-1" /> Descargar
+                          </button>
+                          <button 
+                            type="button" 
+                            className="btn btn-sm btn-primary"
+                            onClick={() => handleViewDocument(documento.ruta)}
+                          >
+                            <FiEye className="me-1" /> Ver documento
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Mensaje de error si el documento no está disponible */}
+                    {documentoError && (
+                      <div className="alert alert-warning">
+                        <p className="mb-0">
+                          <i className="fas fa-exclamation-triangle me-2"></i>
+                          El documento no se encuentra disponible en estos momentos.
+                        </p>
+                        <p className="small mb-0 mt-2">
+                          Esto puede deberse a que:
+                        </p>
+                        <ul className="small mb-0">
+                          <li>El documento fue eliminado o movido</li>
+                          <li>No tienes permisos para acceder al documento</li>
+                          <li>La ruta del documento es incorrecta</li>
+                        </ul>
                       </div>
                     )}
                   </div>
-                  
-                  {/* Mensaje de error si el documento no está disponible */}
-                  {documentoError && (
-                    <div className="alert alert-warning">
-                      <p className="mb-0">
-                        <i className="fas fa-exclamation-triangle me-2"></i>
-                        El documento no se encuentra disponible en estos momentos.
-                      </p>
-                      <p className="small mb-0 mt-2">
-                        Esto puede deberse a que:
-                      </p>
-                      <ul className="small mb-0">
-                        <li>El documento fue eliminado o movido</li>
-                        <li>No tienes permisos para acceder al documento</li>
-                        <li>La ruta del documento es incorrecta</li>
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ) : !loadingDoc && (
-                <div className="alert alert-info">
-                  <FiFileText className="me-2" /> No hay documento adjunto para este gasto.
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>
