@@ -70,7 +70,7 @@ const Header = () => {
           <img src={baricon1} alt="" />
         </Link>
       )}
-      <div className="top-nav-search mob-view">
+      {/*<div className="top-nav-search mob-view">
         <form>
           <input
             type="text"
@@ -81,18 +81,18 @@ const Header = () => {
             <img src={searchnormal} alt="" />
           </Link>
         </form>
-      </div>
+      </div>*/}
       <ul className="nav user-menu float-end">
         <li className="nav-item dropdown d-none d-sm-block">
-          <Link
+          {/*<Link
             to="#"
             className="dropdown-toggle nav-link"
             data-bs-toggle="dropdown"
           >
             <img src={noteicon} alt="" />
             <span className="pulse" />
-          </Link>
-          <div className="dropdown-menu notifications">
+          </Link>*/}
+         { /*<div className="dropdown-menu notifications">
             <div className="topnav-dropdown-header">
               <span>Notificaciones</span>
             </div>
@@ -118,7 +118,7 @@ const Header = () => {
             <div className="topnav-dropdown-footer">
               <Link to="#">Ver todas las notificaciones</Link>
             </div>
-          </div>
+          </div>*/}
         </li>
         <li className="nav-item dropdown has-arrow">
           <Link
@@ -142,7 +142,7 @@ const Header = () => {
                 <p className="text-muted mb-0">{user?.rol || 'Usuario'}</p>
               </div>
             </div>
-            <Link className="dropdown-item" to="/perfil">Mi Perfil</Link>
+            {/*<Link className="dropdown-item" to="/perfil">Mi Perfil</Link>*/}
             <Link className="dropdown-item" to="/conf-cambio-contrasena">Configuración</Link>
             <Link className="dropdown-item" onClick={logout} to="#">Cerrar Sesión</Link>
           </div>

@@ -7,7 +7,8 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
     "Accept": "application/json"
-  }
+  },
+  withCredentials: false // Deshabilitamos withCredentials ya que no lo necesitamos para este caso
 });
 
 // Interceptor para agregar el token de autenticación a todas las peticiones
@@ -20,20 +21,13 @@ api.interceptors.request.use(
     }
     
     // Añadir token de autenticación a cada petición
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      if (environment.DEBUG) {
-        console.log('Token añadido a petición:', token.substring(0, 15) + '...');
-      }
-    } else {
-      console.warn('No se encontró token de autenticación en localStorage');
     }
-    
     return config;
   },
   (error) => {
-    console.error('Error en interceptor de petición:', error);
     return Promise.reject(error);
   }
 );

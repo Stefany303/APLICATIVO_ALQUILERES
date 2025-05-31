@@ -41,6 +41,8 @@ const EspaciosRegistros = () => {
   const [modalEditVisible, setModalEditVisible] = useState(false);
   const [modalViewVisible, setModalViewVisible] = useState(false);
   const [espacioSeleccionado, setEspacioSeleccionado] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [updatedData, setUpdatedData] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -81,14 +83,17 @@ const EspaciosRegistros = () => {
       try {
         // Cargar inmuebles
         const inmueblesData = await inmuebleService.obtenerInmuebles();
+        console.log('Inmuebles cargados:', inmueblesData);
         setInmuebles(Array.isArray(inmueblesData) ? inmueblesData : []);
 
         // Cargar tipos de espacio
         const tiposData = await tipoespacioService.obtenerTodos();
+        console.log('Tipos de espacio cargados:', tiposData);
         setTipoEspacios(Array.isArray(tiposData) ? tiposData : []);
 
         // Cargar todos los espacios
         const espaciosData = await espacioService.obtenerEspacios();
+        console.log('Espacios cargados:', espaciosData);
         const espaciosArray = Array.isArray(espaciosData) ? espaciosData : [];
         setEspacios(espaciosArray);
         setEspaciosFiltrados(espaciosArray);
@@ -129,6 +134,19 @@ const EspaciosRegistros = () => {
   // Aplicar filtros
   useEffect(() => {
     let filtered = [...espacios];
+    console.log('Aplicando filtros a espacios:', espacios);
+    console.log('Ejemplo de un espacio:', espacios[0]);
+
+    // Filtrar por texto de búsqueda
+    if (searchText) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(espacio =>
+        espacio.nombre.toLowerCase().includes(searchLower) ||
+        espacio.descripcion.toLowerCase().includes(searchLower) ||
+        espacio.inmueble_nombre?.toLowerCase().includes(searchLower) ||
+        espacio.piso_nombre?.toLowerCase().includes(searchLower)
+      );
+    }
 
     // Filtrar por inmueble
     if (selectedInmueble) {
@@ -143,15 +161,6 @@ const EspaciosRegistros = () => {
     // Filtrar por tipo de espacio
     if (selectedTipoEspacio) {
       filtered = filtered.filter(espacio => espacio.tipoEspacio_id === parseInt(selectedTipoEspacio));
-    }
-
-    // Filtrar por texto de búsqueda
-    if (searchText) {
-      const searchLower = searchText.toLowerCase();
-      filtered = filtered.filter(espacio =>
-        espacio.nombre.toLowerCase().includes(searchLower) ||
-        espacio.descripcion.toLowerCase().includes(searchLower)
-      );
     }
 
     setEspaciosFiltrados(filtered);
@@ -223,14 +232,19 @@ const EspaciosRegistros = () => {
         espacioSeleccionado.id,
         formData
       );
-      message.success('Espacio actualizado correctamente');
+
+      // Guardar los datos actualizados y mostrar el modal de éxito
+      setUpdatedData(formData);
       setModalEditVisible(false);
-      
-      // Recargar espacios
-      const espaciosData = await espacioService.obtenerEspacios();
-      setEspacios(Array.isArray(espaciosData) ? espaciosData : []);
+      setShowSuccessModal(true);
+
     } catch (error) {
-      message.error('Error al actualizar el espacio');
+      console.error('Error al actualizar el espacio:', error);
+      Modal.error({
+        title: 'Error en la Actualización',
+        content: `No se pudo actualizar el espacio: ${error.response?.data?.message || error.message || 'Error desconocido'}`,
+        okText: 'Aceptar'
+      });
     }
   };
 
@@ -255,7 +269,58 @@ const EspaciosRegistros = () => {
     setSearchText('');
   };
 
+  // Función para manejar el cierre del modal de éxito
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    // Recargar espacios
+    refreshData();
+  };
+
+  // Función para recargar los datos
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Cargar inmuebles
+      const inmueblesData = await inmuebleService.obtenerInmuebles();
+      setInmuebles(Array.isArray(inmueblesData) ? inmueblesData : []);
+
+      // Cargar tipos de espacio
+      const tiposData = await tipoespacioService.obtenerTodos();
+      setTipoEspacios(Array.isArray(tiposData) ? tiposData : []);
+
+      // Cargar todos los espacios
+      const espaciosData = await espacioService.obtenerEspacios();
+      const espaciosArray = Array.isArray(espaciosData) ? espaciosData : [];
+      setEspacios(espaciosArray);
+      setEspaciosFiltrados(espaciosArray);
+      
+      message.success('Datos actualizados correctamente');
+    } catch (error) {
+      console.error('Error al actualizar los datos:', error);
+      setError('Error al cargar los datos');
+      message.error('Error al actualizar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns = [
+    {
+      title: "Inmueble",
+      dataIndex: "inmueble_nombre",
+      key: "inmueble_nombre",
+      sorter: (a, b) => a.inmueble_nombre?.localeCompare(b.inmueble_nombre || ''),
+      render: (text) => text || "N/A",
+    },
+    {
+      title: "Piso",
+      dataIndex: "piso_nombre",
+      key: "piso_nombre",
+      sorter: (a, b) => a.piso_nombre?.localeCompare(b.piso_nombre || ''),
+      render: (text) => text || "N/A",
+    },
     {
       title: "Nombre",
       dataIndex: "nombre",
@@ -394,17 +459,35 @@ const EspaciosRegistros = () => {
                                 type="text"
                                 className="form-control"
                                 placeholder="Buscar aquí"
+                                value={searchText}
                                 onChange={(e) => handleSearch(e.target.value)}
                               />
+                              <button className="btn" type="button">
+                                  <img src={searchnormal} alt="Buscar" />
+                              </button>
                             </form>
+                            
                           </div>
                           <div className="add-group">
                             <Link
                               to="/espacios-anadir"
                               className="btn btn-primary add-pluss ms-2"
+                              title="Añadir espacio"
                             >
-                              <i className="fas fa-plus"></i>
+                               <img src={plusicon} alt="Añadir" />
                             </Link>
+                            <button
+                              className="btn btn-primary doctor-refresh ms-2"
+                              onClick={refreshData}
+                              title="Actualizar datos"
+                              disabled={loading}
+                            >
+                              {loading ? (
+                                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                              ) : (
+                                <i className="fas fa-sync-alt"></i>
+                              )}
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -744,6 +827,30 @@ const EspaciosRegistros = () => {
           </div>
         </div>
       )}
+    </Modal>
+
+    {/* Modal de éxito */}
+    <Modal
+      title="¡Actualización Exitosa!"
+      open={showSuccessModal}
+      onOk={handleSuccessModalClose}
+      onCancel={handleSuccessModalClose}
+      okText="Aceptar"
+      cancelButtonProps={{ style: { display: 'none' } }}
+      centered
+    >
+      <div>
+        <p>El espacio se ha actualizado correctamente con los siguientes datos:</p>
+        {updatedData && (
+          <ul style={{ listStyleType: 'none', padding: '10px' }}>
+            <li><strong>Nombre:</strong> {updatedData.nombre}</li>
+            <li><strong>Descripción:</strong> {updatedData.descripcion}</li>
+            <li><strong>Precio:</strong> S/ {parseFloat(updatedData.precio).toFixed(2)}</li>
+            <li><strong>Capacidad:</strong> {updatedData.capacidad} persona(s)</li>
+            <li><strong>Baño:</strong> {updatedData.bano === 'propio' ? 'Propio' : 'Compartido'}</li>
+          </ul>
+        )}
+      </div>
     </Modal>
     </>
   );

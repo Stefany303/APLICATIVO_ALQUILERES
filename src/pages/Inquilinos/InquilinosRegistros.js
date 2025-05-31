@@ -12,8 +12,8 @@ import Select from "react-select";
 import { DatePicker} from "antd";
 import inquilinoService from '../../services/inquilinoService';
 import contratoService from '../../services/contratoService';
-
 import { EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import personaService from '../../services/personaService';
 
 const InquilinosRegistros = () => {
   const [selectedOption, setSelectedOption] = useState(null);
@@ -24,6 +24,18 @@ const InquilinosRegistros = () => {
   const [error, setError] = useState(null);
   const [selectedInquilino, setSelectedInquilino] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalEditVisible, setModalEditVisible] = useState(false);
+  const [inquilinoSeleccionado, setInquilinoSeleccionado] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [updatedData, setUpdatedData] = useState(null);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    apellido: '',
+    email: '',
+    telefono: '',
+    documento: '',
+    direccion: ''
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,6 +101,166 @@ const InquilinosRegistros = () => {
     setModalVisible(true);
   };
 
+  const handleEdit = (inquilino) => {
+    setInquilinoSeleccionado(inquilino);
+    setFormData({
+      nombre: inquilino.inquilino_nombre,
+      apellido: inquilino.inquilino_apellido,
+      email: inquilino.inquilino_email,
+      telefono: inquilino.inquilino_telefono,
+      documento: inquilino.inquilino_dni,
+      direccion: inquilino.direccion || ''
+    });
+    setModalEditVisible(true);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmitEdit = async (e) => {
+    e.preventDefault();
+    try {
+      // Validar campos requeridos
+      const camposRequeridos = ['nombre', 'apellido', 'email', 'telefono', 'documento'];
+      const camposFaltantes = camposRequeridos.filter(campo => !formData[campo]);
+      
+      if (camposFaltantes.length > 0) {
+        message.error(`Faltan campos requeridos: ${camposFaltantes.join(', ')}`);
+        return;
+      }
+
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        message.error('El email no tiene un formato válido');
+        return;
+      }
+
+      // Validar formato de teléfono (9 dígitos)
+      const telefonoRegex = /^\d{9}$/;
+      if (!telefonoRegex.test(formData.telefono)) {
+        message.error('El teléfono debe tener 9 dígitos');
+        return;
+      }
+
+      // Validar formato de documento (8-10 dígitos)
+      const documentoRegex = /^\d{8,10}$/;
+      if (!documentoRegex.test(formData.documento)) {
+        message.error('El documento debe tener entre 8 y 10 dígitos');
+        return;
+      }
+
+      // Obtener el ID de la persona por DNI
+      const personaResponse = await personaService.obtenerPersonaPorDocumento(formData.documento);
+      if (!personaResponse) {
+        message.error('No se encontró la persona con el documento especificado');
+        return;
+      }
+
+      // Preparar datos para actualizar
+      const personaData = {
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        email: formData.email,
+        telefono: formData.telefono,
+        dni: formData.documento,
+        direccion: formData.direccion || '',
+        rol: 'inquilino'
+      };
+
+      // Actualizar la persona usando el ID correcto
+      await personaService.actualizarPersona(personaResponse.id, personaData);
+      
+      // Guardar los datos actualizados y mostrar el modal de éxito
+      setUpdatedData(formData);
+      setModalEditVisible(false);
+      setShowSuccessModal(true);
+
+    } catch (error) {
+      console.error('Error al actualizar inquilino:', error);
+      Modal.error({
+        title: 'Error en la Actualización',
+        content: `No se pudo actualizar el inquilino: ${error.response?.data?.message || error.message || 'Error desconocido'}`,
+        okText: 'Aceptar'
+      });
+    }
+  };
+
+  // Función para manejar el cierre del modal de éxito
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    refreshData();
+  };
+
+  // Función para recargar los datos
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await contratoService.obtenerContratosDetalles();
+      console.log('Datos actualizados:', data);
+      
+      // Asegurarnos de que los datos sean un array
+      const contratosArray = Array.isArray(data) ? data : [data];
+      
+      // Mapear los datos al formato exacto que espera la tabla
+      const formattedData = contratosArray.map(contrato => ({
+        key: contrato.id,
+        id: contrato.id,
+        inquilino_nombre: contrato.inquilino_nombre || '',
+        inquilino_apellido: contrato.inquilino_apellido || '',
+        inquilino_dni: contrato.inquilino_dni || '',
+        inquilino_email: contrato.inquilino_email || '',
+        inquilino_telefono: contrato.inquilino_telefono || '',
+        inmueble_nombre: contrato.inmueble_nombre || '',
+        espacio_nombre: contrato.espacio_nombre || '',
+        fecha_inicio: contrato.fecha_inicio,
+        fecha_fin: contrato.fecha_fin,
+        monto_alquiler: contrato.monto_alquiler,
+        monto_garantia: contrato.monto_garantia,
+        estado: contrato.estado,
+        descripcion: contrato.descripcion,
+        fecha_pago: contrato.fecha_pago
+      }));
+
+      setInquilinos(formattedData);
+      setFilteredInquilinos(formattedData);
+      message.success('Datos actualizados correctamente');
+    } catch (error) {
+      console.error('Error al actualizar los datos:', error);
+      setError('Error al cargar los datos');
+      message.error('Error al actualizar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = (inquilino) => {
+    Modal.confirm({
+      title: '¿Está seguro de eliminar este inquilino?',
+      content: `Esta acción eliminará al inquilino ${inquilino.inquilino_nombre} ${inquilino.inquilino_apellido} y no podrá ser revertida.`,
+      okText: 'Sí, eliminar',
+      okType: 'danger',
+      cancelText: 'No, cancelar',
+      onOk: async () => {
+        try {
+          await inquilinoService.eliminarInquilino(inquilino.id);
+          message.success('Inquilino eliminado correctamente');
+          // Recargar la lista de inquilinos
+          fetchContratos();
+        } catch (error) {
+          console.error('Error al eliminar inquilino:', error);
+          message.error('Error al eliminar el inquilino');
+        }
+      },
+    });
+  };
+
   const columns = [
     {
       title: 'Inquilino',
@@ -136,11 +308,28 @@ const InquilinosRegistros = () => {
       render: (_, record) => (
         <Space size="middle">
           <Button 
+            className="btn btn-primary btn-sm mx-1"
             type="primary" 
-            icon={<EyeOutlined />} 
             onClick={() => handleViewDetails(record)}
+            title="Ver detalles"
           >
-            Ver
+            <EyeOutlined />
+          </Button>
+          <Button
+            className="btn btn-warning btn-sm mx-1"
+            type="primary"
+            onClick={() => handleEdit(record)}
+            title="Editar"
+          >
+            <EditOutlined />
+          </Button>
+          <Button
+            className="btn btn-danger btn-sm mx-1"
+            type="primary"
+            onClick={() => handleDelete(record)}
+            title="Eliminar"
+          >
+            <DeleteOutlined />
           </Button>
         </Space>
       ),
@@ -234,7 +423,7 @@ const InquilinosRegistros = () => {
                             <input
                               type="text"
                               className="form-control"
-                              placeholder="Search here"
+                              placeholder="Buscar aquí"
                               value={filter}
                               onChange={handleFilterChange}
                             />
@@ -253,12 +442,18 @@ const InquilinosRegistros = () => {
                           >
                             <img src={plusicon} alt="#" />
                           </Link>
-                          <Link
-                            to="#"
+                          <button
                             className="btn btn-primary doctor-refresh ms-2"
+                            onClick={refreshData}
+                            title="Actualizar datos"
+                            disabled={loading}
                           >
-                            <img src={refreshicon} alt="#" />
-                          </Link>
+                            {loading ? (
+                              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            ) : (
+                              <i className="fas fa-sync-alt"></i>
+                            )}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -280,7 +475,7 @@ const InquilinosRegistros = () => {
               </div>
               {/* /Table Header */}
 
-              <div className="staff-search-table">
+              {/*<div className="staff-search-table">
                       <form>
                         <div className="row">
               
@@ -303,7 +498,7 @@ const InquilinosRegistros = () => {
                           </div>
                         </div>
                       </form>
-                    </div>
+              </div>*/}
 
 
               <div className="table-responsive doctor-list">
@@ -312,8 +507,7 @@ const InquilinosRegistros = () => {
                           total: filteredInquilinos.length,
                           showTotal: (total, range) =>
                           `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
-                          onShowSizeChange: onShowSizeChange,
-                          itemRender: itemRender,
+                         
                         }}
                         columns={columns}
                         dataSource={filteredInquilinos}
@@ -358,6 +552,142 @@ const InquilinosRegistros = () => {
           {renderInquilinoInfo(selectedInquilino)}
         </>
       )}
+    </Modal>
+
+    {/* Modal de Edición */}
+    <Modal
+      title="Editar Inquilino"
+      open={modalEditVisible}
+      onCancel={() => setModalEditVisible(false)}
+      footer={null}
+      width={800}
+    >
+      {inquilinoSeleccionado && (
+        <form onSubmit={handleSubmitEdit}>
+          <div className="row">
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Nombre <span className="login-danger">*</span></label>
+                <input
+                  type="text"
+                  className="form-control"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Apellido <span className="login-danger">*</span></label>
+                <input
+                  type="text"
+                  className="form-control"
+                  name="apellido"
+                  value={formData.apellido}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Email <span className="login-danger">*</span></label>
+                <input
+                  type="email"
+                  className="form-control"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Teléfono <span className="login-danger">*</span></label>
+                <input
+                  type="tel"
+                  className="form-control"
+                  name="telefono"
+                  value={formData.telefono}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div className="form-group local-forms">
+                <label>Documento <span className="login-danger">*</span></label>
+                <input
+                  type="text"
+                  className="form-control"
+                  name="documento"
+                  value={formData.documento}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="col-12">
+              <div className="form-group local-forms">
+                <label>Dirección</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  name="direccion"
+                  value={formData.direccion}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+
+            <div className="col-12">
+              <div className="doctor-submit text-end">
+                <button type="submit" className="btn btn-primary submit-form me-2">
+                  Actualizar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary cancel-form"
+                  onClick={() => setModalEditVisible(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      )}
+    </Modal>
+
+    {/* Modal de éxito */}
+    <Modal
+      title="¡Actualización Exitosa!"
+      visible={showSuccessModal}
+      onOk={handleSuccessModalClose}
+      onCancel={handleSuccessModalClose}
+      okText="Aceptar"
+      cancelButtonProps={{ style: { display: 'none' } }}
+      centered
+    >
+      <div>
+        <p>El inquilino se ha actualizado correctamente con los siguientes datos:</p>
+        {updatedData && (
+          <ul style={{ listStyleType: 'none', padding: '10px' }}>
+            <li><strong>Nombre:</strong> {updatedData.nombre} {updatedData.apellido}</li>
+            <li><strong>Email:</strong> {updatedData.email}</li>
+            <li><strong>Teléfono:</strong> {updatedData.telefono}</li>
+            <li><strong>Documento:</strong> {updatedData.documento}</li>
+          </ul>
+        )}
+      </div>
     </Modal>
 </>
     

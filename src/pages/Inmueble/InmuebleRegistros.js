@@ -30,6 +30,8 @@ const InmuebleRegistros = () => {
   const [inmueblesFiltrados, setInmueblesFiltrados] = useState([]);
   const [propietarios, setPropietarios] = useState([]);
   const [error, setError] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [updatedData, setUpdatedData] = useState(null);
 
   // Actualizar el ancho de la ventana al cambiar el tamaño
   useEffect(() => {
@@ -99,18 +101,18 @@ const InmuebleRegistros = () => {
     setInmueblesFiltrados(filtered);
   }, [searchText, inmuebles]);
 
-  // Función para actualizar datos
+  // Función para recargar los datos
   const refreshData = async () => {
     try {
       setLoading(true);
-      const inmueblesData = await inmuebleService.obtenerInmuebles();
-      const inmueblesArray = Array.isArray(inmueblesData) ? inmueblesData : [];
-      setInmuebles(inmueblesArray);
-      setInmueblesFiltrados(inmueblesArray);
-      message.success("Datos actualizados");
+      const data = await inmuebleService.obtenerInmuebles();
+      console.log('Datos actualizados:', data);
+      setInmuebles(Array.isArray(data) ? data : []);
+      setInmueblesFiltrados(Array.isArray(data) ? data : []);
+      message.success('Datos actualizados correctamente');
     } catch (error) {
-      console.error("Error al actualizar datos:", error);
-      message.error("Error al actualizar los datos");
+      console.error('Error al actualizar los datos:', error);
+      message.error('Error al actualizar los datos');
     } finally {
       setLoading(false);
     }
@@ -169,18 +171,24 @@ const InmuebleRegistros = () => {
       // Llamar al servicio para actualizar
       await inmuebleService.actualizarInmueble(inmuebleSeleccionado.id, inmuebleData);
       
-      // Actualizar la lista
-      refreshData();
-      
-      // Cerrar modal y mostrar mensaje
+      // Guardar los datos actualizados y mostrar el modal de éxito
+      setUpdatedData(inmuebleData);
       setEditModalVisible(false);
-      message.success("Inmueble actualizado correctamente");
+      setShowSuccessModal(true);
+      
     } catch (err) {
       console.error("Error al actualizar inmueble:", err);
       message.error("Error al guardar cambios: " + (err.message || "Error desconocido"));
     } finally {
       setLoadingSave(false);
     }
+  };
+
+  // Función para manejar el cierre del modal de éxito
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    // Recargar inmuebles
+    refreshData();
   };
 
   // Acción para eliminar un inmueble
@@ -373,21 +381,26 @@ const InmuebleRegistros = () => {
                                 className="btn btn-primary doctor-refresh ms-2"
                                 onClick={refreshData}
                                 title="Actualizar datos"
+                                disabled={loading}
                               >
-                                <img src={refreshicon} alt="Refrescar" />
+                                {loading ? (
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                ) : (
+                                  <i className="fas fa-sync-alt"></i>
+                                )}
                               </button>
                             </div>
                           </div>
                         </div>
                       </div>
-                      <div className="col-auto text-end float-end ms-auto download-grp">
+                      {/*<div className="col-auto text-end float-end ms-auto download-grp">
                         <button className="btn btn-outline-primary me-2" title="Exportar a PDF">
                           <i className="fas fa-file-pdf"></i>
                         </button>
                         <button className="btn btn-outline-primary me-2" title="Exportar a Excel">
                           <i className="fas fa-file-excel"></i>
                         </button>
-                      </div>
+                      </div>*/}
                     </div>
                   </div>
                   
@@ -404,8 +417,7 @@ const InmuebleRegistros = () => {
                       rowKey="id"
                       loading={loading}
                       pagination={{
-                        pageSize: 10,
-                        showSizeChanger: true,
+                        total: inmueblesFiltrados.length,
                         showTotal: (total, range) =>
                           `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
                       }}
@@ -595,6 +607,30 @@ const InmuebleRegistros = () => {
             </div>
           </Form>
         )}
+      </Modal>
+      
+      {/* Modal de éxito */}
+      <Modal
+        title="¡Actualización Exitosa!"
+        open={showSuccessModal}
+        onOk={handleSuccessModalClose}
+        onCancel={handleSuccessModalClose}
+        okText="Aceptar"
+        cancelButtonProps={{ style: { display: 'none' } }}
+        centered
+      >
+        <div>
+          <p>El inmueble se ha actualizado correctamente con los siguientes datos:</p>
+          {updatedData && (
+            <ul style={{ listStyleType: 'none', padding: '10px' }}>
+              <li><strong>Nombre:</strong> {updatedData.nombre}</li>
+              <li><strong>Dirección:</strong> {updatedData.direccion}</li>
+              <li><strong>Tipo de Inmueble:</strong> {updatedData.tipo_inmueble}</li>
+              <li><strong>Cantidad de Pisos:</strong> {updatedData.cantidad_pisos}</li>
+              <li><strong>Descripción:</strong> {updatedData.descripcion || 'No especificada'}</li>
+            </ul>
+          )}
+        </div>
       </Modal>
     </>
   );

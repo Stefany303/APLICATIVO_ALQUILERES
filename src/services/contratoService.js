@@ -12,20 +12,13 @@ const contratoService = {
     }
   },
 
-  //aqui modifique borre informacion y puse detalles para que funcione
+  // Obtener todos los contratos con detalles
   obtenerContratosDetalles: async () => {
     try {
-      const response = await api.get('/contratos/detalles');
-      console.log('Respuesta del backend:', response.data);
+      const response = await api.get(`${API_URL}/contratos/detalles`);
       return response.data;
     } catch (error) {
-      console.error('Error al obtener detalles de contratos:', error);
-      if (error.response) {
-        console.error('Detalles del error:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-      }
+      console.error('Error al obtener contratos con detalles:', error);
       throw error;
     }
   },
@@ -55,9 +48,10 @@ const contratoService = {
     }
   },
 
+  // Crear un nuevo contrato
   crearContrato: async (contratoData) => {
     try {
-      const response = await api.post('/contratos', contratoData);
+      const response = await api.post(`${API_URL}/contratos`, contratoData);
       return response.data;
     } catch (error) {
       console.error('Error al crear contrato:', error);
@@ -65,9 +59,10 @@ const contratoService = {
     }
   },
 
+  // Actualizar un contrato
   actualizarContrato: async (id, contratoData) => {
     try {
-      const response = await api.put(`/contratos/${id}`, contratoData);
+      const response = await api.put(`${API_URL}/contratos/${id}`, contratoData);
       return response.data;
     } catch (error) {
       console.error('Error al actualizar contrato:', error);
@@ -75,9 +70,10 @@ const contratoService = {
     }
   },
 
+  // Eliminar un contrato
   eliminarContrato: async (id) => {
     try {
-      const response = await api.delete(`/contratos/${id}`);
+      const response = await api.delete(`${API_URL}/contratos/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error al eliminar contrato:', error);

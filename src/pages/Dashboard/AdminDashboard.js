@@ -5,6 +5,7 @@ import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import InquilinosChart from "../Dashboard/InquilinosChart";
 import IngresosGastosChart from "../Dashboard/IngresosGastosChart";
+import { FaHome } from 'react-icons/fa';
 import Select from "react-select";
 import {
   Avatar2,
@@ -19,10 +20,14 @@ import {
   dep_icon5,
   empty_wallet,
   imagesend,
+  logo_02,
+  menuicon04,
   morning_img_01,
   profile_add,
   scissor,
   user001,
+  inquilinos,
+  espacios,
 } from "../../components/imagepath";
 import { Link } from "react-router-dom";
 import CountUp from "react-countup";
@@ -321,7 +326,8 @@ const AdminDashboard = () => {
               </div>
               <div className="col-md-6 position-blk">
                 <div className="morning-img">
-                  <img src={morning_img_01} alt="Bienvenida" />
+                <img src={logo_02} alt="Bienvenida" width="170rem" height="auto" />
+
                 </div>
               </div>
             </div>
@@ -332,7 +338,7 @@ const AdminDashboard = () => {
             <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
               <div className="dash-widget">
                 <div className="dash-boxs comman-flex-center">
-                  <img src={profile_add} alt="Clientes" />
+                  <img src={inquilinos} alt="Clientes" />
                 </div>
                 <div className="dash-content dash-count">
                   <h4>Total Clientes</h4>
@@ -351,7 +357,7 @@ const AdminDashboard = () => {
             <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
               <div className="dash-widget">
                 <div className="dash-boxs comman-flex-center">
-                  <img src={dep_icon1} alt="Espacios" />
+                <FaHome color="#2e37a4" size="2rem" />
                 </div>
                 <div className="dash-content dash-count">
                   <h4>Espacios Disponibles</h4>

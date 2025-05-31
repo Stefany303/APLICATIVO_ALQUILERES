@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from "react-router-dom";
-import { blog, dashboard, logout, menuicon04, menuicon06, menuicon08, menuicon09, menuicon10, menuicon11, menuicon12, menuicon14, menuicon15, menuicon16, sidemenu } from './imagepath';
+import { blog, dashboard,edificio, espacio, reportes,logout, menuicon04, menuicon06, menuicon08, menuicon09, menuicon10, menuicon11, menuicon12, menuicon14, menuicon15, menuicon16, sidemenu } from './imagepath';
 import Scrollbars from "react-scrollbars-custom";
 
 const Sidebar = (props) => {
@@ -160,6 +160,7 @@ const Sidebar = (props) => {
                   >
                     <span className="menu-side">
                       {/* <img src={doctor} alt="" /> */}
+                      <img src={edificio} alt="" className="edificio-icon" />
                     </span>{" "}
                     <span>Inmuebles</span> <span className="menu-arrow" />
                   </Link>
@@ -177,7 +178,7 @@ const Sidebar = (props) => {
                 <li className="submenu">
                   <Link to="#" id="menu-item2" onClick={(e) => handleClick(e, "menu-item2", "menu-items2", "Espacios")}>
                     <span className="menu-side">
-                      <img src={menuicon08} alt="" />
+                      <img src={espacio} alt="" />
                     </span>{" "}
                     <span>Espacios</span> <span className="menu-arrow" />
                   </Link>
@@ -209,10 +210,7 @@ const Sidebar = (props) => {
                     <li>
                       <Link className={props?.activeClassName === 'inquilinos-registros' ? 'active' : ''} to="/inquilinos-registros">Registros </Link>
                     </li>
-                    <li>
-                      <Link className={props?.activeClassName === 'inquilinos-pago' ? 'active' : ''} to="/inquilinos-pago">Registrar Pago </Link>
-                    </li>
-                    
+                   
                   </ul>
                 </li>
                 
@@ -266,7 +264,10 @@ const Sidebar = (props) => {
                     id="menu-item6" 
                     onClick={(e) => handleClick(e, "menu-item6", "menu-items6", "Reportes")}
                   >
-                    <i className="fa fa-flag" /> <span> Reportes </span>{" "}
+                    <span className="menu-side">
+                      <img src={reportes} alt="" />
+                    </span>{" "}
+                     <span> Reportes </span>
                     <span className="menu-arrow" />
                   </Link>
                   <ul style={{ display: sidebar === 'Reportes' ? 'block' : "none" }} className="menu-items6">

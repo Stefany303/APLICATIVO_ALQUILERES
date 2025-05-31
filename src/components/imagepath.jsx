@@ -63,7 +63,11 @@ export { default as doctor } from "../assets/img/icons/menu-icon-02.svg";
 export { default as sidemenu } from "../assets/img/icons/menu-icon-07.svg";
 export { default as blog } from "../assets/img/icons/menu-icon-13.svg";
 export { default as doctorschedule } from "../assets/img/icons/menu-icon-05.svg";
-export { default as patients } from "../assets/img/icons/menu-icon-03.svg";
+export { default as inquilinos } from "../assets/img/icons/menu-icon-03.svg";
+export { default as espacios } from "../assets/img/icons/espacios.png";
+export { default as edificio } from "../assets/img/icons/icone-edificio.png";
+export { default as espacio } from "../assets/img/icons/icon-habitacion.png";
+export { default as reportes } from "../assets/img/icons/reportes.png";
 //edit blog
 export { default as imagesend } from "../assets/img/sent.png";
 export { default as favicon } from "../assets/img/favicon.png";
@@ -232,8 +236,6 @@ export {default as signature} from "../assets/img/signature.png";
 
 //Dashboard//
 
-export {default as morning_img_01} from "../assets/img/morning-img-01.png";
-export {default as morning_img_02} from "../assets/img/morning-img-02.png";
 export {default as sorticon} from "../assets/img/icons/sort-icon-01.svg";
 export {default as sorticon02} from "../assets/img/icons/sort-icon-02.svg";
 export {default as timericon} from "../assets/img/icons/timer.svg";
@@ -249,12 +251,7 @@ export {default as dep_icon2} from "../assets/img/icons/dep-icon-02.svg";
 export {default as dep_icon3} from "../assets/img/icons/dep-icon-03.svg";
 export {default as dep_icon4} from "../assets/img/icons/dep-icon-04.svg";
 export {default as dep_icon5} from "../assets/img/icons/dep-icon-05.svg";
-
-export {default as morning_img_03} from "../assets/img/morning-img-03.png";
-// export {default as report_icon_04} from "assets/img/icons/report-icon-04.svg";
-// export {default as report_icon} from "assets/img/icons/report-icon-03.svg";
-
-
+export {default as logo_02} from "../assets/img/logo-02.png";
  //Blog //
 export { default as Blog1 } from "../assets/img/blog/blog-01.jpg";
 export { default as Blog2 } from "../assets/img/blog/blog-02.jpg";

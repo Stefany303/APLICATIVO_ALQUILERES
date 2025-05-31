@@ -1,4 +1,5 @@
-import api from '../services/api'; // Importa la instancia de axios
+import api from './api';
+import { API_URL } from './authService';
 
 const personaService = {
   // Obtener todas las personas (público)
@@ -88,7 +89,7 @@ const personaService = {
       const response = await api.put(`/personas/${id}`, personaData);
       return response.data;
     } catch (error) {
-      console.error('Error updating persona:', error);
+      console.error('Error al actualizar la persona:', error);
       throw error;
     }
   },

@@ -2,11 +2,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import Header from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
-import { DatePicker, Modal, Button } from "antd";
+import { DatePicker, Modal, Button, Table } from "antd";
 import { message } from "antd";
 import { FiChevronRight, FiSearch, FiX, FiRefreshCw, FiDollarSign, FiEdit, FiEye, FiFileText, FiImage, FiDownload } from "react-icons/fi";
 import Select from "react-select";
-import DataTable from 'react-data-table-component';
 import { imagesend } from "../../components/imagepath";
 import { Link } from 'react-router-dom';
 import espacioService from '../../services/espacioService';
@@ -18,6 +17,8 @@ import documentoService from '../../services/documentoService';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import moment from 'moment';
 import "../../assets/styles/select-components.css";
+import { plusicon, refreshicon, searchnormal, pdficon, pdficon3, pdficon4 } from '../../components/imagepath';
+
 const ContabilidadPagos = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,6 +55,42 @@ const ContabilidadPagos = () => {
   const [comprobanteFile, setComprobanteFile] = useState(null);
   const [loadingRegistro, setLoadingRegistro] = useState(false);
   const [metodoPagoRegistro, setMetodoPagoRegistro] = useState(null);
+  const [searchText, setSearchText] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [updatedData, setUpdatedData] = useState(null);
+  
+  /*useEffect(() => {
+    if (!searchText.trim()) {
+      setInmueblesFiltrados(inmuebles);
+      return;
+    }
+
+    const searchLower = searchText.toLowerCase();
+    const filtered = inmuebles.filter(inmueble => 
+      (inmueble.nombre && inmueble.nombre.toLowerCase().includes(searchLower)) || 
+      (inmueble.direccion && inmueble.direccion.toLowerCase().includes(searchLower)) ||
+      (inmueble.propietario_nombre && inmueble.propietario_nombre.toLowerCase().includes(searchLower)) ||
+      (inmueble.tipo_inmueble && inmueble.tipo_inmueble.toLowerCase().includes(searchLower))
+    );
+    
+    setInmueblesFiltrados(filtered);
+  }, [searchText, inmuebles]);*/
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      const pagosData = await pagoService.obtenerPagos();
+      setPagos(Array.isArray(pagosData) ? pagosData : []);
+      message.success("Datos actualizados correctamente");
+    } catch (error) {
+      console.error("Error al actualizar datos:", error);
+      message.error("Error al actualizar los datos");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleSearch = (e) => {
+    setSearchText(e.target.value);
+  };
 
   const metodosPago = [
     { value: 'efectivo', label: 'Efectivo' },
@@ -895,7 +932,12 @@ const ContabilidadPagos = () => {
       // Actualizar el pago
       const pagoActualizado = await pagoService.actualizarPago(pagoSeleccionado.id, pagoData);
       
-      alert('Pago actualizado correctamente.');
+      // Guardar los datos actualizados y mostrar el modal de éxito
+      setUpdatedData({
+        ...pagoData,
+        inquilino_nombre: pagoSeleccionado.inquilino_nombre,
+        inquilino_apellido: pagoSeleccionado.inquilino_apellido
+      });
       
       // Reset form y cerrar modal
       setFormData({
@@ -912,15 +954,19 @@ const ContabilidadPagos = () => {
       });
       
       setModalEditVisible(false);
+      setShowSuccessModal(true);
       
-      // Recargar los pagos
-      const todosLosPagos = await pagoService.obtenerPagos();
-      setPagos(Array.isArray(todosLosPagos) ? todosLosPagos : []);
-      setPagoSeleccionado(null);
     } catch (error) {
       console.error('Error al actualizar el pago:', error);
-      alert('Error al actualizar el pago');
+      message.error('Error al actualizar el pago');
     }
+  };
+
+  // Función para manejar el cierre del modal de éxito
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    // Recargar los pagos
+    cargarTodosPagos();
   };
 
   // Función para cargar todos los pagos
@@ -1045,77 +1091,87 @@ const ContabilidadPagos = () => {
     }
   };
 
-  // Configuración de columnas para DataTable
+  // Reemplazar la definición de columns con el formato de Table de antd
   const columns = [
     {
-      name: 'Inquilino',
-      selector: row => `${row.inquilino_nombre || ''} ${row.inquilino_apellido || ''}`,
-      sortable: true,
+      title: "Inquilino",
+      key: "inquilino",
+      render: (text, record) => `${record.inquilino_nombre || ''} ${record.inquilino_apellido || ''}`,
+      sorter: (a, b) => {
+        const nombreA = `${a.inquilino_nombre || ''} ${a.inquilino_apellido || ''}`;
+        const nombreB = `${b.inquilino_nombre || ''} ${b.inquilino_apellido || ''}`;
+        return nombreA.localeCompare(nombreB);
+      }
     },
     {
-      name: 'DNI',
-      selector: row => row.inquilino_dni || '',
-      sortable: true,
+      title: "DNI",
+      dataIndex: "inquilino_dni",
+      sorter: (a, b) => a.inquilino_dni?.localeCompare(b.inquilino_dni || ''),
+      render: (text) => text || "N/A",
     },
     {
-      name: 'Monto',
-      selector: row => row.monto || '',
-      sortable: true,
+      title: "Monto",
+      dataIndex: "monto",
+      sorter: (a, b) => (parseFloat(a.monto) || 0) - (parseFloat(b.monto) || 0),
+      render: (monto) => (monto !== undefined && monto !== null ? `S/ ${parseFloat(monto).toFixed(2)}` : "N/A"),
     },
     {
-      name: 'Fecha Programada',
-      selector: row => row.fecha_pago,
-      format: row => row.fecha_pago ? new Date(row.fecha_pago).toLocaleDateString() : '',
-      sortable: true,
+      title: "Fecha Programada",
+      dataIndex: "fecha_pago",
+      sorter: (a, b) => new Date(a.fecha_pago || 0) - new Date(b.fecha_pago || 0),
+      render: (fecha) => fecha ? new Date(fecha).toLocaleDateString() : "N/A",
     },
     {
-      name: 'Fecha Real',
-      selector: row => row.fecha_real_pago,
-      format: row => row.fecha_real_pago ? new Date(row.fecha_real_pago).toLocaleDateString() : '-',
-      sortable: true,
+      title: "Fecha Real",
+      dataIndex: "fecha_real_pago",
+      sorter: (a, b) => new Date(a.fecha_real_pago || 0) - new Date(b.fecha_real_pago || 0),
+      render: (fecha) => fecha ? new Date(fecha).toLocaleDateString() : "-",
     },
     {
-      name: 'Método de Pago',
-      selector: row => row.metodo_pago || '',
-      sortable: true,
+      title: "Método de Pago",
+      dataIndex: "metodo_pago",
+      sorter: (a, b) => a.metodo_pago?.localeCompare(b.metodo_pago || ''),
+      render: (text) => text || "N/A",
     },
     {
-      name: 'Estado',
-      selector: row => row.estado || '',
-      sortable: true,
+      title: "Estado",
+      dataIndex: "estado",
+      sorter: (a, b) => a.estado?.localeCompare(b.estado || ''),
+      render: (text) => text || "N/A",
     },
     {
-      name: 'Acción',
-      cell: row => (
-        <div className="actions">
+      title: "Acciones",
+      key: "acciones",
+      render: (text, record) => (
+        <div className="text-center">
           <button
             type="button"
             className="btn btn-sm btn-success me-1"
-            onClick={() => handleRegistrarPago(row)}
+            onClick={() => handleRegistrarPago(record)}
             title="Registrar Pago"
-            disabled={row.estado === 'pagado'}
+            disabled={record.estado === 'pagado'}
           >
             <FiDollarSign />
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-info me-1"
-            onClick={() => editarPago(row)}
+            className="btn btn-sm btn-warning me-1"
+            onClick={() => editarPago(record)}
             title="Editar"
           >
             <FiEdit />
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-secondary"
-            onClick={() => verPago(row)}
+            className="btn btn-sm btn-primary"
+            onClick={() => verPago(record)}
             title="Ver"
           >
             <FiEye />
           </button>
         </div>
       ),
-    },
+    }
   ];
 
   const paginationComponentOptions = {
@@ -1238,13 +1294,71 @@ const ContabilidadPagos = () => {
           
           <div className="row">
             <div className="col-sm-12">
-              <div className="card">
+              <div className="card card-table show-entire">
                 <div className="card-body">
-                  <div className="row">
-                    <div className="col-12">
-                      <div className="form-heading">
-                        <h4>Buscar Inquilino</h4>
+                  
+                <div className="page-table-header mb-2">
+                    <div className="row align-items-center">
+                      <div className="col">
+                        <div className="doctor-table-blk">
+                          <h3>Lista de Pagos</h3>
+                          <div className="doctor-search-blk">
+                           
+                            <div className="add-group">
+                             
+                              <button
+                                className="btn btn-primary doctor-refresh ms-2"
+                                onClick={refreshData}
+                                title="Actualizar datos"
+                                disabled={loading}
+                              >
+                                {loading ? (
+                                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                ) : (
+                                  <i className="fas fa-sync-alt"></i>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
+                      <div className="col-auto text-end float-end ms-auto download-grp">
+                        <button className="btn btn-outline-primary me-2" title="Exportar a PDF">
+                          <i className="fas fa-file-pdf"></i>
+                        </button>
+                        <button className="btn btn-outline-primary me-2" title="Exportar a Excel">
+                          <i className="fas fa-file-excel"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row mt-4">
+                    <div className="col-12">
+                     {/* <div className="form-heading d-flex justify-content-between align-items-center">
+                        <h3>Lista de Pagos</h3>
+                        <div>
+                          <button 
+                            type="button" 
+                            className="btn btn-info me-2"
+                            onClick={cargarTodosPagos}
+                            disabled={loading2}
+                          >
+                            {loading2 ? (
+                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            ) : (
+                              <FiRefreshCw className="me-2" />
+                            )}
+                            Recargar Todos los Pagos
+                          </button>
+                         <span className="text-muted">
+                            {loading2 ? 'Cargando pagos...' : Array.isArray(pagos) ? 
+                              `${pagos.length} ${pagos.length === 1 ? 'pago' : 'pagos'} encontrados` : ''}
+                          </span>
+                        </div>
+                      </div>*/}
+                      <div className="row">
+                    <div className="col-12">
+                      
                     </div>
                     
                     <div className="col-12 col-md-4">
@@ -1309,46 +1423,26 @@ const ContabilidadPagos = () => {
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="row mt-4">
-                    <div className="col-12">
-                      <div className="form-heading d-flex justify-content-between align-items-center">
-                        <h4>Lista de Pagos</h4>
-                        <div>
-                          <button 
-                            type="button" 
-                            className="btn btn-info me-2"
-                            onClick={cargarTodosPagos}
-                            disabled={loading2}
-                          >
-                            {loading2 ? (
-                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            ) : (
-                              <FiRefreshCw className="me-2" />
-                            )}
-                            Recargar Todos los Pagos
-                          </button>
-                          <span className="text-muted">
-                            {loading2 ? 'Cargando pagos...' : Array.isArray(pagos) ? 
-                              `${pagos.length} ${pagos.length === 1 ? 'pago' : 'pagos'} encontrados` : ''}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="table-responsive">
-                        <DataTable
+
+                      <div className="table-responsive doctor-list">
+                        <Table
                           columns={columns}
-                          data={Array.isArray(pagos) ? pagos : []}
-                          pagination
-                          paginationPerPage={5}
-                          paginationComponentOptions={paginationComponentOptions}
-                          noDataComponent={loading2 ? 'Cargando...' : 'No hay pagos registrados'}
-                          highlightOnHover
-                          striped
-                          responsive
+                          dataSource={Array.isArray(pagos) ? pagos : []}
+                          rowKey="id"
+                          pagination={{
+                            total: pagos.length,
+                            pageSize: 10,
+                            showTotal: (total, range) =>
+                              `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
+                           
+                          }}
+                          loading={loading2}
                         />
                       </div>
                     </div>
                   </div>
+
+                 
                 </div>
               </div>
             </div>
@@ -1893,6 +1987,32 @@ const ContabilidadPagos = () => {
                 </div>
               </form>
             )}
+          </Modal>
+
+          {/* Modal de éxito */}
+          <Modal
+            title="¡Actualización Exitosa!"
+            open={showSuccessModal}
+            onOk={handleSuccessModalClose}
+            onCancel={handleSuccessModalClose}
+            okText="Aceptar"
+            cancelButtonProps={{ style: { display: 'none' } }}
+            centered
+          >
+            <div>
+              <p>El pago se ha actualizado correctamente con los siguientes datos:</p>
+              {updatedData && (
+                <ul style={{ listStyleType: 'none', padding: '10px' }}>
+                  <li><strong>Inquilino:</strong> {`${updatedData.inquilino_nombre} ${updatedData.inquilino_apellido}`}</li>
+                  <li><strong>Monto:</strong> S/ {parseFloat(updatedData.monto).toFixed(2)}</li>
+                  <li><strong>Método de Pago:</strong> {updatedData.metodo_pago}</li>
+                  <li><strong>Estado:</strong> {updatedData.estado}</li>
+                  <li><strong>Fecha de Pago:</strong> {updatedData.fecha_pago ? new Date(updatedData.fecha_pago).toLocaleDateString() : 'No especificada'}</li>
+                  <li><strong>Fecha Real de Pago:</strong> {updatedData.fecha_real_pago ? new Date(updatedData.fecha_real_pago).toLocaleDateString() : 'No especificada'}</li>
+                  <li><strong>Observaciones:</strong> {updatedData.observacion || 'No especificadas'}</li>
+                </ul>
+              )}
+            </div>
           </Modal>
         </div>
       </div>

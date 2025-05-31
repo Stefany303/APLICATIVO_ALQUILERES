@@ -12,6 +12,7 @@ const espacioService = {
   obtenerEspacios: async () => {
     try {
       const response = await api.get(ENDPOINT_BASE);
+      console.log('Respuesta de obtenerEspacios:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error al obtener espacios:', error);

@@ -5,13 +5,14 @@ import Sidebar from "../../components/Sidebar";
 import { DatePicker, Modal } from "antd";
 import { FiChevronRight, FiSearch, FiX, FiRefreshCw, FiPlusCircle, FiDollarSign, FiEdit, FiEye, FiFileText, FiTrash2, FiDownload, FiImage } from "react-icons/fi";
 import Select from "react-select";
-import DataTable from 'react-data-table-component';
+import { Table } from 'antd';
 import { imagesend } from "../../components/imagepath";
 import { Link } from 'react-router-dom';
 import inmuebleService from '../../services/inmuebleService';
 import gastoService from '../../services/gastoService';
 import documentoService from '../../services/documentoService';
 import moment from 'moment';
+import { message } from "antd";
 
 const ContabilidadGastos = () => {
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,8 @@ const ContabilidadGastos = () => {
   const [gastoVisualizando, setGastoVisualizando] = useState(null);
   const [eliminandoGasto, setEliminandoGasto] = useState(null);
   const [modalDeleteVisible, setModalDeleteVisible] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [updatedData, setUpdatedData] = useState(null);
 
   const [inmuebles, setInmuebles] = useState([]);
 
@@ -236,52 +239,44 @@ const ContabilidadGastos = () => {
         await gastoService.actualizarGasto(gastoSeleccionado.id, gastoData);
         gastoID = gastoSeleccionado.id;
         console.log(`Gasto ID ${gastoID} actualizado correctamente`);
+        
+        // Guardar los datos actualizados para mostrar en el modal de éxito
+        setUpdatedData({
+          ...gastoData,
+          inmueble_nombre: inmuebles.find(i => i.value === formData.inmuebleId)?.label || 'N/A'
+        });
+        
+        // Cerrar modal de edición y mostrar modal de éxito
+        setModalVisible(false);
+        setShowSuccessModal(true);
       } else {
         // Si es un nuevo gasto, crearlo
         const respuestaGasto = await gastoService.crearGasto(gastoData);
         gastoID = respuestaGasto.id;
         console.log(`Nuevo gasto creado con ID: ${gastoID}`);
+        alert('Gasto registrado correctamente');
+        handleCancel();
       }
-      
+
       // Si hay documento, subirlo
       if (documento) {
         try {
-          // Crear nombre único para el documento basado en fecha y ID
-          const fechaActual = new Date();
-          const anioActual = fechaActual.getFullYear();
-          const mesActual = String(fechaActual.getMonth() + 1).padStart(2, '0');
-          const diaActual = String(fechaActual.getDate()).padStart(2, '0');
-          const horaActual = String(fechaActual.getHours()).padStart(2, '0');
-          const minutosActual = String(fechaActual.getMinutes()).padStart(2, '0');
-          const segundosActual = String(fechaActual.getSeconds()).padStart(2, '0');
-          
-          const nombreArchivo = `gasto_${anioActual}${mesActual}${diaActual}_${horaActual}${minutosActual}${segundosActual}_${gastoID}.pdf`;
-          
-          // Crear un objeto File con el nuevo nombre
-          const nuevoArchivo = new File([documento], nombreArchivo, { type: documento.type });
-          
-          // Subir el archivo
-          console.log('Subiendo archivo físico al servidor...');
-          console.log(`- Documento: ${nuevoArchivo.name}`);
-          console.log(`- ID del gasto: ${gastoID}`);
-          console.log(`- Tipo de documento: gasto`);
-          console.log(`- Directorio destino: public/documentos/gasto`);
-          
-          // Tiempo para evitar problemas de concurrencia
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
+          // Subir el documento
           const respuestaArchivo = await documentoService.subirArchivo(
-            nuevoArchivo,
+            documento,
             gastoID,
-            'gasto'
+            'gasto',
+            { carpetaDestino: 'documentos/gasto' }
           );
-          
-          console.log('Archivo subido con éxito:', respuestaArchivo);
-          
-          // Registrar metadatos del documento
+
+          if (!respuestaArchivo || !respuestaArchivo.ruta) {
+            throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
+          }
+
+          // Registrar el documento en la base de datos
           const documentoData = {
-            nombre: nombreArchivo,
-            ruta: respuestaArchivo.ruta || `documentos/gasto/${nombreArchivo}`,
+            nombre: documento.name,
+            ruta: respuestaArchivo.ruta,
             documentable_id: gastoID,
             documentable_type: 'gasto'
           };
@@ -294,11 +289,7 @@ const ContabilidadGastos = () => {
         }
       }
       
-      // Mensaje de éxito
-      alert(gastoSeleccionado ? 'Gasto actualizado correctamente' : 'Gasto registrado correctamente');
-      
-      // Cerrar modal y recargar datos
-      handleCancel();
+      // Recargar datos
       await cargarTodosGastos();
       
     } catch (error) {
@@ -644,56 +635,61 @@ const ContabilidadGastos = () => {
   // Definición de columnas para la tabla
   const columns = [
     {
-      name: 'Categoría',
-      selector: row => row.tipo_gasto || '',
-      sortable: true,
+      title: "Categoría",
+      dataIndex: "tipo_gasto",
+      sorter: (a, b) => a.tipo_gasto?.localeCompare(b.tipo_gasto || ''),
+      render: (text) => text || "N/A",
     },
     {
-      name: 'Inmueble',
-      selector: row => row.inmueble_nombre || '',
-      sortable: true,
+      title: "Inmueble",
+      dataIndex: "inmueble_nombre",
+      sorter: (a, b) => a.inmueble_nombre?.localeCompare(b.inmueble_nombre || ''),
+      render: (text) => text || "N/A",
     },
     {
-      name: 'Concepto',
-      selector: row => row.descripcion || '',
-      sortable: true,
+      title: "Concepto",
+      dataIndex: "descripcion",
+      sorter: (a, b) => a.descripcion?.localeCompare(b.descripcion || ''),
+      render: (text) => text || "N/A",
     },
     {
-      name: 'Monto',
-      selector: row => row.monto || '',
-      sortable: true,
-      cell: row => `S/ ${parseFloat(row.monto).toFixed(2)}`
+      title: "Monto",
+      dataIndex: "monto",
+      sorter: (a, b) => (parseFloat(a.monto) || 0) - (parseFloat(b.monto) || 0),
+      render: (monto) => (monto !== undefined && monto !== null ? `S/ ${parseFloat(monto).toFixed(2)}` : "N/A"),
     },
     {
-      name: 'Fecha',
-      selector: row => row.fecha,
-      format: row => row.fecha ? new Date(row.fecha).toLocaleDateString() : '',
-      sortable: true,
+      title: "Fecha",
+      dataIndex: "fecha",
+      sorter: (a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0),
+      render: (fecha) => fecha ? new Date(fecha).toLocaleDateString() : "N/A",
     },
     {
-      name: 'Acciones',
-      cell: row => (
-        <div className="actions">
+      title: "Acciones",
+      key: "acciones",
+      render: (_, record) => (
+        <div className="text-center">
           <button
             type="button"
             className="btn btn-sm btn-primary me-1"
-            onClick={() => editarGasto(row)}
-            title="Editar"
-          >
-            <FiEdit />
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-info me-1"
-            onClick={() => verGasto(row)}
+            onClick={() => verGasto(record)}
             title="Ver"
           >
             <FiEye />
           </button>
           <button
             type="button"
+            className="btn btn-sm btn-warning me-1"
+            onClick={() => editarGasto(record)}
+            title="Editar"
+          >
+            <FiEdit />
+          </button>
+          
+          <button
+            type="button"
             className="btn btn-sm btn-danger"
-            onClick={() => confirmarEliminarGasto(row)}
+            onClick={() => confirmarEliminarGasto(record)}
             title="Eliminar"
           >
             <FiTrash2 />
@@ -708,6 +704,59 @@ const ContabilidadGastos = () => {
     rangeSeparatorText: 'de',
     selectAllRowsItem: true,
     selectAllRowsItemText: 'Todos',
+  };
+
+  const handleSubmitEdit = async (e) => {
+    e.preventDefault();
+    try {
+      // Validar campos requeridos
+      const camposRequeridos = ['inmuebleId', 'concepto', 'monto', 'fechaGasto', 'categoria'];
+      const camposFaltantes = camposRequeridos.filter(campo => !formData[campo]);
+      
+      if (camposFaltantes.length > 0) {
+        message.error(`Faltan campos requeridos: ${camposFaltantes.join(', ')}`);
+        return;
+      }
+
+      // Formatear fecha
+      let fechaGastoFormateada = '';
+      if (formData.fechaGasto) {
+        const partes = formData.fechaGasto.split('/');
+        if (partes.length === 3) {
+          fechaGastoFormateada = `${partes[2]}-${partes[1]}-${partes[0]}`;
+        } else {
+          fechaGastoFormateada = formData.fechaGasto;
+        }
+      }
+
+      // Preparar datos para actualizar
+      const gastoData = {
+        inmueble_id: formData.inmuebleId,
+        concepto: formData.concepto,
+        monto: formData.monto,
+        fecha_gasto: fechaGastoFormateada,
+        categoria: formData.categoria
+      };
+
+      // Actualizar el gasto
+      await gastoService.actualizarGasto(gastoSeleccionado.id, gastoData);
+
+      // Guardar los datos actualizados y mostrar el modal de éxito
+      setUpdatedData(formData);
+      setModalEditVisible(false);
+      setShowSuccessModal(true);
+
+      // Recargar la lista de gastos
+      await cargarTodosGastos();
+
+    } catch (error) {
+      console.error('Error al actualizar gasto:', error);
+      Modal.error({
+        title: 'Error en la Actualización',
+        content: `No se pudo actualizar el gasto: ${error.response?.data?.message || error.message || 'Error desconocido'}`,
+        okText: 'Aceptar'
+      });
+    }
   };
 
   if (loading) {
@@ -763,15 +812,34 @@ const ContabilidadGastos = () => {
           {/* Buscador y botón de nuevo gasto */}
           <div className="row">
             <div className="col-sm-12">
-              <div className="card">
+              <div className="card card-table show-entire">
                 <div className="card-body">
                   <div className="row">
                     <div className="col-12">
-                      <div className="form-heading d-flex justify-content-between align-items-center mb-4">
-                        <h4>Gastos registrados</h4>
+                      <div className="doctor-table-blk m-4">
+                        <h3>Gastos registrados</h3>
+                        <div className="doctor-search-blk">
+                          <div className="add-group">             
+                            <label>&nbsp;</label>
+                            <button 
+                              type="button" 
+                              className="btn btn-primary doctor-refresh ms-2"
+                              onClick={cargarTodosGastos}
+                              title="Actualizar datos"
+                              disabled={loading2}
+                            >
+                              {loading ? (
+                                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    ) : (
+                                      <i className="fas fa-sync-alt"></i>
+                                    )}
+                            
+                            </button>
+                          </div>
+                      </div>
                         <button 
                           type="button" 
-                          className="btn btn-primary"
+                          className="btn btn-primary position-absolute top-0 end-0 m-4"
                           onClick={mostrarModalNuevoGasto}
                         >
                           <FiPlusCircle className="me-2" /> Nuevo Gasto
@@ -821,36 +889,24 @@ const ContabilidadGastos = () => {
                       </div>
                     </div>
                     
-                    <div className="col-12 col-md-2">
-                      <div className="form-group">
-                        <label>&nbsp;</label>
-                        <button 
-                          type="button" 
-                          className="btn btn-info w-100"
-                          onClick={cargarTodosGastos}
-                          disabled={loading2}
-                        >
-                          <FiRefreshCw className="me-2" />
-                          Recargar
-                        </button>
-                      </div>
-                    </div>
+                    
                   </div>
                   
                   {/* DataTable de gastos */}
                   <div className="row mt-4">
                     <div className="col-12">
-                      <div className="table-responsive">
-                        <DataTable
+                      <div className="table-responsive doctor-list">
+                        <Table
                           columns={columns}
-                          data={Array.isArray(gastos) ? gastos : []}
-                          pagination
-                          paginationPerPage={10}
-                          paginationComponentOptions={paginationComponentOptions}
-                          noDataComponent={loading2 ? 'Cargando...' : 'No hay gastos registrados'}
-                          highlightOnHover
-                          striped
-                          responsive
+                          dataSource={Array.isArray(gastos) ? gastos : []}
+                          rowKey="id"
+                          pagination={{
+                            total: gastos.length,
+                            pageSize: 10,
+                            showTotal: (total, range) =>
+                              `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
+                          }}
+                          loading={loading2}
                         />
                       </div>
                     </div>
@@ -881,7 +937,7 @@ const ContabilidadGastos = () => {
         centered
         maskClosable={false}
       >
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={gastoSeleccionado ? handleSubmitEdit : handleSubmit}>
           <div className="row">
             <div className="col-12 col-md-6">
               <div className="form-group local-forms">
@@ -1166,6 +1222,30 @@ const ContabilidadGastos = () => {
             <p>Esta acción no se puede deshacer.</p>
           </div>
         )}
+      </Modal>
+
+      {/* Modal de éxito */}
+      <Modal
+        title="¡Actualización Exitosa!"
+        open={showSuccessModal}
+        onOk={() => setShowSuccessModal(false)}
+        onCancel={() => setShowSuccessModal(false)}
+        okText="Aceptar"
+        cancelButtonProps={{ style: { display: 'none' } }}
+        centered
+      >
+        <div>
+          <p>El gasto se ha actualizado correctamente con los siguientes datos:</p>
+          {updatedData && (
+            <ul style={{ listStyleType: 'none', padding: '10px' }}>
+              <li><strong>Inmueble:</strong> {updatedData.inmueble_nombre}</li>
+              <li><strong>Concepto:</strong> {updatedData.concepto}</li>
+              <li><strong>Monto:</strong> S/ {parseFloat(updatedData.monto).toFixed(2)}</li>
+              <li><strong>Fecha:</strong> {updatedData.fecha_gasto}</li>
+              <li><strong>Categoría:</strong> {updatedData.categoria}</li>
+            </ul>
+          )}
+        </div>
       </Modal>
     </>
   );

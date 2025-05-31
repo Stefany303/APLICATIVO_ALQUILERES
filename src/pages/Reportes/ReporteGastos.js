@@ -83,6 +83,7 @@ const ReporteGastos = () => {
                 console.warn('La respuesta está vacía');
                 setGastos([]);
                 setEstadisticas(null);
+                message.warning('No se encontraron datos');
                 setLoading(false);
                 return;
             }
@@ -96,8 +97,10 @@ const ReporteGastos = () => {
             if (response.datos && Array.isArray(response.datos)) {
                 datosGastos = response.datos;
                 datosEstadisticas = response.estadisticas || null;
+                message.success('Datos actualizados correctamente');
             } else if (Array.isArray(response)) {
                 datosGastos = response;
+                message.success('Datos actualizados correctamente');
             } else if (typeof response === 'object') {
                 // Intentar buscar un array en cualquier propiedad del objeto
                 const posiblesArrays = Object.values(response).filter(val => Array.isArray(val));
@@ -109,6 +112,7 @@ const ReporteGastos = () => {
                         val && typeof val === 'object' && !Array.isArray(val) && 'total_registros' in val
                     );
                     datosEstadisticas = posibleEstadisticas || null;
+                    message.success('Datos actualizados correctamente');
                 }
             }
             
@@ -209,7 +213,7 @@ const ReporteGastos = () => {
             sorter: (a, b) => new Date(a.creado_en) - new Date(b.creado_en),
             render: (fecha) => fecha ? new Date(fecha).toLocaleDateString("es-PE") : "N/A"
         },
-        {
+       { /*{
             title: "",
             dataIndex: "FIELD8",
             render: (text, record) => (
@@ -236,7 +240,7 @@ const ReporteGastos = () => {
                 </div>
               </>
             ),
-          },
+          },*/}
     ];
 
     const customStyles = {
@@ -263,27 +267,15 @@ const ReporteGastos = () => {
       
     // Usar useMemo para garantizar que la propiedad dataSource siempre reciba un array válido
     const datosTabla = useMemo(() => {
-        if (!Array.isArray(gastos)) {
+        if (!gastos || !Array.isArray(gastos)) {
             console.warn('gastos no es un array:', gastos);
             return [];
         }
         
-        return gastos.map(item => {
-            // Asegurarnos que cada elemento tenga un id único
-            const id = item.id || `gasto-${Math.random().toString(36).substring(2, 9)}`;
-            
-            // Asegurarnos que todos los campos existan y sean del tipo correcto
-            return {
-                ...item,
-                id,
-                monto: parseFloat(item.monto || 0),
-                nombre: item.nombre || 'N/A',
-                metodo_pago: item.metodo_pago || 'N/A',
-                tipo_pago: item.tipo_pago || item.tipo_gasto || 'N/A',
-                descripcion: item.descripcion || 'N/A',
-                creado_en: item.creado_en || null
-            };
-        });
+        return gastos.map(item => ({
+            key: item.id || `gasto-${Math.random().toString(36).substring(2, 9)}`,
+            ...item
+        }));
     }, [gastos]);
 
     return (
@@ -327,14 +319,9 @@ const ReporteGastos = () => {
                                                         <div className="doctor-table-blk">
                                                             <h3>Lista de Gastos</h3>
                                                             <div className="doctor-search-blk">
-                                                                <div className="top-nav-search table-search-blk">
-                                                                    <form>
-                                                                        <input type="text" className="form-control" placeholder="Buscar aquí" />
-                                                                       <Link className="btn"><img src={searchnormal} alt="#" /></Link>
-                                                                    </form>
-                                                                </div>
+                                                                
                                                                 <div className="add-group">
-                                                                    <Link to="/addgasto" className="btn btn-primary add-pluss ms-2"><img src={plusicon} alt="#" /></Link>
+                                                                    <Link to="/contabilidad-gastos" className="btn btn-primary add-pluss ms-2"><img src={plusicon} alt="#" /></Link>
                                                                    <Link to="#" className="btn btn-primary doctor-refresh ms-2" onClick={generarReporte}><img src={refreshicon} alt="#" /></Link>
                                                                 </div>
                                                             </div>
@@ -467,13 +454,12 @@ const ReporteGastos = () => {
                                                 <Table
                                                     pagination={{
                                                         total: datosTabla.length,
-                                                        showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} entradas`,
-                                                        showSizeChanger: true, onShowSizeChange: onShowSizeChange, itemRender: itemRender
+                                                        showTotal: (total, range) => `Mostrando ${range[0]} de ${range[1]} de ${total} entradas`,
                                                     }}
                                                     style={{ overflowX: 'auto' }}
                                                     columns={columns}
                                                     dataSource={datosTabla}
-                                                    rowKey="id"
+                                                    rowKey={record => record.key}
                                                     rowSelection={rowSelection}
                                                     loading={loading}
                                                     locale={{ emptyText: 'No hay datos disponibles' }}

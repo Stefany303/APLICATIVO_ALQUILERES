@@ -1,6 +1,6 @@
 /* eslint-disable react/jsx-no-duplicate-props */
 /* eslint-disable no-unused-vars */
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import { Link } from 'react-router-dom';
@@ -13,6 +13,7 @@ import Select from "react-select";
 import reporteService from '../../services/reporteService';
 import inmuebleService from '../../services/inmuebleService';
 import moment from 'moment';
+import { message } from 'antd';
 
 const ReportePagos = () => {
     const [inmuebles, setInmuebles] = useState([]);
@@ -67,12 +68,17 @@ const ReportePagos = () => {
             if (response.datos) {
                 setPagos(response.datos);
                 setEstadisticas(response.estadisticas);
+                message.success('Datos actualizados correctamente');
             } else {
                 setPagos(response);
                 setEstadisticas(null);
+                message.success('Datos actualizados correctamente');
             }
         } catch (error) {
             console.error('Error al generar reporte de pagos:', error);
+            message.error('Error al actualizar los datos');
+            setPagos([]);
+            setEstadisticas(null);
         } finally {
             setLoading(false);
         }
@@ -192,7 +198,7 @@ const ReportePagos = () => {
                 </div>
             )
         },
-        {
+      {/*  {
             title: "",
             dataIndex: "acciones",
             render: (_, record) => (
@@ -218,7 +224,7 @@ const ReportePagos = () => {
                     </div>
                 </div>
             ),
-        },
+        },*/}
     ];
 
     const customStyles = {
@@ -242,6 +248,19 @@ const ReportePagos = () => {
           height: "35px",
         }),
       };
+
+    // Usar useMemo para garantizar que la propiedad dataSource siempre reciba un array válido
+    const datosTabla = useMemo(() => {
+        if (!pagos || !Array.isArray(pagos)) {
+            console.warn('pagos no es un array:', pagos);
+            return [];
+        }
+        
+        return pagos.map(item => ({
+            key: item.id || `pago-${Math.random().toString(36).substring(2, 9)}`,
+            ...item
+        }));
+    }, [pagos]);
 
     return (
         <>
@@ -284,14 +303,9 @@ const ReportePagos = () => {
                                                         <div className="doctor-table-blk">
                                                             <h3>Lista de Pagos</h3>
                                                             <div className="doctor-search-blk">
-                                                                <div className="top-nav-search table-search-blk">
-                                                                    <form>
-                                                                        <input type="text" className="form-control" placeholder="Buscar aquí" />
-                                                                       <Link className="btn"><img src={searchnormal} alt="#" /></Link>
-                                                                    </form>
-                                                                </div>
+                                                                
                                                                 <div className="add-group">
-                                                                    <Link to="/addpayment" className="btn btn-primary add-pluss ms-2"><img src={plusicon} alt="#" /></Link>
+                                                                    <Link to="/contabilidad-pagos" className="btn btn-primary add-pluss ms-2"><img src={plusicon} alt="#" /></Link>
                                                                    <Link to="#" className="btn btn-primary doctor-refresh ms-2" onClick={generarReporte}><img src={refreshicon} alt="#" /></Link>
                                                                 </div>
                                                             </div>
@@ -418,16 +432,16 @@ const ReportePagos = () => {
                                             <div className="table-responsive">
                                                 <Table
                                                     pagination={{
-                                                        total: pagos.length,
+                                                        total: datosTabla.length,
                                                         showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} entradas`,
-                                                        showSizeChanger: true, onShowSizeChange: onShowSizeChange, itemRender: itemRender
                                                     }}
                                                     style={{ overflowX: 'auto' }}
                                                     columns={columns}
-                                                    dataSource={pagos}
-                                                    rowKey={record => record.id}
+                                                    dataSource={datosTabla}
+                                                    rowKey={record => record.key}
                                                     rowSelection={rowSelection}
                                                     loading={loading}
+                                                    locale={{ emptyText: 'No hay datos disponibles' }}
                                                 />
                                             </div>
                                         </div>

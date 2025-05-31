@@ -49,6 +49,8 @@ const ContratoRegistros = () => {
   const [generatingPdf, setGeneratingPdf] = useState(false); // Estado para indicar generación de PDF
   const [uploadingDocument, setUploadingDocument] = useState(false); // Estado para carga de documento
   const [contratoFile, setContratoFile] = useState(null); // Archivo de contrato firmado
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [updatedData, setUpdatedData] = useState(null);
   
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   
@@ -176,8 +178,8 @@ const ContratoRegistros = () => {
     }
     
     // Filtrar por texto de búsqueda
-    if (searchText) {
-      const searchLower = searchText.toLowerCase();
+    if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase().trim();
       filtered = filtered.filter(contrato => 
         (contrato.inquilino_nombre && contrato.inquilino_nombre.toLowerCase().includes(searchLower)) ||
         (contrato.inquilino_apellido && contrato.inquilino_apellido.toLowerCase().includes(searchLower)) ||
@@ -298,12 +300,22 @@ const ContratoRegistros = () => {
       // Llamar al servicio para actualizar
       await contratoService.actualizarContrato(contratoSeleccionado.id, contratoData);
       
+      // Guardar los datos actualizados para mostrar en el modal de éxito
+      setUpdatedData({
+        ...contratoData,
+        inquilino_nombre: contratoSeleccionado.inquilino_nombre,
+        inquilino_apellido: contratoSeleccionado.inquilino_apellido,
+        inmueble_nombre: contratoSeleccionado.inmueble_nombre,
+        espacio_nombre: contratoSeleccionado.espacio_nombre
+      });
+      
       // Actualizar la lista
       handleRefresh();
       
-      // Cerrar modal y mostrar mensaje
+      // Cerrar modal de edición y mostrar modal de éxito
       setEditModalVisible(false);
-      message.success("Contrato actualizado correctamente");
+      setShowSuccessModal(true);
+      
     } catch (err) {
       console.error("Error al actualizar contrato:", err);
       message.error("Error al guardar cambios: " + (err.message || "Error desconocido"));
@@ -763,7 +775,7 @@ const ContratoRegistros = () => {
                           <h3>Lista de Contratos</h3>
                           <div className="doctor-search-blk">
                             <div className="top-nav-search table-search-blk">
-                              <form>
+                              <form onSubmit={(e) => e.preventDefault()}>
                                 <input
                                   type="text"
                                   className="form-control"
@@ -778,7 +790,7 @@ const ContratoRegistros = () => {
                             </div>
                             <div className="add-group">
                               <Link
-                                to="/contrato-generar"
+                                to="/inquilinos-registrar"
                                 className="btn btn-primary add-pluss ms-2"
                                 title="Generar nuevo contrato"
                               >
@@ -810,12 +822,12 @@ const ContratoRegistros = () => {
                   {/* Filtros */}
                   <div className="staff-search-table mb-4">
                     <div className="card">
-                      <div className="card-header bg-light">
+                      {/*<div className="card-header bg-light">
                         <h5 className="mb-0">
                           <i className="fas fa-filter me-2"></i>
                           Filtros de búsqueda
                         </h5>
-                      </div>
+                      </div>*/}
                       <div className="card-body">
                         <form>
                           <div className="row">
@@ -903,10 +915,9 @@ const ContratoRegistros = () => {
                         pagination={{
                           total: filteredContratos.length,
                           showTotal: (total, range) =>
-                            `${range[0]}-${range[1]} de ${total} registros`,
+                            `Mostrando ${range[0]} de ${range[1]} de ${total} registros`,
                           pageSize: 10,
-                          showSizeChanger: true,
-                          showQuickJumper: true
+                          
                         }}
                         columns={columns}
                         dataSource={filteredContratos}
@@ -1122,6 +1133,35 @@ const ContratoRegistros = () => {
           <small className="form-text text-muted">
             Solo se permiten archivos PDF. El contrato debe estar firmado por todas las partes.
           </small>
+        </div>
+      </Modal>
+
+      {/* Modal de éxito */}
+      <Modal
+        title="¡Actualización Exitosa!"
+        open={showSuccessModal}
+        onOk={() => setShowSuccessModal(false)}
+        onCancel={() => setShowSuccessModal(false)}
+        okText="Aceptar"
+        cancelButtonProps={{ style: { display: 'none' } }}
+        centered
+      >
+        <div>
+          <p>El contrato se ha actualizado correctamente con los siguientes datos:</p>
+          {updatedData && (
+            <ul style={{ listStyleType: 'none', padding: '10px' }}>
+              <li><strong>Inquilino:</strong> {updatedData.inquilino_nombre} {updatedData.inquilino_apellido}</li>
+              <li><strong>Inmueble:</strong> {updatedData.inmueble_nombre}</li>
+              <li><strong>Espacio:</strong> {updatedData.espacio_nombre}</li>
+              <li><strong>Monto Alquiler:</strong> S/ {parseFloat(updatedData.monto_alquiler).toFixed(2)}</li>
+              <li><strong>Monto Garantía:</strong> S/ {parseFloat(updatedData.monto_garantia).toFixed(2)}</li>
+              <li><strong>Fecha Inicio:</strong> {updatedData.fecha_inicio}</li>
+              <li><strong>Fecha Fin:</strong> {updatedData.fecha_fin}</li>
+              <li><strong>Fecha de Pago:</strong> {updatedData.fecha_pago}</li>
+              <li><strong>Estado:</strong> {updatedData.estado}</li>
+              {updatedData.descripcion && <li><strong>Observaciones:</strong> {updatedData.descripcion}</li>}
+            </ul>
+          )}
         </div>
       </Modal>
     </>
