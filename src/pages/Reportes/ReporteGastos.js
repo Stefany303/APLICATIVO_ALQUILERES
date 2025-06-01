@@ -192,15 +192,15 @@ const ReporteGastos = () => {
             sorter: (a, b) => parseFloat(a.monto || 0) - parseFloat(b.monto || 0),
             render: (monto) => (monto !== undefined && monto !== null ? `S/ ${parseFloat(monto).toFixed(2)}` : "N/A")
         },
-        {
-            title: "Método de Pago",
-            dataIndex: "metodo_pago",
-            sorter: (a, b) => a.metodo_pago?.localeCompare(b.metodo_pago)
-        },
+        // {
+        //     title: "Metodo de Pago",
+        //     dataIndex: "metodo_pago",
+        //     sorter: (a, b) => a.metodo_pago?.localeCompare(b.metodo_pago)
+        // },
         {
             title: "Tipo de Gasto",
-            dataIndex: "tipo_pago",
-            sorter: (a, b) => a.tipo_pago?.localeCompare(b.tipo_pago)
+            dataIndex: "tipo_gasto",
+            sorter: (a, b) => a.tipo_gasto?.localeCompare(b.tipo_gasto)
         },
         {
             title: "Descripción",

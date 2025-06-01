@@ -2,7 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../utils/AuthContext";
 import Loader from "../component/Loader";
 
-const PrivateRoute = () => {
+const PrivateRoute = ({ children }) => {
   const { user, cargando } = useAuth();
 
   if (cargando) {
@@ -14,10 +14,10 @@ const PrivateRoute = () => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: window.location.pathname }} />;
   }
 
-  return <Outlet />;
+  return children || <Outlet />;
 };
 
 export default PrivateRoute;

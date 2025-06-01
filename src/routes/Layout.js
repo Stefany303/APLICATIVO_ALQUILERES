@@ -2,6 +2,7 @@ import React from "react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import { Outlet, useLocation } from "react-router-dom";
+import AuthDebug from '../components/AuthDebug';
 
 const Layout = () => {
   const location = useLocation();
@@ -19,6 +20,7 @@ const Layout = () => {
           <Outlet /> {/* Here the child routes will be rendered */}
         </div>
       </div>
+      {process.env.NODE_ENV === 'development' && <AuthDebug />}
     </div>
   );
 };
