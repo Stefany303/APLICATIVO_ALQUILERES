@@ -387,7 +387,7 @@ const ReporteGastos = () => {
                                                     </div>
                                                     <div className="col-auto text-end float-end ms-auto download-grp">
                                                        <Link to="#" className="me-2" onClick={exportToExcel}>
-                                                           <img src={pdficon} alt="Excel" title="Exportar a Excel" />
+                                                           <img src={pdficon4} alt="Excel" title="Exportar a Excel" />
                                                        </Link>
                                                     </div>
                                                 </div>

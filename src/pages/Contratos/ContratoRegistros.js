@@ -17,6 +17,7 @@ import documentoService from "../../services/documentoService";
 import { API_URL } from "../../services/authService";
 import moment from 'moment';
 import { SearchOutlined, PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons';
+import * as XLSX from 'xlsx';
 
 const { TextArea } = Input;
 const { RangePicker } = AntDatePicker;
@@ -620,6 +621,35 @@ const ContratoRegistros = () => {
     }
   };
 
+  // Función para exportar a Excel
+  const exportToExcel = () => {
+    try {
+      const dataForExcel = filteredContratos.map(item => ({
+        'Inquilino': `${item.inquilino_nombre || ''} ${item.inquilino_apellido || ''}`,
+        'Espacio': item.espacio_nombre || '',
+        'Inmueble': item.inmueble_nombre || '',
+        'Fecha Inicio': item.fecha_inicio ? new Date(item.fecha_inicio).toLocaleDateString() : '',
+        'Fecha Fin': item.fecha_fin ? new Date(item.fecha_fin).toLocaleDateString() : '',
+        'Monto Alquiler': item.monto_alquiler ? `S/ ${parseFloat(item.monto_alquiler).toFixed(2)}` : '',
+        'Monto Garantía': item.monto_garantia ? `S/ ${parseFloat(item.monto_garantia).toFixed(2)}` : '',
+        'Estado': item.estado || '',
+        'Fecha Pago': item.fecha_pago ? new Date(item.fecha_pago).toLocaleDateString() : ''
+      }));
+      // Crear libro de Excel
+      const ws = XLSX.utils.json_to_sheet(dataForExcel);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Contratos");
+      // Guardar archivo
+      const fecha = new Date().toISOString().slice(0,10);
+      const fileName = `Contratos_${fecha}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      message.success('Reporte exportado exitosamente');
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error);
+      message.error('Error al exportar el reporte');
+    }
+  };
+
   const columns = [
     {
       title: "Inquilino",
@@ -808,10 +838,7 @@ const ContratoRegistros = () => {
                         </div>
                       </div>
                       <div className="col-auto text-end float-end ms-auto download-grp">
-                        <button className="btn btn-outline-primary me-2" title="Exportar a PDF">
-                          <i className="fas fa-file-pdf"></i>
-                        </button>
-                        <button className="btn btn-outline-primary me-2" title="Exportar a Excel">
+                        <button className="btn btn-outline-primary me-2" title="Exportar a Excel" onClick={exportToExcel}>
                           <i className="fas fa-file-excel"></i>
                         </button>
                       </div>

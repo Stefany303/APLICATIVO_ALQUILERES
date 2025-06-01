@@ -424,7 +424,7 @@ const AdminDashboard = () => {
                   </div>
                 )}
                 
-                <Link to="/contratos-registros" className="widget-link">
+                <Link to="/contrato-registros" className="widget-link">
                   Ver todos los contratos <FaChevronRight />
                 </Link>
               </div>
@@ -473,7 +473,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 
-                <Link to="/ingresos-registros" className="widget-link">
+                <Link to="/contabilidad-pagos" className="widget-link">
                   Ver todos los ingresos <FaChevronRight />
                 </Link>
               </div>

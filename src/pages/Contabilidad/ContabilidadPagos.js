@@ -1322,14 +1322,7 @@ const ContabilidadPagos = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="col-auto text-end float-end ms-auto download-grp">
-                        <button className="btn btn-outline-primary me-2" title="Exportar a PDF">
-                          <i className="fas fa-file-pdf"></i>
-                        </button>
-                        <button className="btn btn-outline-primary me-2" title="Exportar a Excel">
-                          <i className="fas fa-file-excel"></i>
-                        </button>
-                      </div>
+                      
                     </div>
                   </div>
                   <div className="row mt-4">

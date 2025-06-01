@@ -23,6 +23,7 @@ import '../../assets/styles/EspaciosRegistrar.css';
 import { message, Spin, Alert, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { SearchOutlined, PlusOutlined, EditOutlined, DeleteOutlined, FileExcelOutlined } from '@ant-design/icons';
+import * as XLSX from 'xlsx';
 
 const EspaciosRegistros = () => {
   const { user, estaAutenticado, token } = useAuth();
@@ -306,6 +307,35 @@ const EspaciosRegistros = () => {
     }
   };
 
+  // Función para exportar a Excel
+  const exportToExcel = () => {
+    try {
+      const dataForExcel = espaciosFiltrados.map(item => ({
+        'Inmueble': item.inmueble_nombre || '',
+        'Piso': item.piso_nombre || '',
+        'Nombre': item.nombre || '',
+        'Tipo': item.tipo_espacio || '',
+        'Descripción': item.descripcion || '',
+        'Precio': item.precio ? `S/ ${parseFloat(item.precio).toFixed(2)}` : '',
+        'Capacidad': item.capacidad || '',
+        'Baño': item.baño === 'propio' ? 'Propio' : 'Compartido',
+        'Estado': item.estado === 0 ? 'Desocupado' : 'Ocupado'
+      }));
+      // Crear libro de Excel
+      const ws = XLSX.utils.json_to_sheet(dataForExcel);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Espacios");
+      // Guardar archivo
+      const fecha = new Date().toISOString().slice(0,10);
+      const fileName = `Espacios_${fecha}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      message.success('Reporte exportado exitosamente');
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error);
+      message.error('Error al exportar el reporte');
+    }
+  };
+
   const columns = [
     {
       title: "Inmueble",
@@ -487,6 +517,13 @@ const EspaciosRegistros = () => {
                               ) : (
                                 <i className="fas fa-sync-alt"></i>
                               )}
+                            </button>
+                            <button
+                              className="btn btn-outline-success ms-2"
+                              onClick={exportToExcel}
+                              title="Exportar a Excel"
+                            >
+                              <FileExcelOutlined />
                             </button>
                           </div>
                         </div>

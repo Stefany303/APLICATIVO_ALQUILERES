@@ -14,6 +14,7 @@ import inquilinoService from '../../services/inquilinoService';
 import contratoService from '../../services/contratoService';
 import { EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import personaService from '../../services/personaService';
+import * as XLSX from 'xlsx';
 
 const InquilinosRegistros = () => {
   const [selectedOption, setSelectedOption] = useState(null);
@@ -381,6 +382,33 @@ const InquilinosRegistros = () => {
     );
   };
 
+  // Función para exportar a Excel
+  const exportToExcel = () => {
+    try {
+      const dataForExcel = filteredInquilinos.map(item => ({
+        'Nombre': `${item.inquilino_nombre} ${item.inquilino_apellido}`,
+        'Documento': item.inquilino_dni,
+        'Email': item.inquilino_email,
+        'Teléfono': item.inquilino_telefono,
+        'Inmueble': item.inmueble_nombre,
+        'Espacio': item.espacio_nombre,
+        'Estado': item.estado
+      }));
+      // Crear libro de Excel
+      const ws = XLSX.utils.json_to_sheet(dataForExcel);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Inquilinos");
+      // Guardar archivo
+      const fecha = new Date().toISOString().slice(0,10);
+      const fileName = `Inquilinos_${fecha}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      message.success('Reporte exportado exitosamente');
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error);
+      message.error('Error al exportar el reporte');
+    }
+  };
+
   return (
     <>
     <Header />
@@ -459,16 +487,8 @@ const InquilinosRegistros = () => {
                     </div>
                   </div>
                   <div className="col-auto text-end float-end ms-auto download-grp">
-                    <Link to="#" className=" me-2">
-                      <img src={pdficon} alt="#" />
-                    </Link>
-                    <Link to="#" className=" me-2">
-                    </Link>
-                    <Link to="#" className=" me-2">
-                      <img src={pdficon3} alt="#" />
-                    </Link>
-                    <Link to="#">
-                      <img src={pdficon4} alt="#" />
+                    <Link to="#" className="me-2" onClick={exportToExcel}>
+                      <img src={pdficon4} alt="Excel" title="Exportar a Excel" />
                     </Link>
                   </div>
                 </div>
