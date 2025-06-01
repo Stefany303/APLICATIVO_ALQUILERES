@@ -12,7 +12,7 @@ import Select from "react-select";
 import { DatePicker} from "antd";
 import inquilinoService from '../../services/inquilinoService';
 import contratoService from '../../services/contratoService';
-import { EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EyeOutlined, EditOutlined, DeleteOutlined, FileExcelOutlined } from '@ant-design/icons';
 import personaService from '../../services/personaService';
 import * as XLSX from 'xlsx';
 
@@ -482,14 +482,19 @@ const InquilinosRegistros = () => {
                               <i className="fas fa-sync-alt"></i>
                             )}
                           </button>
+                          
                         </div>
                       </div>
                     </div>
                   </div>
                   <div className="col-auto text-end float-end ms-auto download-grp">
-                    <Link to="#" className="me-2" onClick={exportToExcel}>
-                      <img src={pdficon4} alt="Excel" title="Exportar a Excel" />
-                    </Link>
+                      <button
+                        className="btn btn-outline-success ms-2"
+                        onClick={exportToExcel}
+                        title="Exportar a Excel"
+                      >
+                      <FileExcelOutlined />
+                      </button>
                   </div>
                 </div>
               </div>

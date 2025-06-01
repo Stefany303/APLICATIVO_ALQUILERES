@@ -15,6 +15,7 @@ import inmuebleService from '../../services/inmuebleService';
 import moment from 'moment';
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
+import { FileExcelOutlined } from '@ant-design/icons';
 
 const ReportePagos = () => {
     const [inmuebles, setInmuebles] = useState([]);
@@ -359,9 +360,13 @@ const ReportePagos = () => {
                                                         </div>
                                                     </div>
                                                     <div className="col-auto text-end float-end ms-auto download-grp">
-                                                       <Link to="#" className="me-2" onClick={exportToExcel}>
-                                                           <img src={pdficon} alt="Excel" title="Exportar a Excel" />
-                                                       </Link>
+                                                        <button
+                                                            className="btn btn-outline-success ms-2"
+                                                            onClick={exportToExcel}
+                                                            title="Exportar a Excel"
+                                                        >
+                                                        <FileExcelOutlined />
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>

@@ -518,17 +518,20 @@ const EspaciosRegistros = () => {
                                 <i className="fas fa-sync-alt"></i>
                               )}
                             </button>
-                            <button
-                              className="btn btn-outline-success ms-2"
-                              onClick={exportToExcel}
-                              title="Exportar a Excel"
-                            >
-                              <FileExcelOutlined />
-                            </button>
+                           
                           </div>
                         </div>
                       </div>
                     </div>
+                    <div className="col-auto text-end float-end ms-auto download-grp">
+                      <button
+                        className="btn btn-outline-success ms-2"
+                        onClick={exportToExcel}
+                        title="Exportar a Excel"
+                      >
+                      <FileExcelOutlined />
+                      </button>
+                  </div>
                   </div>
                 </div>
 

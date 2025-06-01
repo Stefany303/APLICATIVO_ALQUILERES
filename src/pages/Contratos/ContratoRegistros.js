@@ -16,7 +16,7 @@ import pisoService from "../../services/pisoService";
 import documentoService from "../../services/documentoService";
 import { API_URL } from "../../services/authService";
 import moment from 'moment';
-import { SearchOutlined, PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons';
+import { SearchOutlined, PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SaveOutlined, FileExcelOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 
 const { TextArea } = Input;
@@ -838,10 +838,14 @@ const ContratoRegistros = () => {
                         </div>
                       </div>
                       <div className="col-auto text-end float-end ms-auto download-grp">
-                        <button className="btn btn-outline-primary me-2" title="Exportar a Excel" onClick={exportToExcel}>
-                          <i className="fas fa-file-excel"></i>
-                        </button>
-                      </div>
+                      <button
+                        className="btn btn-outline-success ms-2"
+                        onClick={exportToExcel}
+                        title="Exportar a Excel"
+                      >
+                      <FileExcelOutlined />
+                      </button>
+                  </div>
                     </div>
                   </div>
                   {/* /Table Header */}
