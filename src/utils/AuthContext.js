@@ -113,12 +113,57 @@ export const AuthProvider = ({ children }) => {
       console.log('Verificando token con el backend');
       const response = await api.get('/auth/perfil');
       console.log('Respuesta de verificación:', response.data);
-      return true; // Si llegamos aquí, el token es válido porque el middleware lo permitió
+      return true;
     } catch (error) {
       console.error('Error al verificar token:', error);
+      if (error.response?.status === 401) {
+        console.log('Token expirado o inválido, intentando refresh...');
+        const refreshSuccess = await refreshAccessToken(true);
+        if (!refreshSuccess) {
+          console.log('No se pudo refrescar el token, redirigiendo a login...');
+          await logout();
+          navigate('/login');
+        }
+        return refreshSuccess;
+      }
       return false;
     }
   };
+
+  // Configurar interceptor global para manejar errores 401
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 401 && !error.config._retry) {
+          error.config._retry = true;
+          try {
+            console.log('Token expirado, intentando refresh desde interceptor...');
+            const refreshSuccess = await refreshAccessToken(true);
+            if (refreshSuccess) {
+              // Reintentar la petición original con el nuevo token
+              const token = TOKEN_STORAGE.getToken();
+              error.config.headers['Authorization'] = `Bearer ${token}`;
+              return api(error.config);
+            } else {
+              console.log('No se pudo refrescar el token, redirigiendo a login...');
+              await logout();
+              navigate('/login');
+            }
+          } catch (refreshError) {
+            console.error('Error en refresh desde interceptor:', refreshError);
+            await logout();
+            navigate('/login');
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      api.interceptors.response.eject(interceptor);
+    };
+  }, [navigate]);
 
   // Función para refrescar el token
   const refreshAccessToken = async (forceRefresh = false) => {

@@ -106,6 +106,17 @@ class ReporteService {
         }
     }
 
+    // Obtener estadísticas generales para el dashboard
+    async obtenerEstadisticasGenerales() {
+        try {
+            const response = await api.get('/reportes/estadisticas/generales');
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener estadísticas generales:', error);
+            throw error;
+        }
+    }
+
     // Dashboard - Total de inquilinos por mes
     async obtenerInquilinosPorMes() {
         try {
@@ -206,4 +217,5 @@ class ReporteService {
     }
 }
 
-export default new ReporteService(); 
+const reporteService = new ReporteService();
+export default reporteService; 

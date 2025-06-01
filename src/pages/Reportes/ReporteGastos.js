@@ -14,6 +14,7 @@ import reporteService from '../../services/reporteService';
 import inmuebleService from '../../services/inmuebleService';
 import moment from 'moment';
 import { message } from 'antd';
+import * as XLSX from 'xlsx';
 
 const ReporteGastos = () => {
     const [inmuebles, setInmuebles] = useState([]);
@@ -278,6 +279,63 @@ const ReporteGastos = () => {
         }));
     }, [gastos]);
 
+    // Función para exportar a Excel
+    const exportToExcel = () => {
+        try {
+            // Preparar los datos para Excel
+            const dataForExcel = gastos.map(item => ({
+                'Nombre Inmueble': item.nombre || '',
+                'Monto': item.monto ? `S/ ${parseFloat(item.monto).toFixed(2)}` : 'N/A',
+                'Tipo de Gasto': item.tipo_gasto || '',
+                'Descripción': item.descripcion || '',
+                'Fecha': item.creado_en ? new Date(item.creado_en).toLocaleDateString("es-PE") : 'N/A'
+            }));
+
+            // Agregar estadísticas si están disponibles
+            if (estadisticas) {
+                dataForExcel.push(
+                    {},  // Fila vacía para separación
+                    { 'Nombre Inmueble': 'RESUMEN ESTADÍSTICO' },
+                    { 'Nombre Inmueble': 'Total Registros', 'Monto': estadisticas.total_registros },
+                    { 'Nombre Inmueble': 'Monto Total', 'Monto': `S/ ${parseFloat(estadisticas.total_monto || 0).toFixed(2)}` }
+                );
+
+                // Agregar distribución por tipo
+                if (estadisticas.gastos_por_tipo) {
+                    dataForExcel.push(
+                        {},  // Fila vacía
+                        { 'Nombre Inmueble': 'DISTRIBUCIÓN POR TIPO' }
+                    );
+                    Object.entries(estadisticas.gastos_por_tipo).forEach(([tipo, data]) => {
+                        if (data && typeof data === 'object') {
+                            dataForExcel.push({
+                                'Nombre Inmueble': tipo,
+                                'Monto': `S/ ${parseFloat(data.monto_total || 0).toFixed(2)}`,
+                                'Tipo de Gasto': `Cantidad: ${data.cantidad || 0}`
+                            });
+                        }
+                    });
+                }
+            }
+
+            // Crear libro de Excel
+            const ws = XLSX.utils.json_to_sheet(dataForExcel);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte de Gastos");
+
+            // Generar nombre del archivo con fecha
+            const fecha = moment().format('YYYY-MM-DD');
+            const fileName = `Reporte_Gastos_${fecha}.xlsx`;
+
+            // Guardar archivo
+            XLSX.writeFile(wb, fileName);
+            message.success('Reporte exportado exitosamente');
+        } catch (error) {
+            console.error('Error al exportar a Excel:', error);
+            message.error('Error al exportar el reporte');
+        }
+    };
+
     return (
         <>
             <Header />
@@ -328,10 +386,9 @@ const ReporteGastos = () => {
                                                         </div>
                                                     </div>
                                                     <div className="col-auto text-end float-end ms-auto download-grp">
-                                                       <Link to="#" className=" me-2"><img src={pdficon} alt="#" /></Link>
-                                                       <Link to="#" className=" me-2"><img src={pdficon2} alt="#" /></Link>
-                                                       <Link to="#" className=" me-2"><img src={pdficon3} alt="#"  /></Link>
-                                                       <Link to="#"><img src={pdficon4} alt="#"  /></Link>
+                                                       <Link to="#" className="me-2" onClick={exportToExcel}>
+                                                           <img src={pdficon} alt="Excel" title="Exportar a Excel" />
+                                                       </Link>
                                                     </div>
                                                 </div>
                                             </div>

@@ -2,15 +2,22 @@ import React, { useEffect, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import moment from 'moment';
 import 'moment/locale/es';
+import Select from 'react-select';
 
 moment.locale('es');
 
-const IngresosGastosChart = ({ ingresos, gastos, selectedYear }) => {
+const IngresosGastosChart = ({ ingresos, gastos, selectedYear, onYearChange }) => {
+  // Opciones de año (desde 2025 hacia atrás)
+  const yearOptions = Array.from({ length: 10 }, (_, i) => ({
+    value: 2025 - i,
+    label: (2025 - i).toString()
+  }));
+
   const [chartData, setChartData] = useState({
     series: [],
     options: {
       chart: {
-        type: 'bar',
+        type: 'line',
         height: 350,
         stacked: false,
         toolbar: {
@@ -22,9 +29,9 @@ const IngresosGastosChart = ({ ingresos, gastos, selectedYear }) => {
             zoomin: false,
             zoomout: false,
             pan: false,
-            reset: false
-          }
-        }
+            reset: false,
+          },
+        },
       },
       plotOptions: {
         bar: {
@@ -32,16 +39,16 @@ const IngresosGastosChart = ({ ingresos, gastos, selectedYear }) => {
           columnWidth: '60%',
           borderRadius: 4,
           dataLabels: {
-            position: 'top'
-          }
-        }
+            position: 'top',
+          },
+        },
       },
       dataLabels: {
-        enabled: false
+        enabled: false,
       },
       stroke: {
         width: [0, 0, 4],
-        curve: 'smooth'
+        curve: 'smooth',
       },
       colors: ['#00A389', '#FF5722', '#2E37A4'],
       title: {
@@ -50,217 +57,260 @@ const IngresosGastosChart = ({ ingresos, gastos, selectedYear }) => {
         style: {
           fontSize: '16px',
           fontFamily: 'Poppins, sans-serif',
-          fontWeight: 600
-        }
+          fontWeight: 600,
+        },
       },
       grid: {
         borderColor: '#f1f1f1',
         padding: {
-          bottom: 15
-        }
+          bottom: 15,
+        },
       },
       fill: {
         opacity: [0.85, 0.85, 1],
         type: ['solid', 'solid', 'gradient'],
         gradient: {
           shade: 'light',
-          type: "vertical",
+          type: 'vertical',
           shadeIntensity: 0.5,
-          gradientToColors: undefined,
           inverseColors: true,
           opacityFrom: 1,
           opacityTo: 0.8,
           stops: [0, 50, 100],
-          colorStops: []
-        }
+          colorStops: [],
+        },
       },
       markers: {
         size: [0, 0, 5],
         colors: ['#00A389', '#FF5722', '#2E37A4'],
         strokeColors: '#fff',
-        strokeWidth: 2
+        strokeWidth: 2,
       },
       xaxis: {
-        categories: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+        categories: [],
         title: {
-          text: 'Mes'
-        }
+          text: 'Mes',
+        },
       },
       yaxis: [
         {
           title: {
-            text: 'Monto (S/)'
+            text: 'Monto (S/)',
           },
           min: 0,
           labels: {
-            formatter: function(val) {
+            formatter: function (val) {
               return 'S/ ' + val.toFixed(0);
-            }
-          }
-        }
+            },
+          },
+        },
       ],
       tooltip: {
         shared: true,
         intersect: false,
         y: {
-          formatter: function(val) {
+          formatter: function (val) {
             return 'S/ ' + val.toFixed(2);
-          }
-        }
+          },
+        },
       },
       legend: {
         position: 'top',
         horizontalAlign: 'right',
-        offsetY: -10
-      }
-    }
+        offsetY: -10,
+      },
+    },
   });
 
   useEffect(() => {
     console.log("Datos para gráfico de ingresos/gastos:", { ingresos, gastos, selectedYear });
-    
-    if ((ingresos && Array.isArray(ingresos) && ingresos.length > 0) || 
-        (gastos && Array.isArray(gastos) && gastos.length > 0)) {
+    if (
+      (Array.isArray(ingresos) && ingresos.length > 0) ||
+      (Array.isArray(gastos) && gastos.length > 0)
+    ) {
       procesarDatos(ingresos || [], gastos || []);
     } else {
-      generarDatosEjemplo();
+      mostrarSinDatos();
     }
   }, [ingresos, gastos, selectedYear]);
 
   const procesarDatos = (datosIngresos, datosGastos) => {
     try {
-      // Inicializar arrays para todos los meses
-      const ingresosPorMes = Array(12).fill(0);
-      const gastosPorMes = Array(12).fill(0);
-      const meses = Array(12).fill().map((_, i) => moment().month(i).format('MMM'));
-      
-      // Filtrar por año seleccionado y procesar datos de ingresos
-      datosIngresos.forEach(item => {
+      const ingresosPorMes = new Array(12).fill(0);
+      const gastosPorMes = new Array(12).fill(0);
+      const meses = moment.monthsShort();
+
+      datosIngresos.forEach((item) => {
         if (item.mes) {
           const [year, month] = item.mes.split('-');
           if (year === String(selectedYear)) {
-            const monthIndex = parseInt(month) - 1;
-            if (monthIndex >= 0 && monthIndex < 12) {
-              ingresosPorMes[monthIndex] += parseFloat(item.total_ingresos || 0);
+            const idx = parseInt(month, 10) - 1;
+            if (idx >= 0 && idx < 12) {
+              ingresosPorMes[idx] += parseFloat(item.total_ingresos || 0);
             }
           }
         }
       });
-      
-      // Filtrar por año seleccionado y procesar datos de gastos
-      datosGastos.forEach(item => {
+
+      datosGastos.forEach((item) => {
         if (item.mes) {
           const [year, month] = item.mes.split('-');
           if (year === String(selectedYear)) {
-            const monthIndex = parseInt(month) - 1;
-            if (monthIndex >= 0 && monthIndex < 12) {
-              gastosPorMes[monthIndex] += parseFloat(item.total_gastos || 0);
+            const idx = parseInt(month, 10) - 1;
+            if (idx >= 0 && idx < 12) {
+              gastosPorMes[idx] += parseFloat(item.total_gastos || 0);
             }
           }
         }
       });
-      
-      // Calcular balance neto (ingresos - gastos)
-      const balanceNeto = ingresosPorMes.map((ingreso, i) => ingreso - gastosPorMes[i]);
-      
-      // Determinar el máximo valor para establecer el rango del eje Y
+
+      const balanceNeto = ingresosPorMes.map((ing, i) => ing - gastosPorMes[i]);
       const maxIngresos = Math.max(...ingresosPorMes);
       const maxGastos = Math.max(...gastosPorMes);
-      const maxBalance = Math.max(...balanceNeto.map(Math.abs));
+      const maxBalance = Math.max(...balanceNeto.map((v) => Math.abs(v)));
       const maxValue = Math.max(maxIngresos, maxGastos, maxBalance);
-      
-      // Si no hay datos significativos, usar datos de ejemplo
-      if (maxValue <= 0) {
-        console.log("No hay datos significativos, usando datos de ejemplo");
-        return generarDatosEjemplo();
-      }
-      
-      // Actualizar datos del gráfico
-      setChartData({
-        series: [
-          {
-            name: 'Ingresos',
-            type: 'column',
-            data: ingresosPorMes
-          },
-          {
-            name: 'Gastos',
-            type: 'column',
-            data: gastosPorMes
-          },
-          {
-            name: 'Balance Neto',
-            type: 'line',
-            data: balanceNeto
-          }
-        ],
-        options: {
-          ...chartData.options,
-          xaxis: {
-            ...chartData.options.xaxis,
-            categories: meses
-          },
-          yaxis: [
-            {
-              title: {
-                text: 'Monto (S/)'
-              },
-              min: 0,
-              max: Math.ceil(maxValue * 1.2),
-              labels: {
-                formatter: function(val) {
-                  return 'S/ ' + val.toFixed(0);
-                }
-              }
-            }
-          ]
-        }
-      });
-    } catch (error) {
-      console.error('Error al procesar datos de ingresos y gastos:', error);
-      generarDatosEjemplo();
-    }
-  };
 
-  const generarDatosEjemplo = () => {
-    const ingresos = [2500, 3500, 3200, 2800, 3000, 3800, 4200, 3500, 3000, 2700, 3200, 4000];
-    const gastos = [1800, 2200, 2000, 1500, 2500, 2300, 2000, 1800, 2400, 2100, 1900, 2200];
-    const balance = ingresos.map((ing, i) => ing - gastos[i]);
-    
-    setChartData({
-      series: [
+      if (maxValue <= 0) {
+        console.log("No hay datos significativos");
+        mostrarSinDatos();
+        return;
+      }
+
+      const nuevasSeries = [
         {
           name: 'Ingresos',
           type: 'column',
-          data: ingresos
+          data: ingresosPorMes,
         },
         {
           name: 'Gastos',
           type: 'column',
-          data: gastos
+          data: gastosPorMes,
         },
         {
           name: 'Balance Neto',
           type: 'line',
-          data: balance
-        }
+          data: balanceNeto,
+        },
+      ];
+
+      setChartData((prev) => ({
+        series: nuevasSeries,
+        options: {
+          ...prev.options,
+          chart: {
+            ...prev.options.chart,
+            type: 'line',
+          },
+          xaxis: {
+            ...prev.options.xaxis,
+            categories: meses,
+          },
+          yaxis: [
+            {
+              title: {
+                text: 'Monto (S/)',
+              },
+              min: 0,
+              max: Math.ceil(maxValue * 1.2),
+              labels: {
+                formatter: function (val) {
+                  return 'S/ ' + val.toFixed(0);
+                },
+              },
+            },
+          ],
+        },
+      }));
+    } catch (err) {
+      console.error('Error al procesar datos de ingresos y gastos:', err);
+      mostrarSinDatos();
+    }
+  };
+
+  const mostrarSinDatos = () => {
+    const meses = moment.monthsShort();
+    setChartData((prev) => ({
+      series: [
+        { name: 'Ingresos', type: 'column', data: [] },
+        { name: 'Gastos', type: 'column', data: [] },
+        { name: 'Balance Neto', type: 'line', data: [] }
       ],
       options: {
-        ...chartData.options
-      }
-    });
+        ...prev.options,
+        chart: {
+          ...prev.options.chart,
+          type: 'line',
+        },
+        xaxis: {
+          ...prev.options.xaxis,
+          categories: meses,
+        },
+        yaxis: [
+          {
+            ...prev.options.yaxis[0],
+            max: 1000,
+          },
+        ],
+        annotations: {
+          points: [{
+            x: 5,
+            y: 500,
+            marker: {
+              size: 0
+            },
+            label: {
+              text: 'No hay datos disponibles',
+              style: {
+                color: '#666',
+                fontSize: '14px'
+              }
+            }
+          }]
+        }
+      },
+    }));
   };
 
   return (
-    <div id="chart">
-      <ReactApexChart 
-        options={chartData.options} 
-        series={chartData.series} 
-        type="line" 
-        height={350}
-      />
+    <div>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h4>Análisis Financiero ({selectedYear})</h4>
+        <Select
+          className="custom-react-select"
+          defaultValue={yearOptions.find(opt => opt.value === selectedYear)}
+          onChange={(opt) => onYearChange(opt.value)}
+          options={yearOptions}
+          components={{ IndicatorSeparator: () => null }}
+          styles={{
+            control: (base, state) => ({
+              ...base,
+              borderColor: state.isFocused ? 'none' : '2px solid rgba(46, 55, 164, 0.1)',
+              boxShadow: state.isFocused ? '0 0 0 1px #2e37a4' : 'none',
+              borderRadius: '10px',
+              fontSize: '14px',
+              minHeight: '40px'
+            }),
+            dropdownIndicator: (base, state) => ({
+              ...base,
+              transform: state.selectProps.menuIsOpen ? 'rotate(-180deg)' : 'rotate(0)',
+              transition: '250ms',
+              width: '30px',
+              height: '30px'
+            })
+          }}
+        />
+      </div>
+      <div id="chart">
+        <ReactApexChart
+          options={chartData.options}
+          series={chartData.series}
+          type="line"
+          height={350}
+        />
+      </div>
     </div>
   );
 };
 
-export default IngresosGastosChart; 
+export default IngresosGastosChart;

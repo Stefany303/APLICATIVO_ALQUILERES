@@ -1,73 +1,44 @@
-import React, { useState, useEffect } from "react";
-import DonutChart from "../Dashboard//DonutChart";
-import { FaChevronRight, FaArrowUp, FaArrowDown } from 'react-icons/fa';
+import React, { useState, useEffect, useMemo } from "react";
+import { 
+  FaChevronRight, 
+  FaArrowUp, 
+  FaArrowDown, 
+  FaHome, 
+  FaUsers,
+  FaFileContract, 
+  FaMoneyBillWave, 
+  FaChartLine,
+  FaExclamationTriangle
+} from 'react-icons/fa';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
-import InquilinosChart from "../Dashboard/InquilinosChart";
 import IngresosGastosChart from "../Dashboard/IngresosGastosChart";
-import { FaHome } from 'react-icons/fa';
+import TendenciasIngresosChart from "./TendenciasIngresosChart.jsx";
 import Select from "react-select";
-import {
-  Avatar2,
-  Avatar3,
-  Avatar4,
-  Avatar5,
-  calendar,
-  dep_icon1,
-  dep_icon2,
-  dep_icon3,
-  dep_icon4,
-  dep_icon5,
-  empty_wallet,
-  imagesend,
-  logo_02,
-  menuicon04,
-  morning_img_01,
-  profile_add,
-  scissor,
-  user001,
-  inquilinos,
-  espacios,
-} from "../../components/imagepath";
 import { Link } from "react-router-dom";
 import CountUp from "react-countup";
 import { useAuth } from "../../utils/AuthContext";
 import reporteService from '../../services/reporteService';
-import { message, Spin, Card, Row, Col, Statistic, Progress, Table } from 'antd';
+import { message, Spin, Row, Col, Progress } from 'antd';
 import moment from 'moment';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [dashboardData, setDashboardData] = useState({
-    totalClientes: 0,
-    espaciosOcupados: 0,
-    espaciosDisponibles: 0,
-    ingresosMensuales: 0,
-    pagosPendientes: 0,
-    contratosActivos: 0,
-    contratosPorVencer: 0,
-    totalEspacios: 0,
-    pagosDelMes: {
-      completados: 0,
-      pendientes: 0,
-      retrasados: 0,
-      totalMonto: 0
-    },
-    // Añadir datos para la tendencia
-    tendencia: {
-      clientes: 0, // positivo = aumento, negativo = disminución
-      ingresos: 0,
-      contratos: 0,
-      ocupacion: 0
-    },
-    // Datos completos del API
-    datosCrudos: null
+    inquilinos: { activos: 0, total: 0 },
+    espacios: { total: 0, ocupados: 0, disponibles: 0 },
+    contratosPorVencer: [],
+    ingresosMensuales: [],
+    ingresosGarantia: 0,
+    ingresosMensualesPrevistos: [],
+    gastosMensuales: [],
+    tendencias: { ingresos: 0, ocupacion: 0 }
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Generar opciones de años (últimos 10 años)
+  // Opciones de año
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 10 }, (_, i) => ({
     value: currentYear - i,
@@ -78,153 +49,72 @@ const AdminDashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        console.log('Iniciando carga de datos del dashboard...');
-        
-        // Usar el nuevo servicio para obtener todos los datos en una sola llamada
-        const dashboardResponse = await reporteService.obtenerDatosDashboard();
-        console.log('Datos recibidos del dashboard:', dashboardResponse);
-        
-        if (!dashboardResponse) {
+        const estadisticas = await reporteService.obtenerEstadisticasGenerales();
+
+        if (!estadisticas) {
           throw new Error('No se recibieron datos del dashboard');
         }
-        
-        // Procesar los datos recibidos
-        const {
-          totalInquilinos,
-          espaciosDisponibles,
-          ingresos,
-          gastos,
-          contratos,
-          ocupacion,
-          contratosPorVencer,
-          pagos,
-          contratosVencidos
-        } = dashboardResponse;
-        
-        // Calcular totales
-        let totalClientes = totalInquilinos?.data?.[0]?.total_inquilinos || 0;
-        
-        // Calcular espacios totales, ocupados y disponibles
-        let espaciosOcupadosTotal = 0;
-        let espaciosDisponiblesTotal = 0;
-        let espaciosTotalGeneral = 0;
-        
-        if (Array.isArray(espaciosDisponibles)) {
-          espaciosDisponibles.forEach(inmueble => {
-            const ocupados = parseInt(inmueble.espacios_ocupados || 0);
-            const disponibles = parseInt(inmueble.espacios_disponibles || 0);
-            
-            espaciosOcupadosTotal += ocupados;
-            espaciosDisponiblesTotal += disponibles;
-            espaciosTotalGeneral += inmueble.total_espacios || 0;
-          });
-        }
-        
-        // Calcular ingresos mensuales (último mes disponible)
-        let ingresosMensuales = 0;
-        if (Array.isArray(ingresos) && ingresos.length > 0) {
-          // Ordenar por mes (del más reciente al más antiguo)
-          ingresos.sort((a, b) => b.mes.localeCompare(a.mes));
-          ingresosMensuales = parseFloat(ingresos[0].total_ingresos) || 0;
-        }
-        
-        // Calcular pagos pendientes del mes actual
-        let pagosPendientesTotal = 0;
-        let pagosCompletados = 0;
-        let pagosPendientes = 0;
-        let pagosRetrasados = 0;
-        
-        if (Array.isArray(pagos)) {
-          // Obtener el mes actual en formato YYYY-MM
-          const mesActual = moment().format('YYYY-MM');
-          
-          // Buscar los pagos del mes actual
-          const pagoMesActual = pagos.find(p => p.mes === mesActual) || pagos[0]; // Si no hay del mes actual, usar el primero
-          
-          if (pagoMesActual) {
-            pagosCompletados = parseFloat(pagoMesActual.monto_pagado || 0);
-            pagosPendientes = parseFloat(pagoMesActual.monto_pendiente || 0);
-            pagosPendientesTotal = pagosPendientes;
-          }
-          
-          // Para demo, distribuir pagos pendientes entre pendientes y retrasados
-          if (pagosPendientes > 0) {
-            pagosRetrasados = Math.round(pagosPendientes * 0.3); // 30% retrasados
-            pagosPendientes = Math.round(pagosPendientes * 0.7); // 70% pendientes
-          }
-        }
-        
-        // Obtener contratos activos
-        let contratosActivos = parseInt(contratos?.data?.contratos_activos_mes_actual || 0);
-        
-        // Obtener contratos por vencer
-        let contratosPorVencerTotal = Array.isArray(contratosPorVencer) ? contratosPorVencer.length : 0;
-        
-        // Calcular tendencias
-        const tendenciaClientes = totalInquilinos?.variacion_porcentual || 0;
-        const tendenciaContratos = contratos?.variacion_porcentual || 0;
-        
-        // Calcular tendencia de ingresos (comparando los dos meses más recientes)
-        let tendenciaIngresos = 0;
-        if (Array.isArray(ingresos) && ingresos.length >= 2) {
-          const ingresoActual = parseFloat(ingresos[0].total_ingresos) || 0;
-          const ingresoAnterior = parseFloat(ingresos[1].total_ingresos) || 0;
-          
-          if (ingresoAnterior > 0) {
-            tendenciaIngresos = ((ingresoActual - ingresoAnterior) / ingresoAnterior) * 100;
-          }
-        }
-        
-        // Calcular tendencia de ocupación
-        let tendenciaOcupacion = 0;
-        if (espaciosTotalGeneral > 0) {
-          const tasaOcupacion = (espaciosOcupadosTotal / espaciosTotalGeneral) * 100;
-          // Para simplificar, usamos un valor positivo si la ocupación es mayor al 50%
-          tendenciaOcupacion = tasaOcupacion > 50 ? 5 : -5;
-        }
-        
-        // Estructurar pagos del mes para el gráfico
-        const pagosDelMes = {
-          completados: pagosCompletados > 0 ? 1 : 0, // Convertir a contador
-          pendientes: pagosPendientes > 0 ? 1 : 0,   // Convertir a contador
-          retrasados: pagosRetrasados > 0 ? 1 : 0,   // Convertir a contador
-          totalMonto: pagosCompletados + pagosPendientes + pagosRetrasados
-        };
-        
-        // Asegurarnos de que haya al menos un valor para el gráfico
-        if (pagosDelMes.completados + pagosDelMes.pendientes + pagosDelMes.retrasados === 0) {
-          pagosDelMes.completados = 1;
-        }
-        
-        // Actualizar datos del dashboard
-        const newDashboardData = {
-          totalClientes,
-          espaciosOcupados: espaciosOcupadosTotal,
-          espaciosDisponibles: espaciosDisponiblesTotal,
-          ingresosMensuales,
-          pagosPendientes: pagosPendientesTotal,
-          contratosActivos,
-          contratosPorVencer: contratosPorVencerTotal,
-          totalEspacios: espaciosTotalGeneral,
-          pagosDelMes,
-          tendencia: {
-            clientes: tendenciaClientes,
-            ingresos: tendenciaIngresos,
-            contratos: tendenciaContratos,
-            ocupacion: tendenciaOcupacion
-          },
-          // Guardar los datos crudos para referencias futuras
-          datosCrudos: dashboardResponse
-        };
-        
-        console.log('Datos procesados del dashboard:', newDashboardData);
-        setDashboardData(newDashboardData);
 
-      } catch (error) {
-        console.error('Error al cargar datos del dashboard:', error);
+        // Calcular tendencia de ingresos
+        const calcularTendenciaIngresos = () => {
+          const arr = estadisticas.ingresos_mensuales;
+          if (arr && arr.length >= 2) {
+            const ingresoActual = parseFloat(arr[0].total_ingresos);
+            const ingresoAnterior = parseFloat(arr[1].total_ingresos);
+            return ingresoAnterior > 0
+              ? ((ingresoActual - ingresoAnterior) / ingresoAnterior) * 100
+              : 0;
+          }
+          return 0;
+        };
+
+        // Calcular tendencia de ocupación
+        const calcularTendenciaOcupacion = () => {
+          const esp = estadisticas.espacios;
+          if (esp.total > 0) {
+            const tasa = (parseInt(esp.ocupados) / esp.total) * 100;
+            return tasa;
+          }
+          return 0;
+        };
+
+        // Estructurar datos
+        const newDashboardData = {
+          inquilinos: {
+            activos: estadisticas.inquilinos.activos,
+            total: estadisticas.inquilinos.total
+          },
+          espacios: {
+            total: parseInt(estadisticas.espacios.total),
+            ocupados: parseInt(estadisticas.espacios.ocupados),
+            disponibles: parseInt(estadisticas.espacios.disponibles)
+          },
+          contratosPorVencer: estadisticas.contratos_por_vencer,
+          ingresosMensuales: estadisticas.ingresos_mensuales.map(item => ({
+            mes: item.mes,
+            total_ingresos: parseFloat(item.total_ingresos)
+          })),
+          ingresosGarantia: parseFloat(estadisticas.ingresos_garantia?.[0]?.total_ingresos_garantia || 0),
+          ingresosMensualesPrevistos: estadisticas.ingresos_mensuales_previstos.map(item => ({
+            mes: item.mes,
+            total_ingresos: parseFloat(item.total_ingresos)
+          })),
+          gastosMensuales: estadisticas.gastos_mensuales.map(item => ({
+            mes: item.mes,
+            total_gastos: parseFloat(item.total_gastos)
+          })),
+          tendencias: {
+            ingresos: calcularTendenciaIngresos(),
+            ocupacion: calcularTendenciaOcupacion()
+          }
+        };
+
+        setDashboardData(newDashboardData);
+      } catch (err) {
+        console.error(err);
         setError({
           message: 'Error al cargar los datos del dashboard',
-          details: error.response?.data || error.message
+          details: err.response?.data || err.message
         });
         message.error('Error al cargar datos del dashboard');
       } finally {
@@ -235,21 +125,52 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // Función para renderizar el indicador de tendencia
+  // Render de flecha de tendencia
   const renderTendencia = (valor) => {
     if (valor > 0) {
-      return <span className="text-success"><FaArrowUp /> {Math.abs(valor).toFixed(1)}%</span>;
+      return <span className="tendencia-positiva"><FaArrowUp /> {valor.toFixed(1)}%</span>;
     } else if (valor < 0) {
-      return <span className="text-danger"><FaArrowDown /> {Math.abs(valor).toFixed(1)}%</span>;
+      return <span className="tendencia-negativa"><FaArrowDown /> {Math.abs(valor).toFixed(1)}%</span>;
     }
     return <span>0%</span>;
   };
 
-  // Calcular porcentajes de forma segura
+  // Calcular porcentaje
   const calcularPorcentaje = (valor, total) => {
     if (total === 0) return 0;
     return Math.round((valor / total) * 100);
   };
+
+  // Filtrar datos por año
+  const {
+    ingresosFiltrados,
+    ingresosPrevistosFiltrados,
+    gastosFiltrados
+  } = useMemo(() => {
+    const extraerAño = mesStr => parseInt(mesStr.split("-")[0], 10);
+
+    const ingresosHist = dashboardData.ingresosMensuales
+      .filter(item => extraerAño(item.mes) === selectedYear)
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+
+    const ingresosPrev = dashboardData.ingresosMensualesPrevistos
+      .filter(item => extraerAño(item.mes) === selectedYear)
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+
+    const gastos = dashboardData.gastosMensuales
+      .filter(item => extraerAño(item.mes) === selectedYear)
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+
+    return {
+      ingresosFiltrados: ingresosHist,
+      ingresosPrevistosFiltrados: ingresosPrev,
+      gastosFiltrados: gastos
+    };
+  }, [dashboardData, selectedYear]);
+
+  // Calcular el ingreso del mes actual
+  const mesActual = moment().format('YYYY-MM');
+  const ingresoMesActual = dashboardData.ingresosMensuales.find(item => item.mes === mesActual)?.total_ingresos || 0;
 
   if (loading) {
     return (
@@ -271,14 +192,9 @@ const AdminDashboard = () => {
             <h4 className="alert-heading">Error al cargar el dashboard</h4>
             <p>{error.message}</p>
             {error.details && (
-              <pre className="mt-3">
-                {JSON.stringify(error.details, null, 2)}
-              </pre>
+              <pre className="mt-3">{JSON.stringify(error.details, null, 2)}</pre>
             )}
-            <button 
-              className="btn btn-primary mt-3" 
-              onClick={() => window.location.reload()}
-            >
+            <button className="btn btn-primary mt-3" onClick={() => window.location.reload()}>
               Reintentar
             </button>
           </div>
@@ -290,480 +206,840 @@ const AdminDashboard = () => {
   return (
     <>
       <Header />
-      <Sidebar
-        id="menu-item"
-        id1="menu-items"
-        activeClassName="admin-dashboard"
-      />
+      <Sidebar id="menu-item" id1="menu-items" activeClassName="admin-dashboard" />
+
       <div className="page-wrapper">
         <div className="content">
           <div className="page-header">
-            <div className="row">
-              <div className="col-sm-12">
+            <Row>
+              <Col span={24}>
                 <ul className="breadcrumb">
                   <li className="breadcrumb-item">
-                    <Link to="#">Dashboard </Link>
+                    <Link to="#">Dashboard</Link>
                   </li>
                   <li className="breadcrumb-item">
-                    <i className="feather-chevron-right">
-                      <FaChevronRight />
-                    </i>
+                    <i><FaChevronRight /></i>
                   </li>
                   <li className="breadcrumb-item active">Dashboard Principal</li>
                 </ul>
-              </div>
-            </div>
-          </div>
-          <div className="good-morning-blk">
-            <div className="row">
-              <div className="col-md-6">
-                <div className="morning-user">
-                  <h2>
-                    Bienvenido, <span>{user?.nombre || ''} {user?.apellido || ''}</span>
-                  </h2>
-                  <p>Panel de control del sistema de alquileres - {moment().format('DD/MM/YYYY')}</p>
-                </div>
-              </div>
-              <div className="col-md-6 position-blk">
-                <div className="morning-img">
-                <img src={logo_02} alt="Bienvenida" width="170rem" height="auto" />
-
-                </div>
-              </div>
-            </div>
+              </Col>
+            </Row>
           </div>
           
-          {/* Primera fila de widgets */}
-          <div className="row">
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="dash-widget">
-                <div className="dash-boxs comman-flex-center">
-                  <img src={inquilinos} alt="Clientes" />
-                </div>
-                <div className="dash-content dash-count">
-                  <h4>Total Clientes</h4>
-                  <h2>
-                    <CountUp delay={0.4} end={dashboardData.totalClientes} duration={0.6} />
-                  </h2>
-                  <p>
-                    <span className={dashboardData.tendencia.clientes >= 0 ? "passive-view" : "text-danger"}>
-                      {renderTendencia(dashboardData.tendencia.clientes)}
-                    </span>{" "}
-                    vs mes anterior
-                  </p>
-                </div>
+          <div className="dashboard-header">
+            <div className="welcome-section">
+              <div className="welcome-text">
+                <h2>Bienvenido, <span>{user?.nombre || ''} {user?.apellido || ''}</span></h2>
+                <p>Panel de control del sistema de alquileres - {moment().format('DD/MM/YYYY')}</p>
               </div>
-            </div>
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="dash-widget">
-                <div className="dash-boxs comman-flex-center">
-                <FaHome color="#2e37a4" size="2rem" />
-                </div>
-                <div className="dash-content dash-count">
-                  <h4>Espacios Disponibles</h4>
-                  <h2>
-                    <CountUp delay={0.4} end={dashboardData.espaciosDisponibles} duration={0.6} />
-                  </h2>
-                  <p>
-                    <span className="passive-view">
-                      <i className="feather-arrow-up-right me-1">
-                        <FaChevronRight />
-                      </i>
-                      {calcularPorcentaje(dashboardData.espaciosDisponibles, dashboardData.totalEspacios)}%
-                    </span>{" "}
-                    del total
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="dash-widget">
-                <div className="dash-boxs comman-flex-center">
-                  <img src={empty_wallet} alt="Ingresos" />
-                </div>
-                <div className="dash-content dash-count">
-                  <h4>Ingresos Mensuales</h4>
-                  <h2>
-                    S/<CountUp delay={0.4} end={dashboardData.ingresosMensuales} duration={0.6} decimals={2} />
-                  </h2>
-                  <p>
-                    <span className={dashboardData.tendencia.ingresos >= 0 ? "passive-view" : "text-danger"}>
-                      {renderTendencia(dashboardData.tendencia.ingresos)}
-                    </span>{" "}
-                    vs mes anterior
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="dash-widget">
-                <div className="dash-boxs comman-flex-center">
-                  <img src={calendar} alt="Contratos" />
-                </div>
-                <div className="dash-content dash-count">
-                  <h4>Contratos Activos</h4>
-                  <h2>
-                    <CountUp delay={0.4} end={dashboardData.contratosActivos} duration={0.6} />
-                  </h2>
-                  <p>
-                    <span className={dashboardData.tendencia.contratos >= 0 ? "passive-view" : "text-danger"}>
-                      {renderTendencia(dashboardData.tendencia.contratos)}
-                    </span>{" "}
-                    vs mes anterior
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Segunda fila de widgets - Nuevos indicadores */}
-          <div className="row mb-4">
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="card">
-                <div className="card-body">
-                  <h5 className="card-title">Tasa de Ocupación</h5>
-                  <div className="text-center my-3">
-                    <Progress 
-                      type="circle" 
-                      percent={calcularPorcentaje(dashboardData.espaciosOcupados, dashboardData.totalEspacios)} 
-                      strokeColor={{
-                        '0%': '#108ee9',
-                        '100%': '#87d068',
-                      }}
-                    />
-                  </div>
-                  <p className="card-text text-center">
-                    {dashboardData.espaciosOcupados} de {dashboardData.totalEspacios} espacios ocupados
-                  </p>
-                  
-                  {dashboardData.datosCrudos?.ocupacion && dashboardData.datosCrudos.ocupacion.length > 0 && (
-                    <div className="mt-3" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                      <table className="table table-sm">
-                        <thead>
-                          <tr>
-                            <th>Inmueble</th>
-                            <th>Ocupación</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dashboardData.datosCrudos.ocupacion.map((item, index) => (
-                            <tr key={index}>
-                              <td title={item.inmueble_nombre}>
-                                {item.inmueble_nombre.length > 15 
-                                  ? item.inmueble_nombre.substring(0, 13) + '...' 
-                                  : item.inmueble_nombre}
-                              </td>
-                              <td>
-                                <div className="d-flex align-items-center">
-                                  <div style={{ width: '60px' }}>
-                                    {parseFloat(item.tasa_ocupacion).toFixed(1)}%
-                                  </div>
-                                  <div className="progress flex-grow-1" style={{ height: '5px' }}>
-                                    <div 
-                                      className="progress-bar"
-                                      style={{ 
-                                        width: `${item.tasa_ocupacion}%`,
-                                        backgroundColor: parseFloat(item.tasa_ocupacion) > 70 
-                                          ? '#52c41a' 
-                                          : parseFloat(item.tasa_ocupacion) > 30 
-                                            ? '#1890ff' 
-                                            : '#ff4d4f'  
-                                      }}
-                                    ></div>
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="card">
-                <div className="card-body">
-                  <h5 className="card-title">Contratos por Vencer</h5>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <h2 className="mb-0 text-warning">
-                      <CountUp delay={0.4} end={dashboardData.contratosPorVencer} duration={0.6} />
-                    </h2>
-                    <div className="card-icon bg-warning-light text-warning">
-                      <i className="fas fa-exclamation-triangle"></i>
-                    </div>
-                  </div>
-                  <p className="card-text mt-2">
-                    Vencen en los próximos 30 días
-                  </p>
-                  {dashboardData.datosCrudos?.contratosPorVencer && dashboardData.datosCrudos.contratosPorVencer.length > 0 && (
-                    <div className="mt-2">
-                      <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                        <table className="table table-sm table-hover">
-                          <thead>
-                            <tr>
-                              <th>Inquilino</th>
-                              <th>Espacio</th>
-                              <th>Días</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {dashboardData.datosCrudos.contratosPorVencer.slice(0, 3).map(contrato => (
-                              <tr key={contrato.id}>
-                                <td title={contrato.inquilino_nombre}>{contrato.inquilino_nombre.length > 12 ? contrato.inquilino_nombre.substring(0, 10) + '...' : contrato.inquilino_nombre}</td>
-                                <td title={contrato.espacio_nombre}>{contrato.espacio_nombre}</td>
-                                <td className={contrato.dias_restantes <= 7 ? 'text-danger' : 'text-warning'}>
-                                  {contrato.dias_restantes}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <Link to="/contratos-registros" className="btn btn-sm btn-outline-warning w-100 mt-2">
-                        Ver todos
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="card">
-                <div className="card-body">
-                  <h5 className="card-title">Pagos Pendientes</h5>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <h2 className="mb-0 text-danger">
-                      S/<CountUp delay={0.4} end={dashboardData.pagosPendientes} duration={0.6} decimals={2} />
-                    </h2>
-                    <div className="card-icon bg-danger-light text-danger">
-                      <i className="fas fa-dollar-sign"></i>
-                    </div>
-                  </div>
-                  <p className="card-text mt-2">
-                    {dashboardData.pagosDelMes.pendientes + dashboardData.pagosDelMes.retrasados > 0 ? 
-                      `${dashboardData.pagosDelMes.pendientes + dashboardData.pagosDelMes.retrasados} pagos pendientes este mes` : 
-                      'Sin pagos pendientes registrados'
-                    }
-                  </p>
-
-                  {dashboardData.datosCrudos?.pagos && dashboardData.datosCrudos.pagos.length > 0 && (
-                    <div className="mt-2" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                      <table className="table table-sm">
-                        <thead>
-                          <tr>
-                            <th>Mes</th>
-                            <th>Pagado</th>
-                            <th>Pendiente</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dashboardData.datosCrudos.pagos.slice(0, 4).map((item, index) => {
-                            const mes = moment(item.mes).format('MMM-YY');
-                            const pagado = parseFloat(item.monto_pagado || 0);
-                            const pendiente = parseFloat(item.monto_pendiente || 0);
-                            
-                            return (
-                              <tr key={index}>
-                                <td>{mes}</td>
-                                <td className="text-success">{pagado > 0 ? `S/ ${pagado.toFixed(2)}` : '-'}</td>
-                                <td className={pendiente > 0 ? "text-danger" : "text-muted"}>
-                                  {pendiente > 0 ? `S/ ${pendiente.toFixed(2)}` : '-'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  <Link to="/pagos-registros" className="btn btn-sm btn-outline-danger w-100 mt-2">
-                    Ver todos los pagos
-                  </Link>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-6 col-sm-6 col-lg-6 col-xl-3">
-              <div className="card">
-                <div className="card-body">
-                  <h5 className="card-title">Acciones Rápidas</h5>
-                  <div className="quick-actions">
-                    <Link to="/contrato-generar" className="btn btn-sm btn-primary mb-2 w-100">
-                      <i className="fas fa-plus-circle me-1"></i> Nuevo Contrato
-                    </Link>
-                    <Link to="/inmueble-anadir" className="btn btn-sm btn-info mb-2 w-100">
-                      <i className="fas fa-building me-1"></i> Añadir Inmueble
-                    </Link>
-                    <Link to="/inquilinos-registrar" className="btn btn-sm btn-success w-100">
-                      <i className="fas fa-user-plus me-1"></i> Registrar Inquilino
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Gráficas */}
-          <div className="row">
-            <div className="col-12 col-md-12 col-lg-6 col-xl-9">
-              <div className="card">
-                <div className="card-body">
-                  <div className="chart-title patient-visit">
-                    <h4>Distribución de Espacios</h4>
-                    <div>
-                      <ul className="nav chat-user-total">
-                        <li>
-                          <i className="fa fa-circle current-users" aria-hidden="true" />
-                          Ocupados {calcularPorcentaje(dashboardData.espaciosOcupados, dashboardData.totalEspacios)}%
-                        </li>
-                        <li>
-                          <i className="fa fa-circle old-users" aria-hidden="true" />{" "}
-                          Disponibles {calcularPorcentaje(dashboardData.espaciosDisponibles, dashboardData.totalEspacios)}%
-                        </li>
-                      </ul>
-                    </div>
-                    <div className="form-group mb-0">
-                      <Select
-                        className="custom-react-select"
-                        defaultValue={yearOptions[0]}
-                        onChange={setSelectedOption}
-                        options={yearOptions}
-                        id="search-commodity"
-                        components={{
-                          IndicatorSeparator: () => null
-                        }}
-                        styles={{
-                          control: (baseStyles, state) => ({
-                            ...baseStyles,
-                            borderColor: state.isFocused ? 'none' : '2px solid rgba(46, 55, 164, 0.1);',
-                            boxShadow: state.isFocused ? '0 0 0 1px #2e37a4' : 'none',
-                            '&:hover': {
-                              borderColor: state.isFocused ? 'none' : '2px solid rgba(46, 55, 164, 0.1)',
-                            },
-                            borderRadius: '10px',
-                            fontSize: "14px",
-                            minHeight: "45px",
-                          }),
-                          dropdownIndicator: (base, state) => ({
-                            ...base,
-                            transform: state.selectProps.menuIsOpen ? 'rotate(-180deg)' : 'rotate(0)',
-                            transition: '250ms',
-                            width: '35px',
-                            height: '35px',
-                          }),
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div id="patient-chart">
-                    <InquilinosChart 
-                      espaciosData={dashboardData.datosCrudos?.espaciosDisponibles || dashboardData.datosCrudos?.ocupacion}
-                      selectedYear={selectedOption?.value || currentYear}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-12 col-md-12 col-lg-6 col-xl-3 d-flex">
-              <div className="card w-100">
-                <div className="card-body">
-                  <div className="chart-title">
-                    <h4>Estado de Pagos del Mes</h4>
-                  </div>
-                  <div id="donut-chart-dash" className="chart-user-icon">
-                    <DonutChart 
-                      completados={dashboardData.pagosDelMes.completados || 0}
-                      pendientes={dashboardData.pagosDelMes.pendientes || 0}
-                      retrasados={dashboardData.pagosDelMes.retrasados || 0}
-                      montoCompletado={dashboardData.datosCrudos?.pagos && dashboardData.datosCrudos.pagos.length > 0 ? 
-                        parseFloat(dashboardData.datosCrudos.pagos[0]?.monto_pagado || 0) : 0}
-                      montoPendiente={dashboardData.datosCrudos?.pagos && dashboardData.datosCrudos.pagos.length > 0 ? 
-                        parseFloat(dashboardData.datosCrudos.pagos[0]?.monto_pendiente || 0) : 0}
-                    />
-                    <img src={user001} alt="Usuario" />
-                  </div>
-                  <div className="text-center mt-4">
-                    <div className="row">
-                      <div className="col-4">
-                        <div className="status-item text-success">
-                          <strong>{dashboardData.pagosDelMes.completados}</strong>
-                          <p>Completados</p>
-                        </div>
-                      </div>
-                      <div className="col-4">
-                        <div className="status-item text-warning">
-                          <strong>{dashboardData.pagosDelMes.pendientes}</strong>
-                          <p>Pendientes</p>
-                        </div>
-                      </div>
-                      <div className="col-4">
-                        <div className="status-item text-danger">
-                          <strong>{dashboardData.pagosDelMes.retrasados}</strong>
-                          <p>Retrasados</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Nuevo gráfico Ingresos vs Gastos */}
-          <div className="row mt-4">
-            <div className="col-12">
-              <div className="card">
-                <div className="card-body">
-                  <div className="chart-title mb-4">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <h4>Análisis Financiero</h4>
-                      <div className="form-group m-0" style={{ width: '200px' }}>
-                        <Select
-                          className="custom-react-select"
-                          defaultValue={yearOptions[0]}
-                          onChange={setSelectedOption}
-                          options={yearOptions}
-                          id="search-financial-year"
-                          components={{
-                            IndicatorSeparator: () => null
-                          }}
-                          styles={{
-                            control: (baseStyles, state) => ({
-                              ...baseStyles,
-                              borderColor: state.isFocused ? 'none' : '2px solid rgba(46, 55, 164, 0.1);',
-                              boxShadow: state.isFocused ? '0 0 0 1px #2e37a4' : 'none',
-                              '&:hover': {
-                                borderColor: state.isFocused ? 'none' : '2px solid rgba(46, 55, 164, 0.1)',
-                              },
-                              borderRadius: '10px',
-                              fontSize: "14px",
-                              minHeight: "40px",
-                            }),
-                            dropdownIndicator: (base, state) => ({
-                              ...base,
-                              transform: state.selectProps.menuIsOpen ? 'rotate(-180deg)' : 'rotate(0)',
-                              transition: '250ms',
-                              width: '30px',
-                              height: '30px',
-                            }),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <IngresosGastosChart
-                    ingresos={dashboardData.datosCrudos?.ingresos}
-                    gastos={dashboardData.datosCrudos?.gastos}
-                    selectedYear={selectedOption?.value || currentYear}
+              <div className="dashboard-actions">
+                <div className="year-selector">
+                  <span>Seleccionar año:</span>
+                  <Select
+                    options={yearOptions}
+                    value={{ value: selectedYear, label: selectedYear.toString() }}
+                    onChange={(option) => setSelectedYear(option.value)}
+                    className="year-select"
+                    styles={{
+                      control: (provided) => ({
+                        ...provided,
+                        minHeight: '40px',
+                        borderRadius: '8px',
+                        border: '1px solid #e0e0e0',
+                        boxShadow: 'none',
+                        '&:hover': {
+                          borderColor: '#4361ee'
+                        }
+                      })
+                    }}
                   />
                 </div>
               </div>
             </div>
           </div>
+
+          <div className="kpi-grid">
+            <div className="kpi-card clientes-card">
+              <div className="kpi-icon">
+                <FaUsers />
+              </div>
+              <div className="kpi-content">
+                <h4>Total Clientes</h4>
+                <h2>
+                  <CountUp end={dashboardData.inquilinos.total} duration={0.6} />
+                </h2>
+                <p>
+                  <span className="kpi-subtext">
+                    {dashboardData.inquilinos.activos} activos
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="kpi-card espacios-card">
+              <div className="kpi-icon">
+                <FaHome />
+              </div>
+              <div className="kpi-content">
+                <h4>Espacios Disponibles</h4>
+                <h2>
+                  <CountUp end={dashboardData.espacios.disponibles} duration={0.6} />
+                </h2>
+                <p>
+                  <span className="kpi-subtext">
+                    {calcularPorcentaje(dashboardData.espacios.disponibles, dashboardData.espacios.total)}% del total
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="kpi-card ingresos-card">
+              <div className="kpi-icon">
+                <FaMoneyBillWave />
+              </div>
+              <div className="kpi-content">
+                <h4>Ingresos Mensuales</h4>
+                <h2>
+                  S/<CountUp 
+                    end={ingresoMesActual}
+                    duration={0.6}
+                    decimals={2}
+                  />
+                </h2>
+                <p>
+                  {renderTendencia(dashboardData.tendencias.ingresos)} vs mes anterior
+                </p>
+              </div>
+            </div>
+
+            <div className="kpi-card contratos-card">
+              <div className="kpi-icon">
+                <FaFileContract />
+              </div>
+              <div className="kpi-content">
+                <h4>Contratos por Vencer</h4>
+                <h2>
+                  <CountUp end={dashboardData.contratosPorVencer.length} duration={0.6} />
+                </h2>
+                <p>En los próximos 30 días</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="dashboard-widgets">
+            <div className="widget-card">
+              <div className="widget-header">
+                <FaHome className="widget-icon" />
+                <h3>Tasa de Ocupación</h3>
+              </div>
+              <div className="widget-content">
+                <div className="ocupacion-progress">
+                  <Progress
+                    type="circle"
+                    percent={calcularPorcentaje(
+                      dashboardData.espacios.ocupados,
+                      dashboardData.espacios.total
+                    )}
+                    strokeColor={{
+                      '0%': '#4361ee',
+                      '100%': '#06d6a0'
+                    }}
+                    strokeWidth={10}
+                    width={150}
+                    format={percent => `${percent}%`}
+                  />
+                  <div className="ocupacion-stats">
+                    <div className="stat-item">
+                      <span className="stat-label">Ocupados</span>
+                      <span className="stat-value">{dashboardData.espacios.ocupados}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Disponibles</span>
+                      <span className="stat-value">{dashboardData.espacios.disponibles}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Total</span>
+                      <span className="stat-value">{dashboardData.espacios.total}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="tendencia-ocupacion">
+                  <span>Tendencia: </span>
+                  {renderTendencia(dashboardData.tendencias.ocupacion - 
+                    calcularPorcentaje(
+                      dashboardData.espacios.ocupados,
+                      dashboardData.espacios.total
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="widget-card">
+              <div className="widget-header">
+                <FaFileContract className="widget-icon" />
+                <h3>Contratos por Vencer</h3>
+              </div>
+              <div className="widget-content">
+                <div className="contratos-summary">
+                  <div className="contratos-count">
+                    <span className="count">{dashboardData.contratosPorVencer.length}</span>
+                    <span>contratos próximos a vencer</span>
+                  </div>
+                  <div className="contratos-warning">
+                    <FaExclamationTriangle className="warning-icon" />
+                    <span>Revise los detalles</span>
+                  </div>
+                </div>
+                
+                {dashboardData.contratosPorVencer.length > 0 ? (
+                  <div className="contratos-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Inquilino</th>
+                          <th>Espacio</th>
+                          <th>Días</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dashboardData.contratosPorVencer.slice(0, 5).map((contrato) => (
+                          <tr key={contrato.id}>
+                            <td title={contrato.inquilino_nombre}>
+                              {contrato.inquilino_nombre.length > 15
+                                ? contrato.inquilino_nombre.substring(0, 12) + "..."
+                                : contrato.inquilino_nombre}
+                            </td>
+                            <td title={contrato.espacio_nombre}>{contrato.espacio_nombre}</td>
+                            <td className={contrato.dias_restantes <= 7 ? "dias-peligro" : "dias-advertencia"}>
+                              {contrato.dias_restantes}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="no-contratos">
+                    <p>No hay contratos próximos a vencer</p>
+                  </div>
+                )}
+                
+                <Link to="/contratos-registros" className="widget-link">
+                  Ver todos los contratos <FaChevronRight />
+                </Link>
+              </div>
+            </div>
+
+            <div className="widget-card">
+              <div className="widget-header">
+                <FaMoneyBillWave className="widget-icon" />
+                <h3>Pagos Registrados (Mes)</h3>
+              </div>
+              <div className="widget-content">
+                <div className="ingresos-summary">
+                  <div className="ingresos-amount">
+                    S/<CountUp
+                      end={ingresoMesActual}
+                      duration={0.6}
+                      decimals={2}
+                    />
+                  </div>
+                  <div className="ingresos-tendencia">
+                    {renderTendencia(dashboardData.tendencias.ingresos)}
+                  </div>
+                </div>
+                
+                <div className="ingresos-history">
+                  <h4>Historial de ingresos</h4>
+                  <div className="history-bars">
+                    {dashboardData.ingresosMensuales.slice(0, 6).reverse().map((item, index) => {
+                      const mesFormateado = moment(item.mes, "YYYY-MM").format("MMM");
+                      const maxVal = Math.max(...dashboardData.ingresosMensuales.map(i => i.total_ingresos), 1000);
+                      const height = (item.total_ingresos / maxVal) * 100;
+                      
+                      return (
+                        <div className="bar-container" key={index}>
+                          <div className="bar-label">{mesFormateado}</div>
+                          <div className="bar-bg">
+                            <div 
+                              className="bar-fill" 
+                              style={{ height: `${height}%` }}
+                            ></div>
+                          </div>
+                          <div className="bar-value">S/{item.total_ingresos.toFixed(0)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                <Link to="/ingresos-registros" className="widget-link">
+                  Ver todos los ingresos <FaChevronRight />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="charts-container">
+            <div className="chart-card">
+              <div className="chart-header">
+                <FaChartLine className="chart-icon" />
+                <h3>Tendencias de Ingresos</h3>
+              </div>
+              <div className="chart-content">
+                <TendenciasIngresosChart
+                  ingresos={ingresosFiltrados}
+                  ingresosPrevistos={ingresosPrevistosFiltrados}
+                  selectedYear={selectedYear}
+                />
+              </div>
+            </div>
+
+            <div className="chart-card">
+              <div className="chart-header">
+                <FaChartLine className="chart-icon" />
+                <h3>Análisis Financiero</h3>
+              </div>
+              <div className="chart-content">
+                <IngresosGastosChart
+                  ingresos={ingresosFiltrados}
+                  ingresosPrevistos={ingresosPrevistosFiltrados}
+                  gastos={gastosFiltrados}
+                  selectedYear={selectedYear}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .page-wrapper {
+          background-color: #f5f8fa;
+          min-height: 100vh;
+          padding-bottom: 40px;
+        }
+        
+        .content {
+          padding: 20px 20px 40px 20px;
+          margin: 0;
+        }
+        
+        .breadcrumb {
+          background: transparent;
+          padding: 0;
+          margin-bottom: 20px;
+        }
+        
+        .dashboard-header {
+          background: linear-gradient(135deg, #3f51b5 0%, #283593 100%);
+          border-radius: 12px;
+          padding: 25px 30px;
+          margin-bottom: 25px;
+          color: white;
+          box-shadow: 0 10px 20px rgba(67, 97, 238, 0.15);
+        }
+        
+        .welcome-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        
+        .welcome-text h2 {
+          font-size: 28px;
+          font-weight: 600;
+          margin-bottom: 8px;
+        }
+        
+        .welcome-text h2 span {
+          color: #ffd166;
+        }
+        
+        .welcome-text p {
+          font-size: 16px;
+          opacity: 0.9;
+          margin: 0;
+        }
+        
+        .dashboard-actions {
+          display: flex;
+          align-items: center;
+        }
+        
+        .year-selector {
+          display: flex;
+          align-items: center;
+          background: rgba(255, 255, 255, 0.15);
+          padding: 8px 15px;
+          border-radius: 12px;
+        }
+        
+        .year-selector span {
+          margin-right: 10px;
+          font-size: 14px;
+        }
+        
+        .kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 20px;
+          margin-bottom: 25px;
+        }
+        
+        .kpi-card {
+          background: white;
+          border-radius: 12px;
+          padding: 20px;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+          display: flex;
+          align-items: center;
+          transition: all 0.3s ease;
+          border-left: 4px solid;
+        }
+        
+        .kpi-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .clientes-card { border-left-color: #7e57c2; }
+        .espacios-card { border-left-color: #42a5f5; }
+        .ingresos-card { border-left-color: #66bb6a; }
+        .contratos-card { border-left-color: #ffa726; }
+        
+        .kpi-icon {
+          width: 60px;
+          height: 60px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-right: 15px;
+          font-size: 24px;
+          color: white;
+        }
+        
+        .clientes-card .kpi-icon {
+          background: linear-gradient(135deg, #7209b7 0%, #3a0ca3 100%);
+        }
+        
+        .espacios-card .kpi-icon {
+          background: linear-gradient(135deg, #4cc9f0 0%, #4361ee 100%);
+        }
+        
+        .ingresos-card .kpi-icon {
+          background: linear-gradient(135deg, #06d6a0 0%, #118ab2 100%);
+        }
+        
+        .contratos-card .kpi-icon {
+          background: linear-gradient(135deg, #ff9e00 0%, #ef476f 100%);
+        }
+        
+        .kpi-content h4 {
+          font-size: 16px;
+          color: #6c757d;
+          margin-bottom: 5px;
+          font-weight: 500;
+        }
+        
+        .kpi-content h2 {
+          font-size: 28px;
+          font-weight: 700;
+          margin-bottom: 5px;
+          color: #212529;
+        }
+        
+        .kpi-subtext {
+          font-size: 14px;
+          color: #6c757d;
+        }
+        
+        .dashboard-widgets {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+          gap: 20px;
+          margin-bottom: 25px;
+        }
+        
+        .widget-card {
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+          transition: all 0.3s ease;
+          border-top: 3px solid;
+        }
+        
+        .widget-card:nth-child(1) { border-top-color: #42a5f5; }
+        .widget-card:nth-child(2) { border-top-color: #ffa726; }
+        .widget-card:nth-child(3) { border-top-color: #66bb6a; }
+        
+        .widget-card:hover {
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .widget-header {
+          display: flex;
+          align-items: center;
+          padding: 20px;
+          background: #f8f9fa;
+          border-bottom: 1px solid #e9ecef;
+        }
+        
+        .widget-icon {
+          font-size: 20px;
+          margin-right: 12px;
+          color: #4361ee;
+        }
+        
+        .widget-header h3 {
+          font-size: 18px;
+          font-weight: 600;
+          margin: 0;
+          color: #212529;
+        }
+        
+        .widget-content {
+          padding: 20px;
+        }
+        
+        .ocupacion-progress {
+          display: flex;
+          align-items: center;
+          justify-content: space-around;
+          margin-bottom: 20px;
+        }
+        
+        .ocupacion-stats {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        
+        .stat-item {
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .stat-label {
+          font-size: 14px;
+          color: #6c757d;
+          margin-bottom: 4px;
+        }
+        
+        .stat-value {
+          font-size: 18px;
+          font-weight: 600;
+          color: #212529;
+        }
+        
+        .tendencia-ocupacion {
+          text-align: center;
+          padding: 10px;
+          background: #f8f9fa;
+          border-radius: 10px;
+          font-weight: 500;
+        }
+        
+        .contratos-summary {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+        
+        .contratos-count {
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .contratos-count .count {
+          font-size: 32px;
+          font-weight: 700;
+          color: #ef476f;
+          line-height: 1;
+        }
+        
+        .contratos-warning {
+          display: flex;
+          align-items: center;
+          background: #fff9db;
+          padding: 8px 15px;
+          border-radius: 30px;
+          color: #e67700;
+          font-weight: 500;
+        }
+        
+        .warning-icon {
+          margin-right: 8px;
+          font-size: 18px;
+        }
+        
+        .contratos-table {
+          margin-bottom: 20px;
+        }
+        
+        .contratos-table table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        
+        .contratos-table th {
+          background: #f8f9fa;
+          padding: 10px;
+          text-align: left;
+          font-weight: 600;
+          color: #495057;
+          border-bottom: 2px solid #e9ecef;
+        }
+        
+        .contratos-table td {
+          padding: 12px 10px;
+          border-bottom: 1px solid #e9ecef;
+          color: #495057;
+        }
+        
+        .dias-peligro {
+          color: #ef476f;
+          font-weight: 600;
+        }
+        
+        .dias-advertencia {
+          color: #ff9e00;
+          font-weight: 600;
+        }
+        
+        .no-contratos {
+          text-align: center;
+          padding: 30px 0;
+          color: #6c757d;
+        }
+        
+        .ingresos-summary {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 25px;
+        }
+        
+        .ingresos-amount {
+          font-size: 28px;
+          font-weight: 700;
+          color: #06d6a0;
+        }
+        
+        .ingresos-tendencia {
+          font-size: 16px;
+          font-weight: 500;
+        }
+        
+        .ingresos-history h4 {
+          font-size: 16px;
+          color: #6c757d;
+          margin-bottom: 15px;
+        }
+        
+        .history-bars {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          height: 180px;
+          margin-bottom: 20px;
+        }
+        
+        .bar-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          width: 14%;
+        }
+        
+        .bar-label {
+          font-size: 12px;
+          color: #6c757d;
+          margin-bottom: 8px;
+        }
+        
+        .bar-bg {
+          height: 120px;
+          width: 20px;
+          background: #f1f3f9;
+          border-radius: 4px;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          align-items: flex-end;
+        }
+        
+        .bar-fill {
+          width: 100%;
+          background: linear-gradient(180deg, #5c6bc0 0%, #3949ab 100%);
+          border-radius: 4px 4px 0 0;
+          transition: height 0.5s ease;
+        }
+        
+        .bar-value {
+          font-size: 12px;
+          margin-top: 8px;
+          font-weight: 500;
+          color: #495057;
+        }
+        
+        .charts-container {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+          gap: 20px;
+          margin-bottom: 25px;
+        }
+        
+        .chart-card {
+          background: #f6f8fa;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+          transition: box-shadow 0.3s ease;
+          border-top: 3px solid #5c6bc0;
+          border: 1px solid #e0e0e0;
+        }
+        
+        .chart-card:hover {
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-header {
+          display: flex;
+          align-items: center;
+          padding: 20px;
+          background: #f8f9fa;
+          border-bottom: 1px solid #e9ecef;
+        }
+        
+        .chart-icon {
+          font-size: 20px;
+          margin-right: 12px;
+          color: #4361ee;
+        }
+        
+        .chart-header h3 {
+          font-size: 18px;
+          font-weight: 600;
+          margin: 0;
+          color: #212529;
+        }
+        
+        .chart-content {
+          padding: 20px;
+          height: 500px;
+        }
+        
+        .widget-link {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          color: #4361ee;
+          font-weight: 500;
+          text-decoration: none;
+          transition: all 0.2s ease;
+        }
+        
+        .widget-link:hover {
+          background: #edf2ff;
+          color: #3a0ca3;
+        }
+        
+        .widget-link svg {
+          margin-left: 8px;
+          font-size: 12px;
+        }
+        
+        .tendencia-positiva {
+          color: #06d6a0;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          background: rgba(102, 187, 106, 0.15);
+          padding: 2px 8px;
+          border-radius: 12px;
+        }
+        
+        .tendencia-negativa {
+          color: #ef476f;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          background: rgba(239, 71, 111, 0.15);
+          padding: 2px 8px;
+          border-radius: 12px;
+        }
+        
+        @media (max-width: 992px) {
+          .dashboard-widgets {
+            grid-template-columns: 1fr;
+          }
+          
+          .charts-container {
+            grid-template-columns: 1fr;
+          }
+          
+          .ocupacion-progress {
+            flex-direction: column;
+            gap: 20px;
+          }
+        }
+        
+        @media (max-width: 768px) {
+          .welcome-section {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+          }
+          
+          .dashboard-actions {
+            width: 100%;
+          }
+          
+          .year-selector {
+            width: 100%;
+          }
+          
+          .history-bars {
+            height: 150px;
+          }
+          
+          .bar-bg {
+            height: 100px;
+          }
+          
+          .kpi-card {
+            flex-direction: column;
+            text-align: center;
+          }
+          
+          .kpi-icon {
+            margin-right: 0;
+            margin-bottom: 15px;
+          }
+        }
+        
+        @media (max-width: 576px) {
+          .content {
+            padding: 15px;
+          }
+          
+          .kpi-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .chart-content {
+            height: 300px;
+          }
+        }
+      `}</style>
     </>
   );
 };

@@ -14,6 +14,7 @@ import reporteService from '../../services/reporteService';
 import inmuebleService from '../../services/inmuebleService';
 import moment from 'moment';
 import { message } from 'antd';
+import * as XLSX from 'xlsx';
 
 const ReportePagos = () => {
     const [inmuebles, setInmuebles] = useState([]);
@@ -262,6 +263,52 @@ const ReportePagos = () => {
         }));
     }, [pagos]);
 
+    // Función para exportar a Excel
+    const exportToExcel = () => {
+        try {
+            // Preparar los datos para Excel
+            const dataForExcel = pagos.map(item => ({
+                'Nombre Inmueble': item.nombre_inmueble || '',
+                'Espacio': item.nombre_espacio || '',
+                'Inquilino': `${item.Nombres || ''} ${item.Apellidos || ''}`,
+                'DNI': item.DNI || '',
+                'Monto': `S/ ${parseFloat(item.monto || 0).toFixed(2)}`,
+                'Método de Pago': item.metodo_pago ? item.metodo_pago.charAt(0).toUpperCase() + item.metodo_pago.slice(1) : '',
+                'Tipo de Pago': item.tipo_pago ? item.tipo_pago.charAt(0).toUpperCase() + item.tipo_pago.slice(1) : '',
+                'Fecha de Pago': item.fecha_pago ? new Date(item.fecha_pago).toLocaleDateString("es-PE") : 'N/A',
+                'Estado': item.estado ? item.estado.charAt(0).toUpperCase() + item.estado.slice(1) : ''
+            }));
+
+            // Agregar estadísticas si están disponibles
+            if (estadisticas) {
+                dataForExcel.push(
+                    {},  // Fila vacía para separación
+                    { 'Nombre Inmueble': 'RESUMEN ESTADÍSTICO' },
+                    { 'Nombre Inmueble': 'Total Registros', 'Monto': estadisticas.total_registros },
+                    { 'Nombre Inmueble': 'Monto Total', 'Monto': `S/ ${estadisticas.total_monto.toFixed(2)}` },
+                    { 'Nombre Inmueble': 'Pagos Cancelados', 'Monto': estadisticas.pagos_completados },
+                    { 'Nombre Inmueble': 'Pagos Pendientes', 'Monto': estadisticas.pagos_pendientes }
+                );
+            }
+
+            // Crear libro de Excel
+            const ws = XLSX.utils.json_to_sheet(dataForExcel);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte de Pagos");
+
+            // Generar nombre del archivo con fecha
+            const fecha = moment().format('YYYY-MM-DD');
+            const fileName = `Reporte_Pagos_${fecha}.xlsx`;
+
+            // Guardar archivo
+            XLSX.writeFile(wb, fileName);
+            message.success('Reporte exportado exitosamente');
+        } catch (error) {
+            console.error('Error al exportar a Excel:', error);
+            message.error('Error al exportar el reporte');
+        }
+    };
+
     return (
         <>
             <Header />
@@ -312,10 +359,9 @@ const ReportePagos = () => {
                                                         </div>
                                                     </div>
                                                     <div className="col-auto text-end float-end ms-auto download-grp">
-                                                       <Link to="#" className=" me-2"><img src={pdficon} alt="#" /></Link>
-                                                       <Link to="#" className=" me-2"><img src={pdficon2} alt="#" /></Link>
-                                                       <Link to="#" className=" me-2"><img src={pdficon3} alt="#"  /></Link>
-                                                       <Link to="#"><img src={pdficon4} alt="#"  /></Link>
+                                                       <Link to="#" className="me-2" onClick={exportToExcel}>
+                                                           <img src={pdficon} alt="Excel" title="Exportar a Excel" />
+                                                       </Link>
                                                     </div>
                                                 </div>
                                             </div>
