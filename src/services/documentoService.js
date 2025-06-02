@@ -8,7 +8,6 @@ const documentoService = {
       const response = await api.get(`${API_URL}/documentos`);
       return response.data;
     } catch (error) {
-      console.error('Error al obtener los documentos:', error);
       throw error;
     }
   },
@@ -19,7 +18,6 @@ const documentoService = {
       const response = await api.get(`${API_URL}/documentos/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error al obtener el documento:', error);
       throw error;
     }
   },
@@ -30,7 +28,6 @@ const documentoService = {
       const response = await api.get(`${API_URL}/documentos/documentable/${documentable_id}/${documentable_type}`);
       return response.data;
     } catch (error) {
-      console.error('Error al obtener los documentos:', error);
       throw error;
     }
   },
@@ -38,13 +35,11 @@ const documentoService = {
   // Crear un documento usando fetch directamente
   crearDocumento: async (documento) => {
     try {
-      // Obtener el token de autenticación
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No hay token de autenticación disponible');
       }
 
-      // Crear un objeto simple con los datos exactos
       const documentoEnviar = {
         nombre: documento.nombre,
         ruta: documento.ruta,
@@ -52,11 +47,8 @@ const documentoService = {
         documentable_type: documento.documentable_type
       };
 
-      console.log('Enviando datos al backend:', JSON.stringify(documentoEnviar));
       const url = `${API_URL}/documentos`;
-      console.log('URL:', url);
 
-      // Usar fetch con el token en el header
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -72,10 +64,8 @@ const documentoService = {
       }
 
       const data = await response.json();
-      console.log('Respuesta del backend:', data);
       return data;
     } catch (error) {
-      console.error('Error al crear el documento:', error);
       throw error;
     }
   },
@@ -105,7 +95,6 @@ const documentoService = {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error al actualizar el documento:', error);
       throw error;
     }
   },
@@ -133,7 +122,6 @@ const documentoService = {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error al eliminar el documento:', error);
       throw error;
     }
   },
@@ -161,7 +149,6 @@ const documentoService = {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error al obtener los documentos:', error);
       throw error;
     }
   },
@@ -176,12 +163,6 @@ const documentoService = {
       if (!documentable_id || !documentable_type) {
         throw new Error('Se requieren documentable_id y documentable_type para subir el archivo');
       }
-
-      console.log('Preparando subida de archivo con los siguientes datos:');
-      console.log('- Archivo:', file ? file.name : 'No hay archivo');
-      console.log('- ID:', documentable_id);
-      console.log('- Tipo:', documentable_type);
-      console.log('- Opciones:', options);
 
       // Obtener el token de autenticación
       const token = localStorage.getItem('token');
@@ -209,11 +190,6 @@ const documentoService = {
         formData.append('usarCarpetaComun', 'true');
       }
 
-      console.log('Contenido del FormData:');
-      for (let pair of formData.entries()) {
-        console.log(pair[0] + ': ' + (pair[0] === 'archivo' ? 'Archivo presente' : pair[1]));
-      }
-
       // Enviar la solicitud al servidor
       const response = await fetch(`${API_URL}/documentos/upload`, {
         method: 'POST',
@@ -224,10 +200,8 @@ const documentoService = {
       });
 
       // Log de la respuesta HTTP
-      console.log('Respuesta HTTP:', response.status, response.statusText);
       
       const responseData = await response.text();
-      console.log('Texto de respuesta:', responseData);
       
       let data;
       try {
@@ -274,7 +248,6 @@ const documentoService = {
       }
 
       const url = `${API_URL}/documentos/ver/${rutaRelativa}`;
-      console.log('URL para ver documento:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -287,11 +260,9 @@ const documentoService = {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
 
-      // Abrir el documento en una nueva pestaña con el token en la URL
       window.open(`${url}?token=${token}`, '_blank');
       return true;
     } catch (error) {
-      console.error('Error al ver documento:', error);
       throw error;
     }
   },
@@ -308,9 +279,7 @@ const documentoService = {
         throw new Error('No hay token de autenticación disponible');
       }
 
-      console.log('Iniciando descarga:', { rutaOriginal: rutaRelativa, nombreArchivo });
       const url = `${API_URL}/documentos/descargar/${rutaRelativa}`;
-      console.log('URL de descarga:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -324,28 +293,17 @@ const documentoService = {
         throw new Error(errorData.mensaje || `Error ${response.status}: ${response.statusText}`);
       }
 
-      // Obtener el blob del archivo
       const blob = await response.blob();
-      
-      // Crear URL del blob
       const downloadUrl = window.URL.createObjectURL(blob);
-      
-      // Crear un elemento <a> temporal
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.download = nombreArchivo || 'documento.pdf';
-      
-      // Agregar al DOM, hacer clic y remover
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      // Liberar la URL del blob
       window.URL.revokeObjectURL(downloadUrl);
-      
       return true;
     } catch (error) {
-      console.error('Error al descargar documento:', error);
       throw error;
     }
   }

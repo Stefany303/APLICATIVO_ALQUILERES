@@ -89,7 +89,6 @@ const ReporteGastos = () => {
                 return;
             }
             
-            console.log('Datos recibidos del servidor:', response);
             
             // Extraer los datos según la estructura de la respuesta
             let datosGastos = [];

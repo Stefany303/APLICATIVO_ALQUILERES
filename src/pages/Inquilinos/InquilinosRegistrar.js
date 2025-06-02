@@ -122,14 +122,13 @@ const InquilinosRegistrar = () => {
       if (formData.pisoId && formData.inmuebleId) {
         try {
           setLoading(true);
-          console.log('Cargando espacios para inmueble:', formData.inmuebleId, 'y piso:', formData.pisoId);
+          //console.log('Cargando espacios para inmueble:', formData.inmuebleId, 'y piso:', formData.pisoId);
           const data = await espacioService.obtenerEspaciosPorPiso(formData.inmuebleId, formData.pisoId);
-          console.log('Datos de espacios recibidos:', data);
           
           if (data && Array.isArray(data)) {
             setEspacios(data);
           } else {
-            console.log('No se recibieron datos válidos de espacios');
+           // console.log('No se recibieron datos válidos de espacios');
             setEspacios([]);
             setError('No se pudieron cargar los espacios');
           }
@@ -159,7 +158,7 @@ const InquilinosRegistrar = () => {
       const resultado = await personaService.obtenerPersonaPorDocumento(documento);
       
       if (resultado && resultado.id) {
-        console.log('Inquilino encontrado:', resultado);
+        //console.log('Inquilino encontrado:', resultado);
         setInquilinoExistente(resultado);
         
         // Actualizar el formulario con los datos del inquilino
@@ -182,7 +181,7 @@ const InquilinosRegistrar = () => {
         
         setDocumentoVerificado(true);
       } else {
-        console.log('No se encontró inquilino con el documento:', documento);
+        //console.log('No se encontró inquilino con el documento:', documento);
         setInquilinoExistente(null);
         setDocumentoVerificado(true);
         
@@ -349,7 +348,6 @@ const InquilinosRegistrar = () => {
       return;
     }
 
-    console.log('Validaciones pasadas, avanzando al paso 2');
     setStep(2);
   };
 
@@ -419,10 +417,9 @@ const InquilinosRegistrar = () => {
       // Si ya existe el inquilino, usamos su ID directamente
       if (inquilinoExistente) {
         inquilinoId = inquilinoExistente.id;
-        console.log('Usando inquilino existente con ID:', inquilinoId);
       } else {
         // Si no existe, creamos un nuevo inquilino
-        console.log('Creando nuevo inquilino...');
+        //console.log('Creando nuevo inquilino...');
         
         // Crear la persona (inquilino)
         const personaData = {
@@ -437,7 +434,7 @@ const InquilinosRegistrar = () => {
         
         // Obtener el token usando getAuthToken
         const token = getAuthToken();
-        console.log('Token obtenido:', token);
+        //console.log('Token obtenido:', token);
 
         if (!token) {
           throw new Error('No hay token de autenticación disponible');
@@ -450,7 +447,7 @@ const InquilinosRegistrar = () => {
             }
           });
           inquilinoId = personaResponse.data.id;
-          console.log('Nuevo inquilino creado con ID:', inquilinoId);
+          //console.log('Nuevo inquilino creado con ID:', inquilinoId);
         } catch (error) {
           if (error.response?.data?.error?.includes('Duplicate entry') && error.response?.data?.error?.includes('email')) {
             const emailDuplicado = error.response.data.error.match(/'([^']+)'/)[1];
@@ -476,7 +473,7 @@ const InquilinosRegistrar = () => {
           espacioData
         );
         
-        console.log('Espacio actualizado a estado "Ocupado"');
+        //console.log('Espacio actualizado a estado "Ocupado"');
       } catch (espacioError) {
         console.error('Error al actualizar estado del espacio:', espacioError);
         // No interrumpimos el flujo principal si falla esta actualización
@@ -497,7 +494,7 @@ const InquilinosRegistrar = () => {
         fecha_pago: formData.fechaInicio
       };
       
-      console.log('Creando contrato con datos:', contratoData);
+     
       
       // Obtener el token usando getAuthToken
       const token = getAuthToken();
@@ -511,7 +508,6 @@ const InquilinosRegistrar = () => {
         }
       });
       
-      console.log('Contrato creado:', contratoResponse.data);
       
       // Generar pagos mensuales automáticamente
       try {
@@ -521,7 +517,6 @@ const InquilinosRegistrar = () => {
           formData.fechaInicio,
           formData.fechaFin
         );
-        console.log('Pagos mensuales generados correctamente');
       } catch (pagosError) {
         console.error('Error al generar pagos mensuales:', pagosError);
         // No interrumpimos el flujo principal si falla la generación de pagos
@@ -876,7 +871,7 @@ const InquilinosRegistrar = () => {
                                   espacios
                                     .filter(espacio => espacio.estado === 0 || espacio.estado === '0') // Filtrar solo espacios desocupados
                                     .map(espacio => {
-                                      console.log('Renderizando espacio desocupado:', espacio);
+                                      // console.log('Renderizando espacio desocupado:', espacio);
                                       return (
                                         <option key={espacio.id} value={espacio.id}>
                                           {`${espacio.nombre} - ${espacio.tipo_espacio} (S/ ${parseFloat(espacio.precio).toFixed(2)})`}

@@ -296,7 +296,6 @@ const ContratoRegistros = () => {
         fecha_pago: fechaPago
       };
       
-      console.log('Actualizando contrato con datos:', contratoData);
       
       // Llamar al servicio para actualizar
       await contratoService.actualizarContrato(contratoSeleccionado.id, contratoData);
@@ -598,7 +597,6 @@ const ContratoRegistros = () => {
             throw new Error('Ruta del documento no disponible');
         }
         
-        console.log('Intentando abrir documento:', rutaDocumento);
         await documentoService.verDocumento(rutaDocumento);
     } catch (error) {
         console.error('Error al abrir documento:', error);
@@ -613,7 +611,6 @@ const ContratoRegistros = () => {
             throw new Error('Ruta del documento no disponible');
         }
         
-        console.log('Intentando descargar documento:', { ruta: rutaDocumento, nombre: nombreArchivo });
         await documentoService.descargarDocumento(rutaDocumento, nombreArchivo);
     } catch (error) {
         console.error('Error al descargar documento:', error);

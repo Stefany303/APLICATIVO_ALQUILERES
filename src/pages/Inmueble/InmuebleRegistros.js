@@ -56,7 +56,6 @@ const InmuebleRegistros = () => {
 
         // Obtener inmuebles
         const inmueblesData = await inmuebleService.obtenerInmuebles();
-        console.log('Inmuebles obtenidos:', inmueblesData);
         
         // Asegurarnos de que los datos sean un array
         const inmueblesArray = Array.isArray(inmueblesData) ? inmueblesData : [];
@@ -68,11 +67,9 @@ const InmuebleRegistros = () => {
           const propietariosData = await inmuebleService.obtenerPropietarios();
           setPropietarios(Array.isArray(propietariosData) ? propietariosData : []);
         } catch (err) {
-          console.error("Error al obtener propietarios:", err);
           setPropietarios([]);
         }
       } catch (error) {
-        console.error("Error al obtener los datos:", error);
         setError("Error al cargar los inmuebles. Por favor, intente de nuevo más tarde.");
         message.error("Error al cargar los inmuebles");
       } finally {
@@ -106,12 +103,10 @@ const InmuebleRegistros = () => {
     try {
       setLoading(true);
       const data = await inmuebleService.obtenerInmuebles();
-      console.log('Datos actualizados:', data);
       setInmuebles(Array.isArray(data) ? data : []);
       setInmueblesFiltrados(Array.isArray(data) ? data : []);
       message.success('Datos actualizados correctamente');
     } catch (error) {
-      console.error('Error al actualizar los datos:', error);
       message.error('Error al actualizar los datos');
     } finally {
       setLoading(false);

@@ -47,7 +47,6 @@ const inmuebleService = {
         }
       });
 
-      console.log('Respuesta de inmuebles:', response.data); // Debug
 
       // Verificar si la respuesta tiene la estructura esperada
       if (response.data && Array.isArray(response.data)) {
@@ -95,13 +94,11 @@ const inmuebleService = {
         return [];
       }
 
-      console.log('Obteniendo pisos para inmueble:', inmuebleId); // Debug
       const response = await axios.get(`${API_URL}/pisos/inmuebles/${inmuebleId}/pisos`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-      console.log('Respuesta de pisos:', response.data); // Debug
 
       // Verificar si la respuesta tiene la estructura esperada
       if (response.data && Array.isArray(response.data)) {
@@ -187,13 +184,11 @@ const inmuebleService = {
         return [];
       }
 
-      console.log('Obteniendo pisos para inmueble:', inmuebleId);
       const response = await axios.get(`${API_URL}/pisos/inmuebles/${inmuebleId}/pisos`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-      console.log('Respuesta de pisos:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error al obtener pisos:', error);

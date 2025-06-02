@@ -15,9 +15,8 @@ api.defaults.validateStatus = function (status) {
 // Función para obtener el token del localStorage
 const getAuthToken = () => {
   const token = localStorage.getItem('token');
-  console.log('Token obtenido del localStorage:', token);
+
   if (!token) {
-    console.warn('No se encontró token en el localStorage');
     return null;
   }
   return `Bearer ${token}`;
@@ -25,13 +24,12 @@ const getAuthToken = () => {
 
 // Función para guardar el token
 const setAuthToken = (token) => {
-  console.log('Guardando token en localStorage:', token);
+
   localStorage.setItem('token', token);
 };
 
 // Función para eliminar el token
 const removeAuthToken = () => {
-  console.log('Eliminando token del localStorage');
   localStorage.removeItem('token');
 };
 
@@ -40,15 +38,11 @@ api.interceptors.request.use(
     (config) => {
       const token = getAuthToken();
       if (token) {
-        console.log('Agregando token a la petición:', token);
         config.headers.Authorization = token;
-      } else {
-        console.warn('No se pudo agregar token a la petición');
       }
       return config;
     },
     (error) => {
-      console.error('Error en el interceptor de peticiones:', error);
       return Promise.reject(error);
     }
 );
@@ -60,9 +54,7 @@ api.interceptors.response.use(
     },
     (error) => {
       if (error.response && error.response.status === 401) {
-        console.warn('Token inválido o expirado');
         removeAuthToken();
-        // Aquí podrías redirigir al usuario a la página de login
         window.location.href = '/login';
       }
       return Promise.reject(error);

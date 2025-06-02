@@ -40,8 +40,7 @@ const inquilinoService = {
   // Crear un nuevo inquilino
   crearInquilino: async (inquilinoData) => {
     try {
-      console.log('Datos recibidos en crearInquilino:', inquilinoData);
-      console.log('URL del API:', API_URL);
+      
       
       // Validar que los datos sean un objeto
       if (!inquilinoData || typeof inquilinoData !== 'object') {
@@ -112,10 +111,7 @@ const inquilinoService = {
       if (!inmuebleId || isNaN(inmuebleId)) {
         throw new Error('El inmueble_id es requerido y debe ser un número válido');
       }
-      console.log('=== VALIDACIÓN DE INMUEBLE ===');
-      console.log('Inmueble ID recibido del formulario:', inquilinoData.inmuebleId);
-      console.log('Inmueble ID convertido:', inmuebleId);
-      console.log('=== FIN VALIDACIÓN ===');
+  
 
       
       // Validar campos requeridos para el contrato
@@ -125,18 +121,14 @@ const inquilinoService = {
 
       // Validar que el espacio_id sea un número válido
       const espacioId = parseInt(inquilinoData.espacioId);
-      console.log('=== VALIDACIÓN DE ESPACIO ===');
-      console.log('Espacio ID recibido del formulario:', inquilinoData.espacioId);
-      console.log('Espacio ID convertido:', espacioId);
-      
+    
       if (!espacioId || isNaN(espacioId)) {
         throw new Error('El espacio_id es requerido y debe ser un número válido');
       }
-      console.log('=== FIN VALIDACIÓN ===');
 
       // Obtener el token usando getAuthToken
       const token = getAuthToken();
-      console.log('Token obtenido:', token);
+      //console.log('Token obtenido:', token);
 
       if (!token) {
         throw new Error('No hay token de autenticación disponible');
@@ -153,16 +145,11 @@ const inquilinoService = {
         rol: 'inquilino'
       };
 
-      console.log('=== DATOS DE LA PERSONA ===');
-      console.log('Datos a enviar:', JSON.stringify(personaData, null, 2));
-      console.log('=== FIN DATOS ===');
-
       const personaResponse = await api.post(`${API_URL}/personas`, personaData, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      console.log('Persona creada:', personaResponse.data);
 
       // 2. Crear el contrato
       const contratoData = {
@@ -179,21 +166,11 @@ const inquilinoService = {
         fecha_pago: inquilinoData.fechaInicio
       };
 
-      console.log('=== DATOS DEL CONTRATO ===');
-      console.log('1. Datos recibidos del formulario:', JSON.stringify(inquilinoData, null, 2));
-      console.log('2. ID de la persona creada:', personaResponse.data.id);
-      console.log('3. Espacio ID seleccionado:', espacioId);
-      console.log('4. Inmueble ID:', parseInt(inquilinoData.inmuebleId));
-      console.log('5. Datos del contrato a enviar:', JSON.stringify(contratoData, null, 2));
-      console.log('=== FIN DATOS ===');
-
-      console.log('Enviando petición POST a la API...');
       const contratoResponse = await api.post(`${API_URL}/contratos`, contratoData, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      console.log('Respuesta del servidor:', JSON.stringify(contratoResponse.data, null, 2));
 
       return {
         persona: personaResponse.data,

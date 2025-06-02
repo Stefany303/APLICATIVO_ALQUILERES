@@ -82,7 +82,7 @@ const ContabilidadPagos = () => {
       setPagos(Array.isArray(pagosData) ? pagosData : []);
       message.success("Datos actualizados correctamente");
     } catch (error) {
-      console.error("Error al actualizar datos:", error);
+     
       message.error("Error al actualizar los datos");
     } finally {
       setLoading(false);
@@ -118,7 +118,7 @@ const ContabilidadPagos = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        console.log("Iniciando carga de datos...");
+        // console.log("Iniciando carga de datos...");
         
         // Obtener inmuebles para referencia
         const inmueblesData = await inmuebleService.obtenerInmuebles();
@@ -128,7 +128,7 @@ const ContabilidadPagos = () => {
         await cargarTodosPagos();
         
       } catch (error) {
-        console.error('Error en la carga inicial:', error);
+        // console.error('Error en la carga inicial:', error);
         setError('Error al cargar los datos iniciales');
       } finally {
         setLoading(false);
@@ -206,7 +206,6 @@ const ContabilidadPagos = () => {
     
     // Formato para base de datos: YYYY-MM-DD
     const fechaRealActual = `${anioActual}-${mesActual}-${diaActual}`;
-    console.log('Fecha actual para pago real (formato DB):', fechaRealActual);
     
     // Convertir fecha_pago de YYYY-MM-DD a DD-MM-YYYY para mostrar
     let fechaPagoFormateada = '';
@@ -219,8 +218,6 @@ const ContabilidadPagos = () => {
       fechaPagoFormateada = `${dia}-${mes}-${anio}`;
     }
     
-    console.log('Pago seleccionado:', pago);
-    console.log('Fecha pago:', pago.fecha_pago, 'formateada:', fechaPagoFormateada);
     
     setFormData({
       inmueble_id: '',
@@ -280,7 +277,6 @@ const ContabilidadPagos = () => {
         const documentos = await documentoService.obtenerDocumentosPorTipo(pago.id, 'pago');
         
         if (documentos && documentos.length > 0) {
-          console.log('Documentos encontrados:', documentos);
           
           // Determinar el tipo de documento basado en la extensión
           let tipoDocumento = 'pdf'; // valor predeterminado
@@ -325,11 +321,9 @@ const ContabilidadPagos = () => {
             const rutaComun = `${baseUrl}/PUBLIC/PAGO/1/${documentos[0].nombre}`;
             const rutaComunAlternativa = `${baseUrl}/public/pago/1/${documentos[0].nombre}`;
             
-            console.log(`Intentando con ruta común: ${rutaComun}`);
             let existeEnRutaComun = await verificarExistenciaArchivo(rutaComun);
             
             if (existeEnRutaComun) {
-              console.log(`¡Documento encontrado en la carpeta común!`);
               setDocumento({ 
                 nombre: documentos[0].nombre || `Comprobante-${pago.id}.pdf`,
                 ruta: rutaComun,
@@ -338,11 +332,9 @@ const ContabilidadPagos = () => {
               setDocumentoError(false);
             } else {
               // Probar con la ruta alternativa en minúsculas
-              console.log(`Intentando con ruta común alternativa: ${rutaComunAlternativa}`);
               existeEnRutaComun = await verificarExistenciaArchivo(rutaComunAlternativa);
               
               if (existeEnRutaComun) {
-                console.log(`¡Documento encontrado en la carpeta común alternativa!`);
                 setDocumento({ 
                   nombre: documentos[0].nombre || `Comprobante-${pago.id}.pdf`,
                   ruta: rutaComunAlternativa,
@@ -360,7 +352,6 @@ const ContabilidadPagos = () => {
             }
           }
         } else {
-          console.log(`No se encontraron documentos en la BD para el pago ${pago.id}`);
           
           // Intentar buscar en la carpeta común donde se guardan realmente los documentos
           const posiblesRutas = [
@@ -383,12 +374,10 @@ const ContabilidadPagos = () => {
           
           for (const rutaRelativa of posiblesRutas) {
             const rutaCompleta = baseUrl + rutaRelativa;
-            console.log(`Verificando ruta: ${rutaCompleta}`);
             
             const existeArchivo = await verificarExistenciaArchivo(rutaCompleta);
             
             if (existeArchivo) {
-              console.log(`¡Documento encontrado en: ${rutaCompleta}!`);
               
               // Determinar el tipo basado en la extensión
               let tipo = 'pdf';
@@ -412,7 +401,6 @@ const ContabilidadPagos = () => {
           
           if (!documentoEncontrado) {
             // Como último recurso, buscar cualquier archivo en la carpeta común
-            console.log("Intentando buscar cualquier archivo relacionado en la carpeta común...");
             
             try {
               // Esta parte sería mejor con una API del lado del servidor que liste archivos
@@ -429,7 +417,6 @@ const ContabilidadPagos = () => {
                 const rutaBusqueda = `${baseUrl}/PUBLIC/PAGO/1/pago${formatoFecha}`;
                 const rutaBusquedaMinusculas = `${baseUrl}/public/pago/1/pago${formatoFecha}`;
                 
-                console.log(`Buscando archivos que coincidan con: ${rutaBusqueda}*`);
                 
                 // Intentar con algunas posibles combinaciones
                 const posiblesArchivos = [
@@ -442,11 +429,9 @@ const ContabilidadPagos = () => {
                 for (const posibleArchivo of posiblesArchivos) {
                   if (posibleArchivo.includes('*')) continue; // Saltamos los patrones con comodines
                   
-                  console.log(`Verificando: ${posibleArchivo}`);
                   const existe = await verificarExistenciaArchivo(posibleArchivo);
                   
                   if (existe) {
-                    console.log(`¡Encontrado documento en: ${posibleArchivo}!`);
                     setDocumento({
                       nombre: `Comprobante de pago #${pago.id}.pdf`,
                       ruta: posibleArchivo,
@@ -490,11 +475,9 @@ const ContabilidadPagos = () => {
         const rutaDirecta = `${baseUrl}/PUBLIC/PAGO/1/pago_${pago.id}.pdf`;
         const rutaDirectaMinusculas = `${baseUrl}/public/pago/1/pago_${pago.id}.pdf`;
         
-        console.log(`Intentando ruta directa: ${rutaDirecta}`);
         const existeDirecta = await verificarExistenciaArchivo(rutaDirecta);
         
         if (existeDirecta) {
-          console.log(`¡Documento encontrado en ruta directa!`);
           setDocumento({
             nombre: `Comprobante de pago #${pago.id}.pdf`,
             ruta: rutaDirecta,
@@ -502,11 +485,10 @@ const ContabilidadPagos = () => {
           });
           setDocumentoError(false);
         } else {
-          console.log(`Intentando ruta directa alternativa: ${rutaDirectaMinusculas}`);
           const existeDirectaAlt = await verificarExistenciaArchivo(rutaDirectaMinusculas);
           
           if (existeDirectaAlt) {
-            console.log(`¡Documento encontrado en ruta directa alternativa!`);
+          
             setDocumento({
               nombre: `Comprobante de pago #${pago.id}.pdf`,
               ruta: rutaDirectaMinusculas,
@@ -770,8 +752,8 @@ const ContabilidadPagos = () => {
       const minutosActual = String(fechaActual.getMinutes()).padStart(2, '0');
       const segundosActual = String(fechaActual.getSeconds()).padStart(2, '0');
       
-      console.log('Fecha pago formateada:', fechaPagoFormateada);
-      console.log('Fecha real formateada:', fechaRealFormateada);
+      // console.log('Fecha pago formateada:', fechaPagoFormateada);
+      // console.log('Fecha real formateada:', fechaRealFormateada);
       
       // Crear objeto con datos del pago
       const pagoData = {
@@ -785,7 +767,7 @@ const ContabilidadPagos = () => {
         observacion: formData.observaciones
       };
       
-      console.log('Datos del pago a actualizar:', pagoData);
+      // console.log('Datos del pago a actualizar:', pagoData);
 
       // Actualizar primero el pago
       const pagoActualizado = await pagoService.actualizarPago(pagoSeleccionado.id, pagoData);
@@ -809,13 +791,7 @@ const ContabilidadPagos = () => {
         // Crear un objeto File con el nuevo nombre
         const nuevoArchivo = new File([documento], nombreArchivo, { type: documento.type });
         
-        // Subir el archivo con el nuevo nombre, pero indicando que debe guardarse en /pago/ (sin subcarpeta de ID)
-        console.log('Subiendo archivo físico al servidor...');
-        console.log('Parámetros para subir archivo:');
-        console.log('- Documento:', nuevoArchivo.name);
-        console.log('- ID del pago:', idPago);
-        console.log('- Tipo de documento: pago');
-        console.log('- Directorio destino: /pago/ (sin subcarpeta)');
+       
         
         // Incluir un timeout para evitar problemas de concurrencia
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -827,7 +803,7 @@ const ContabilidadPagos = () => {
           'pago',
           { usarCarpetaComun: true }  // Parámetro adicional para indicar que use /pago/ en lugar de /pago/{id}/
         );
-        console.log('Archivo subido con éxito:', respuestaArchivo);
+     
         
         // Registrar los metadatos del documento con la nueva ruta en /pago/
         const documentoData = {
@@ -837,9 +813,8 @@ const ContabilidadPagos = () => {
           documentable_type: 'pago'
         };
 
-        console.log('Registrando metadatos del documento:', documentoData);
         const respuestaDocumento = await documentoService.crearDocumento(documentoData);
-        console.log('Documento registrado correctamente:', respuestaDocumento);        
+        //console.log('Documento registrado correctamente:', respuestaDocumento);        
         alert('Pago actualizado correctamente y documento subido al servidor.');
         
         // Reset form and search
@@ -876,7 +851,6 @@ const ContabilidadPagos = () => {
     } catch (error) {
       console.error('Error detallado:', error);
       if (error.response && error.response.data) {
-        console.log('Respuesta del servidor:', error.response.data);
         alert(`Error: ${error.response.data.mensaje || error.message}`);
       } else {
         alert('Error al actualizar el pago o registrar el documento');
@@ -927,7 +901,6 @@ const ContabilidadPagos = () => {
         observacion: formData.observaciones
       };
       
-      console.log('Datos del pago a actualizar:', pagoData);
 
       // Actualizar el pago
       const pagoActualizado = await pagoService.actualizarPago(pagoSeleccionado.id, pagoData);
@@ -973,16 +946,14 @@ const ContabilidadPagos = () => {
   const cargarTodosPagos = async () => {
     try {
       setLoading2(true);
-      console.log("Cargando todos los pagos...");
+      //console.log("Cargando todos los pagos...");
       
       const todosLosPagos = await pagoService.obtenerPagos();
-      console.log(`Pagos obtenidos: ${todosLosPagos.length}`);
       
       setPagos(Array.isArray(todosLosPagos) ? todosLosPagos : []);
       
       // Si hay resultados, mostrar mensaje
       if (Array.isArray(todosLosPagos) && todosLosPagos.length > 0) {
-        console.log(`Se han cargado ${todosLosPagos.length} pagos correctamente`);
       } else {
         console.warn("No se encontraron pagos en el sistema");
       }

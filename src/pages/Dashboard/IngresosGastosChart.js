@@ -123,7 +123,6 @@ const IngresosGastosChart = ({ ingresos, gastos, selectedYear, onYearChange }) =
   });
 
   useEffect(() => {
-    console.log("Datos para gráfico de ingresos/gastos:", { ingresos, gastos, selectedYear });
     if (
       (Array.isArray(ingresos) && ingresos.length > 0) ||
       (Array.isArray(gastos) && gastos.length > 0)
@@ -171,7 +170,6 @@ const IngresosGastosChart = ({ ingresos, gastos, selectedYear, onYearChange }) =
       const maxValue = Math.max(maxIngresos, maxGastos, maxBalance);
 
       if (maxValue <= 0) {
-        console.log("No hay datos significativos");
         mostrarSinDatos();
         return;
       }
@@ -223,7 +221,6 @@ const IngresosGastosChart = ({ ingresos, gastos, selectedYear, onYearChange }) =
         },
       }));
     } catch (err) {
-      console.error('Error al procesar datos de ingresos y gastos:', err);
       mostrarSinDatos();
     }
   };

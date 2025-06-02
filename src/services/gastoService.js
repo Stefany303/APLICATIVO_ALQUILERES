@@ -16,7 +16,7 @@ const gastoService = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error al obtener gastos:', error);
+      // console.error('Error al obtener gastos:', error);
       throw error;
     }
   },
@@ -28,7 +28,7 @@ const gastoService = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error al obtener el gasto:', error);
+      // console.error('Error al obtener el gasto:', error);
       throw error;
     }
   },
@@ -40,7 +40,7 @@ const gastoService = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error al obtener gastos por inmueble:', error);
+      // console.error('Error al obtener gastos por inmueble:', error);
       throw error;
     }
   },
@@ -53,7 +53,7 @@ const gastoService = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error al buscar gastos:', error);
+      // console.error('Error al buscar gastos:', error);
       throw error;
     }
   },
@@ -71,22 +71,18 @@ const gastoService = {
         observaciones: gastoData.observaciones
       };
 
-      console.log('Enviando datos del gasto:', datosMapeados);
       const response = await axios.post(`${API_URL}/gastos`, datosMapeados, {
         headers: getAuthHeader()
       });
       
-      console.log('Respuesta del servidor:', response.data);
-      
       // Verificar que la respuesta tenga el formato esperado
       if (response.data && response.data.mensaje === 'Gasto creado' && response.data.id) {
-        // La API devuelve { mensaje: 'Gasto creado', id: idGasto }
         return { id: response.data.id };
       }
       
       return response.data;
     } catch (error) {
-      console.error('Error al crear el gasto:', error);
+      // console.error('Error al crear el gasto:', error);
       throw error;
     }
   },

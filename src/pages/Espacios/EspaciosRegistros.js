@@ -84,17 +84,15 @@ const EspaciosRegistros = () => {
       try {
         // Cargar inmuebles
         const inmueblesData = await inmuebleService.obtenerInmuebles();
-        console.log('Inmuebles cargados:', inmueblesData);
+      
         setInmuebles(Array.isArray(inmueblesData) ? inmueblesData : []);
 
         // Cargar tipos de espacio
         const tiposData = await tipoespacioService.obtenerTodos();
-        console.log('Tipos de espacio cargados:', tiposData);
         setTipoEspacios(Array.isArray(tiposData) ? tiposData : []);
 
         // Cargar todos los espacios
         const espaciosData = await espacioService.obtenerEspacios();
-        console.log('Espacios cargados:', espaciosData);
         const espaciosArray = Array.isArray(espaciosData) ? espaciosData : [];
         setEspacios(espaciosArray);
         setEspaciosFiltrados(espaciosArray);
@@ -135,8 +133,7 @@ const EspaciosRegistros = () => {
   // Aplicar filtros
   useEffect(() => {
     let filtered = [...espacios];
-    console.log('Aplicando filtros a espacios:', espacios);
-    console.log('Ejemplo de un espacio:', espacios[0]);
+   
 
     // Filtrar por texto de búsqueda
     if (searchText) {

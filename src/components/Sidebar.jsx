@@ -34,9 +34,7 @@ const Sidebar = (props) => {
       ulDiv.style.display = 'block';
       div.classList.add('subdrop');
       setSidebar(label);
-    }
-    console.log('div', div);
-    console.log('sidebar', sidebar);
+    } 
   }
 
   // Al cargar la página, si se pasa activeClassName y es de Inmuebles, se abre ese submenú
@@ -51,7 +49,6 @@ const Sidebar = (props) => {
       const submenuMapping = [
         { keyword: 'admin-dashboard', submenu: 'Dashboard', menuId: 'menu-item', submenuClass: 'menu-items' },
         { keyword: 'inmueble-anadir', submenu: 'Inmuebles', menuId: 'menu-item1', submenuClass: 'menu-items1' },
-        { keyword: 'persona-registrar', submenu: 'Inmuebles', menuId: 'menu-item1', submenuClass: 'menu-items1' },
         { keyword: 'inmueble-registros', submenu: 'Inmuebles', menuId: 'menu-item1', submenuClass: 'menu-items1' },
         { keyword: 'espacios-anadir', submenu: 'Espacios', menuId: 'menu-item2', submenuClass: 'menu-items2' },
         { keyword: 'espacios-registrar', submenu: 'Espacios', menuId: 'menu-item2', submenuClass: 'menu-items2' },
@@ -70,6 +67,8 @@ const Sidebar = (props) => {
         { keyword: 'reporte-pagos', submenu: 'Reportes', menuId: 'menu-item6', submenuClass: 'menu-items6' },
         { keyword: 'reporte-gastos', submenu: 'Reportes', menuId: 'menu-item6', submenuClass: 'menu-items6' },
         { keyword: 'conf-cambio-contrasena', submenu: 'Configuracion', menuId: 'menu-item7', submenuClass: 'menu-items7' },
+        { keyword: 'persona-registrar', submenu: 'Configuracion', menuId: 'menu-item7', submenuClass: 'menu-item7' },
+
        
       ];
       const active = props.activeClassName.toLowerCase();

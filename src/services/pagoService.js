@@ -40,7 +40,6 @@ const pagoService = {
       // Obtener el token de autenticación
       const token = getAuthToken();
       if (!token) {
-        console.error('No hay token de autenticación disponible para crear el pago');
         throw new Error('No autorizado: Inicie sesión para realizar esta acción');
       }
       
@@ -51,30 +50,16 @@ const pagoService = {
         }
       };
       
-      console.log('Datos del pago a enviar:', JSON.stringify(pagoData, null, 2));
       const response = await api.post(`${API_URL}/pagos`, pagoData, config);
-      console.log('Respuesta del servidor al crear pago:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error al crear el pago:', error);
-      
       // Obtener más detalles sobre el error
       if (error.response) {
-        // El servidor respondió con un código de estado que no está en el rango 2xx
-        console.error('Detalles del error del servidor:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data,
-          endpoint: `${API_URL}/pagos`
-        });
-        
         // Si hay un mensaje de error específico en la respuesta, úsalo
         if (error.response.data && error.response.data.message) {
           throw new Error(`Error del servidor: ${error.response.data.message}`);
         }
       } else if (error.request) {
-        // La solicitud se hizo pero no se recibió respuesta
-        console.error('No se recibió respuesta del servidor:', error.request);
         throw new Error('No se pudo conectar con el servidor. Verifique su conexión a internet.');
       }
       
@@ -87,7 +72,6 @@ const pagoService = {
       // Obtener el token de autenticación
       const token = getAuthToken();
       if (!token) {
-        console.error('No hay token de autenticación disponible para actualizar el pago');
         throw new Error('No autorizado: Inicie sesión para realizar esta acción');
       }
       
@@ -98,31 +82,19 @@ const pagoService = {
         }
       };
       
-      console.log('Actualizando pago ID:', id, 'con datos:', pagoData);
-      
       // Asegurarse de que los campos requeridos estén presentes
       const camposRequeridos = ['contrato_id', 'monto', 'metodo_pago', 'tipo_pago', 'estado', 'fecha_pago', 'fecha_real_pago'];
       for (const campo of camposRequeridos) {
         if (!pagoData.hasOwnProperty(campo) || pagoData[campo] === undefined || pagoData[campo] === '') {
-          console.warn(`Campo requerido '${campo}' no está presente o está vacío en la actualización.`);
+          throw new Error(`El campo '${campo}' es requerido`);
         }
       }
       
       const response = await api.put(`${API_URL}/pagos/${id}`, pagoData, config);
-      console.log('Respuesta del servidor al actualizar pago:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error al actualizar el pago:', error);
-      
       // Obtener más detalles sobre el error
       if (error.response) {
-        console.error('Detalles del error del servidor:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data,
-          endpoint: `${API_URL}/pagos/${id}`
-        });
-        
         // Si hay un mensaje de error específico en la respuesta, úsalo
         if (error.response.data && error.response.data.message) {
           throw new Error(`Error del servidor: ${error.response.data.message}`);

@@ -12,7 +12,6 @@ const espacioService = {
   obtenerEspacios: async () => {
     try {
       const response = await api.get(ENDPOINT_BASE);
-      console.log('Respuesta de obtenerEspacios:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error al obtener espacios:', error);
@@ -79,9 +78,7 @@ const espacioService = {
       };
 
       if (environment.DEBUG) {
-        console.log('Intentando crear espacio:');
-        console.log(`Ruta: ${ENDPOINT_INMUEBLES}/${espacioData.inmueble_id}/pisos/${espacioData.piso_id}/espacios`);
-        console.log('Datos a enviar:', datosParaEnviar);
+       
       }
 
       // Usar la instancia de api que ya tiene configurada la autenticación y manejo de errores
@@ -144,7 +141,6 @@ const espacioService = {
         datosActualizados.estado = parseInt(datosActualizados.estado);
       }
       
-      console.log('Actualizando espacio con datos:', datosActualizados);
 
       const response = await api.put(
         `${ENDPOINT_INMUEBLES}/${inmuebleId}/pisos/${pisoId}/espacios/${espacioId}`,

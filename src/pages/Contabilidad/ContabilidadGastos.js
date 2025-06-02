@@ -76,7 +76,7 @@ const ContabilidadGastos = () => {
         // Cargar gastos
         await cargarTodosGastos();
       } catch (error) {
-        console.error('Error fetching data:', error);
+        // console.error('Error fetching data:', error);
         setError('Error al cargar los datos');
       } finally {
         setLoading(false);
@@ -90,21 +90,18 @@ const ContabilidadGastos = () => {
   const cargarTodosGastos = async () => {
     try {
       setLoading2(true);
-      console.log("Cargando todos los gastos...");
       
       const todosLosGastos = await gastoService.obtenerGastos();
-      console.log(`Gastos obtenidos: ${todosLosGastos.length}`);
       
       setGastos(Array.isArray(todosLosGastos) ? todosLosGastos : []);
       
       // Si hay resultados, mostrar mensaje
       if (Array.isArray(todosLosGastos) && todosLosGastos.length > 0) {
-        console.log(`Se han cargado ${todosLosGastos.length} gastos correctamente`);
       } else {
-        console.warn("No se encontraron gastos en el sistema");
+        // console.warn("No se encontraron gastos en el sistema");
       }
     } catch (error) {
-      console.error('Error al cargar todos los gastos:', error);
+      // console.error('Error al cargar todos los gastos:', error);
       alert('Error al cargar todos los gastos');
       setGastos([]);
     } finally {
@@ -230,7 +227,6 @@ const ContabilidadGastos = () => {
         categoria: formData.categoria,
       };
       
-      console.log('Datos del gasto a guardar:', gastoData);
       
       let gastoID;
       
@@ -238,7 +234,6 @@ const ContabilidadGastos = () => {
       if (gastoSeleccionado) {
         await gastoService.actualizarGasto(gastoSeleccionado.id, gastoData);
         gastoID = gastoSeleccionado.id;
-        console.log(`Gasto ID ${gastoID} actualizado correctamente`);
         
         // Guardar los datos actualizados para mostrar en el modal de éxito
         setUpdatedData({
@@ -253,7 +248,6 @@ const ContabilidadGastos = () => {
         // Si es un nuevo gasto, crearlo
         const respuestaGasto = await gastoService.crearGasto(gastoData);
         gastoID = respuestaGasto.id;
-        console.log(`Nuevo gasto creado con ID: ${gastoID}`);
         alert('Gasto registrado correctamente');
         handleCancel();
       }
@@ -281,7 +275,6 @@ const ContabilidadGastos = () => {
             documentable_type: 'gasto'
           };
           
-          console.log('Registrando metadatos del documento:', documentoData);
           await documentoService.crearDocumento(documentoData);
         } catch (docError) {
           console.error('Error al subir documento:', docError);
@@ -332,11 +325,9 @@ const ContabilidadGastos = () => {
       
       // Extraer el nombre del archivo de la ruta completa
       const nombreArchivo = rutaDocumento.split('/').pop();
-      console.log('Nombre del archivo:', nombreArchivo);
       
       // Usar la ruta común documentos/pago/1/
       const rutaServicio = `documentos/pago/1/${nombreArchivo}`;
-      console.log('Ruta para el servicio:', rutaServicio);
       
       await documentoService.verDocumento(rutaServicio);
     } catch (error) {
@@ -354,11 +345,9 @@ const ContabilidadGastos = () => {
       
       // Extraer el nombre del archivo de la ruta completa
       const nombreArchivo = rutaDocumento.split('/').pop();
-      console.log('Nombre del archivo:', nombreArchivo);
       
       // Usar la ruta común documentos/pago/1/
       const rutaServicio = `documentos/pago/1/${nombreArchivo}`;
-      console.log('Ruta para el servicio:', rutaServicio);
       
       await documentoService.descargarDocumento(rutaServicio, nombreArchivo);
     } catch (error) {
@@ -391,7 +380,6 @@ const ContabilidadGastos = () => {
         const documentos = await documentoService.obtenerDocumentosPorTipo(gasto.id, 'gasto');
         
         if (documentos && documentos.length > 0) {
-          console.log('Documentos encontrados:', documentos);
           
           // Determinar el tipo de documento basado en la extensión
           let tipoDocumento = 'pdf'; // valor predeterminado
@@ -436,11 +424,9 @@ const ContabilidadGastos = () => {
             const rutaComun = `${baseUrl}/documentos/pago/1/${documentos[0].nombre}`;
             const rutaComunAlternativa = `${baseUrl}/public/pago/1/${documentos[0].nombre}`;
             
-            console.log(`Intentando con ruta común: ${rutaComun}`);
             let existeEnRutaComun = await verificarExistenciaArchivo(rutaComun);
             
             if (existeEnRutaComun) {
-              console.log(`¡Documento encontrado en la carpeta común!`);
               setDocumento({ 
                 nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
                 ruta: rutaComun,
@@ -449,11 +435,9 @@ const ContabilidadGastos = () => {
               setDocumentoError(false);
             } else {
               // Probar con la ruta alternativa
-              console.log(`Intentando con ruta común alternativa: ${rutaComunAlternativa}`);
               existeEnRutaComun = await verificarExistenciaArchivo(rutaComunAlternativa);
               
               if (existeEnRutaComun) {
-                console.log(`¡Documento encontrado en la carpeta común alternativa!`);
                 setDocumento({ 
                   nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
                   ruta: rutaComunAlternativa,
@@ -471,7 +455,7 @@ const ContabilidadGastos = () => {
             }
           }
         } else {
-          console.log(`No se encontraron documentos para el gasto ${gasto.id}`);
+          //console.log(`No se encontraron documentos para el gasto ${gasto.id}`);
           setDocumento(null);
         }
       } catch (error) {

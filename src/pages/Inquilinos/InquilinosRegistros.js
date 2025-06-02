@@ -47,14 +47,12 @@ const InquilinosRegistros = () => {
     setLoading(true);
     try {
       const data = await contratoService.obtenerContratosDetalles();
-      console.log('Datos recibidos del backend:', data);
       
       // Asegurarnos de que los datos sean un array
       const contratosArray = Array.isArray(data) ? data : [data];
       
       // Mapear los datos al formato exacto que espera la tabla
       const formattedData = contratosArray.map(contrato => {
-        console.log('Procesando contrato:', contrato);
         return {
           key: contrato.id, // Añadir key para la tabla
           id: contrato.id,
@@ -75,7 +73,6 @@ const InquilinosRegistros = () => {
         };
       });
 
-      console.log('Datos formateados para la tabla:', formattedData);
       setInquilinos(formattedData);
       setFilteredInquilinos(formattedData);
     } catch (error) {
@@ -204,7 +201,6 @@ const InquilinosRegistros = () => {
       setLoading(true);
       setError(null);
       const data = await contratoService.obtenerContratosDetalles();
-      console.log('Datos actualizados:', data);
       
       // Asegurarnos de que los datos sean un array
       const contratosArray = Array.isArray(data) ? data : [data];
