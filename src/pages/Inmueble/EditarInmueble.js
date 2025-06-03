@@ -59,14 +59,12 @@ const EditarInmueble = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Datos enviados:", formData);
     const camposValidos = ['propietario_id', 'tipoInmueble_id', 'nombre', 'descripcion', 'direccion', 'ubigeo'];
   
     const datosFiltrados = Object.fromEntries(
       Object.entries(formData).filter(([key]) => camposValidos.includes(key))
     );
   
-    console.log("Datos enviados:", datosFiltrados);
     try {
       await inmuebleService.actualizarInmueble(id, datosFiltrados);
       alert('Inmueble actualizado correctamente');

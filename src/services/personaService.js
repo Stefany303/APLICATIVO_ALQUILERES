@@ -16,7 +16,6 @@ const personaService = {
   obtenerInquilinos: async () => {
     try {
       const response = await api.get('/personas/inquilinosObtener');
-      console.log('Respuesta de personas:', response);
       return response.data;
 
     } catch (error) {
@@ -64,7 +63,6 @@ const personaService = {
   // Crear una nueva persona (protegido, solo administradores)
   crearPersona: async (personaData) => {
     try {
-      console.log('personaData:', personaData);
       const response = await api.post('/personas', personaData);
       return response.data;
     } catch (error) {

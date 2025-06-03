@@ -175,7 +175,6 @@ const EspaciosRegistrar = () => {
         estado: 0
       };
 
-      console.log("Datos a enviar:", JSON.stringify(espacioData));
 
       const espacioCreado = await espacioService.crearEspacio(espacioData);
       

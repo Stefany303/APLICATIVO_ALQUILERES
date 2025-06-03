@@ -186,9 +186,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         let tokenValido = await verificarToken();
-        //console.log('Resultado de verificación de token:', tokenValido);
         if (!tokenValido) {
-          //console.log('Token no válido, intentando refresh...');
           tokenValido = await refreshAccessToken(true);
         }
 

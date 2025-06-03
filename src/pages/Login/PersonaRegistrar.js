@@ -166,7 +166,7 @@ const PersonaRegistrar = () => {
                 </li>
                 <li className="breadcrumb-item">
                   <i className="feather-chevron-right">
-                    <FaChevronRight />
+                    <FaChevronRight icon="chevron-right" />
                   </i>
                 </li>
                 <li className="breadcrumb-item active">Registrar</li>

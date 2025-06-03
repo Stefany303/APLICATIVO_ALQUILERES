@@ -87,7 +87,6 @@ const DonutChart = ({ completados, pendientes, retrasados, montoCompletado, mont
 
   useEffect(() => {
     // Calcular porcentajes basados en montos, no en conteos
-    console.log("Montos para gráfico:", { completados, pendientes, montoCompletado, montoPendiente });
     
     // Obtener los montos como números
     const montoCompletadoNum = parseFloat(montoCompletado || 0);

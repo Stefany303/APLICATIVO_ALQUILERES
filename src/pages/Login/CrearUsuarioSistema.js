@@ -57,7 +57,6 @@ export default function CrearUsuarioSistemaModal({ createAccount, setCreateAccou
     const [password, setPassword] = useState("");
   
     const handleSubmit = () => {
-      console.log("Usuario registrado:", { username, password });
       setCreateAccount(false); // Cerrar modal después de registrar
     };
   

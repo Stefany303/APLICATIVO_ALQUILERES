@@ -111,7 +111,6 @@ const AdminDashboard = () => {
 
         setDashboardData(newDashboardData);
       } catch (err) {
-        console.error(err);
         setError({
           message: 'Error al cargar los datos del dashboard',
           details: err.response?.data || err.message
