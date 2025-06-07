@@ -1,4 +1,4 @@
-import api from '../services/api'; // Importa la instancia de axios
+import api from './api';
 
 const pisoService = {
     obtenerPorInmueble: async (inmuebleId) => {

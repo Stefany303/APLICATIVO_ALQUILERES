@@ -1,24 +1,10 @@
-import axios from 'axios';
 import api from './api';
-import { API_URL, getAuthToken } from './authService';
-
-// Verificar si estamos en desarrollo o producción
-const isDevelopment = process.env.NODE_ENV === 'development';
-const API_URL_LOCAL = isDevelopment 
-  ? 'http://localhost:3000/api'  // URL para desarrollo (puerto 3000)
-  : process.env.REACT_APP_API_URL || 'http://localhost:3000/api';  // URL para producción
-
-// Configurar axios para manejar errores de conexión
-axios.defaults.timeout = 10000; // 10 segundos de timeout
-axios.defaults.validateStatus = function (status) {
-  return status >= 200 && status < 500; // Aceptar cualquier status que no sea error del servidor
-};
 
 const inquilinoService = {
   // Obtener todos los inquilinos
   obtenerInquilinos: async () => {
     try {
-      const response = await api.get(`${API_URL}/personas/inquilinos`);
+      const response = await api.get('/personas/inquilinos');
       return response.data;
     } catch (error) {
       console.error('Error al obtener inquilinos:', error);
@@ -29,7 +15,7 @@ const inquilinoService = {
   // Obtener un inquilino por ID
   obtenerInquilino: async (id) => {
     try {
-      const response = await api.get(`${API_URL}/personas/inquilinos/${id}`);
+      const response = await api.get(`/personas/inquilinos/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error al obtener inquilino:', error);
@@ -40,8 +26,6 @@ const inquilinoService = {
   // Crear un nuevo inquilino
   crearInquilino: async (inquilinoData) => {
     try {
-      
-      
       // Validar que los datos sean un objeto
       if (!inquilinoData || typeof inquilinoData !== 'object') {
         throw new Error('Los datos recibidos no son válidos');
@@ -54,7 +38,8 @@ const inquilinoService = {
       if (camposFaltantes.length > 0) {
         throw new Error(`Faltan campos requeridos: ${camposFaltantes.join(', ')}`);
       }
-// Validar que el email tenga un formato válido
+
+      // Validar que el email tenga un formato válido
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(inquilinoData.email)) {
         throw new Error('El email no tiene un formato válido');
@@ -111,27 +96,12 @@ const inquilinoService = {
       if (!inmuebleId || isNaN(inmuebleId)) {
         throw new Error('El inmueble_id es requerido y debe ser un número válido');
       }
-  
-
-      
-      // Validar campos requeridos para el contrato
-    /*  if (!inquilinoData.espacio_id) {
-        throw new Error('El espacio_id es requerido para crear el contrato');
-      }*/
 
       // Validar que el espacio_id sea un número válido
       const espacioId = parseInt(inquilinoData.espacioId);
     
       if (!espacioId || isNaN(espacioId)) {
         throw new Error('El espacio_id es requerido y debe ser un número válido');
-      }
-
-      // Obtener el token usando getAuthToken
-      const token = getAuthToken();
-      //console.log('Token obtenido:', token);
-
-      if (!token) {
-        throw new Error('No hay token de autenticación disponible');
       }
 
       // 1. Crear la persona
@@ -145,11 +115,7 @@ const inquilinoService = {
         rol: 'inquilino'
       };
 
-      const personaResponse = await api.post(`${API_URL}/personas`, personaData, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const personaResponse = await api.post('/personas', personaData);
 
       // 2. Crear el contrato
       const contratoData = {
@@ -166,11 +132,7 @@ const inquilinoService = {
         fecha_pago: inquilinoData.fechaInicio
       };
 
-      const contratoResponse = await api.post(`${API_URL}/contratos`, contratoData, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const contratoResponse = await api.post('/contratos', contratoData);
 
       return {
         persona: personaResponse.data,
@@ -193,7 +155,7 @@ const inquilinoService = {
   // Actualizar un inquilino existente
   actualizarInquilino: async (id, inquilinoData) => {
     try {
-      const response = await api.put(`${API_URL}/inquilinos/${id}`, inquilinoData);
+      const response = await api.put(`/inquilinos/${id}`, inquilinoData);
       return response.data;
     } catch (error) {
       console.error('Error al actualizar inquilino:', error);
@@ -204,7 +166,7 @@ const inquilinoService = {
   // Eliminar un inquilino
   eliminarInquilino: async (id) => {
     try {
-      const response = await api.delete(`${API_URL}/inquilinos/${id}`);
+      const response = await api.delete(`/inquilinos/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error al eliminar inquilino:', error);

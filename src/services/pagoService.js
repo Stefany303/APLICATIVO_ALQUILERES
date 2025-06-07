@@ -1,10 +1,10 @@
 import api from './api';
-import { API_URL, getAuthToken } from './authService';
+import moment from 'moment';
 
 const pagoService = {
   obtenerPagos: async () => {
     try {
-      const response = await api.get(`${API_URL}/pagos/buscar`);
+      const response = await api.get('/pagos/buscar');
       return response.data;
     } catch (error) {
       console.error('Error al obtener pagos:', error);
@@ -14,7 +14,7 @@ const pagoService = {
 
   obtenerPagoPorId: async (id) => {
     try {
-      const response = await api.get(`${API_URL}/pagos/${id}`);
+      const response = await api.get(`/pagos/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error al obtener el pago:', error);
@@ -28,7 +28,7 @@ const pagoService = {
       if (dni) params.dni = dni;
       if (nombre) params.nombre = nombre;
 
-      const response = await api.get(`${API_URL}/pagos/buscador`, { params });
+      const response = await api.get('/pagos/buscador', { params });
       return response.data; // Devuelve los datos obtenidos
     } catch (error) {
       console.error('Error al obtener los contratos:', error);
@@ -37,77 +37,60 @@ const pagoService = {
   },
   crearPago: async (pagoData) => {
     try {
-      // Obtener el token de autenticación
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No autorizado: Inicie sesión para realizar esta acción');
-      }
-      
-      // Configurar headers con el token
-      const config = {
-        headers: {
-          'Authorization': token
-        }
-      };
-      
-      const response = await api.post(`${API_URL}/pagos`, pagoData, config);
+      const response = await api.post('/pagos', pagoData);
       return response.data;
     } catch (error) {
-      // Obtener más detalles sobre el error
-      if (error.response) {
-        // Si hay un mensaje de error específico en la respuesta, úsalo
-        if (error.response.data && error.response.data.message) {
-          throw new Error(`Error del servidor: ${error.response.data.message}`);
-        }
+      if (error.response && error.response.data && error.response.data.message) {
+        throw new Error(`Error del servidor: ${error.response.data.message}`);
       } else if (error.request) {
         throw new Error('No se pudo conectar con el servidor. Verifique su conexión a internet.');
       }
-      
       throw error;
     }
   },
 
   actualizarPago: async (id, pagoData) => {
     try {
-      // Obtener el token de autenticación
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No autorizado: Inicie sesión para realizar esta acción');
-      }
+      // Obtener el pago actual para asegurarnos de tener todos los campos necesarios
+      const pagoActual = await pagoService.obtenerPagoPorId(id);
       
-      // Configurar headers con el token
-      const config = {
-        headers: {
-          'Authorization': token
-        }
+      // Combinar los datos actuales con los nuevos datos
+      const datosActualizados = {
+        ...pagoActual,
+        ...pagoData
       };
-      
-      // Asegurarse de que los campos requeridos estén presentes
-      const camposRequeridos = ['contrato_id', 'monto', 'metodo_pago', 'tipo_pago', 'estado', 'fecha_pago', 'fecha_real_pago'];
-      for (const campo of camposRequeridos) {
-        if (!pagoData.hasOwnProperty(campo) || pagoData[campo] === undefined || pagoData[campo] === '') {
-          throw new Error(`El campo '${campo}' es requerido`);
+
+      // Formatear todas las fechas al formato YYYY-MM-DD
+      const camposFecha = ['fecha_pago', 'fecha_real_pago', 'creado_en', 'actualizado_en'];
+      camposFecha.forEach(campo => {
+        if (datosActualizados[campo]) {
+          datosActualizados[campo] = moment(datosActualizados[campo]).format('YYYY-MM-DD');
         }
+      });
+
+      // Validar campos requeridos
+      const camposRequeridos = ['contrato_id', 'monto', 'tipo_pago', 'estado', 'fecha_pago'];
+      const camposFaltantes = camposRequeridos.filter(campo => 
+        !datosActualizados[campo] || datosActualizados[campo] === ''
+      );
+
+      if (camposFaltantes.length > 0) {
+        throw new Error(`Los siguientes campos son requeridos: ${camposFaltantes.join(', ')}`);
       }
       
-      const response = await api.put(`${API_URL}/pagos/${id}`, pagoData, config);
+      const response = await api.put(`/pagos/${id}`, datosActualizados);
       return response.data;
     } catch (error) {
-      // Obtener más detalles sobre el error
-      if (error.response) {
-        // Si hay un mensaje de error específico en la respuesta, úsalo
-        if (error.response.data && error.response.data.message) {
-          throw new Error(`Error del servidor: ${error.response.data.message}`);
-        }
+      if (error.response && error.response.data && error.response.data.message) {
+        throw new Error(`Error del servidor: ${error.response.data.message}`);
       }
-      
       throw error;
     }
   },
 
   eliminarPago: async (id) => {
     try {
-      await api.delete(`${API_URL}/pagos/${id}`);
+      await api.delete(`/pagos/${id}`);
     } catch (error) {
       console.error('Error al eliminar el pago:', error);
       throw error;

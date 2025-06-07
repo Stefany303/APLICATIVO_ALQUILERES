@@ -1,5 +1,4 @@
 import api from './api';
-import { API_URL } from './authService';
 
 const personaService = {
   // Obtener todas las personas (público)
@@ -17,7 +16,6 @@ const personaService = {
     try {
       const response = await api.get('/personas/inquilinosObtener');
       return response.data;
-
     } catch (error) {
       console.error('Error fetching personas:', error);
       throw error;

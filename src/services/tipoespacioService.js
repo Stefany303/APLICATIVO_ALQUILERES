@@ -1,8 +1,6 @@
 import api from './api';
-import { API_URL } from '../environment';
 
-
-const ENDPOINT_BASE = API_URL + '/tipos-espacio';
+const ENDPOINT_BASE = '/tipos-espacio';
 
 const tipoEspacioService = {
     obtenerTodos: async () => {

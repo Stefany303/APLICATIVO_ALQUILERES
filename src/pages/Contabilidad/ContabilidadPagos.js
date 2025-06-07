@@ -1037,7 +1037,11 @@ const ContabilidadPagos = () => {
       await pagoService.actualizarPago(pagoARegistrar.id, {
         estado: 'pagado',
         fecha_real_pago: new Date().toISOString().split('T')[0],
-        metodo_pago: metodoPagoRegistro
+        metodo_pago: metodoPagoRegistro,
+        contrato_id: pagoARegistrar.contrato_id,
+        monto: pagoARegistrar.monto,
+        tipo_pago: pagoARegistrar.tipo_pago,
+        fecha_pago: pagoARegistrar.fecha_pago
       });
 
       message.destroy();

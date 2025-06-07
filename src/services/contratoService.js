@@ -1,5 +1,5 @@
 import api from './api';
-import { API_URL, getAuthToken } from './authService';
+import { API_URL } from './environment';
 
 const contratoService = {
   obtenerContratos: async () => {
@@ -15,7 +15,7 @@ const contratoService = {
   // Obtener todos los contratos con detalles
   obtenerContratosDetalles: async () => {
     try {
-      const response = await api.get(`${API_URL}/contratos/detalles`);
+      const response = await api.get('/contratos/detalles');
       return response.data;
     } catch (error) {
       console.error('Error al obtener contratos con detalles:', error);
@@ -30,7 +30,7 @@ const contratoService = {
       if (dni) params.dni = dni;
       if (nombre) params.nombre = nombre;
 
-      const response = await api.get(`${API_URL}/contratos/inquilinos/detalles`, { params });
+      const response = await api.get('/contratos/inquilinos/detalles', { params });
       return response.data; // Devuelve los datos obtenidos
     } catch (error) {
       console.error('Error al obtener los contratos:', error);
@@ -40,7 +40,7 @@ const contratoService = {
 
   obtenerContratoPorId: async (id) => {
     try {
-      const response = await api.get(`${API_URL}/contratos/${id}`);
+      const response = await api.get(`/contratos/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error al obtener el contrato:', error);
@@ -51,7 +51,7 @@ const contratoService = {
   // Crear un nuevo contrato
   crearContrato: async (contratoData) => {
     try {
-      const response = await api.post(`${API_URL}/contratos`, contratoData);
+      const response = await api.post('/contratos', contratoData);
       return response.data;
     } catch (error) {
       console.error('Error al crear contrato:', error);
@@ -62,7 +62,7 @@ const contratoService = {
   // Actualizar un contrato
   actualizarContrato: async (id, contratoData) => {
     try {
-      const response = await api.put(`${API_URL}/contratos/${id}`, contratoData);
+      const response = await api.put(`/contratos/${id}`, contratoData);
       return response.data;
     } catch (error) {
       console.error('Error al actualizar contrato:', error);
@@ -73,7 +73,7 @@ const contratoService = {
   // Eliminar un contrato
   eliminarContrato: async (id) => {
     try {
-      const response = await api.delete(`${API_URL}/contratos/${id}`);
+      const response = await api.delete(`/contratos/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error al eliminar contrato:', error);
@@ -83,7 +83,7 @@ const contratoService = {
 
   obtenerEspaciosDisponibles: async () => {
     try {
-      const response = await api.get(`${API_URL}/espacios/disponibles`);
+      const response = await api.get('/espacios/disponibles');
       return response.data;
     } catch (error) {
       console.error('Error al obtener espacios disponibles:', error);

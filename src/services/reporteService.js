@@ -89,7 +89,6 @@ class ReporteService {
             const response = await api.get(`/reportes/generar/gastos?${params.toString()}`);
             return response.data;
         } catch (error) {
-            // console.error('Error al generar reporte de gastos:', error);
             throw error;
         }
     }
@@ -144,7 +143,6 @@ class ReporteService {
             const response = await api.get('/reportes/dashboard/ingresos');
             return response.data;
         } catch (error) {
-            // console.error('Error al obtener ingresos mensuales:', error);
             throw error;
         }
     }
@@ -155,7 +153,6 @@ class ReporteService {
             const response = await api.get('/reportes/dashboard/gastos');
             return response.data;
         } catch (error) {
-            // console.error('Error al obtener gastos mensuales:', error);
             throw error;
         }
     }
@@ -199,7 +196,6 @@ class ReporteService {
             const response = await api.get('/reportes/dashboard/pagos');
             return response.data;
         } catch (error) {
-            // console.error('Error al obtener pagos pendientes vs pagados:', error);
             throw error;
         }
     }

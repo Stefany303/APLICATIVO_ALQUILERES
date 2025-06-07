@@ -9,7 +9,7 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // Variables de entorno
 export const environment = {
   // API URL - URL base para todas las peticiones al backend
-  API_URL: process.env.REACT_APP_API_URL || 'http://localhost:3000/api',
+  API_URL: process.env.REACT_APP_URL_BASE_API,
   
   // Tiempo de espera para peticiones (en milisegundos)
   API_TIMEOUT: 10000,
@@ -24,4 +24,3 @@ export const environment = {
 // Exportar directamente la URL de la API para uso más sencillo
 export const API_URL = environment.API_URL;
 
-export default environment;

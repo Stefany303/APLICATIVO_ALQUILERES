@@ -1,10 +1,5 @@
 import api from './api';
-
-// Verificar si estamos en desarrollo o producción
-const isDevelopment = process.env.NODE_ENV === 'development';
-const API_URL = isDevelopment
-    ? 'http://localhost:3000/api'  // URL para desarrollo (puerto 3000)
-    : process.env.REACT_APP_API_URL || 'http://localhost:3000/api';  // URL para producción
+import { API_URL } from './environment';
 
 // Configurar axios para manejar errores de conexión
 api.defaults.timeout = 10000; // 10 segundos de timeout
@@ -24,7 +19,6 @@ const getAuthToken = () => {
 
 // Función para guardar el token
 const setAuthToken = (token) => {
-
   localStorage.setItem('token', token);
 };
 

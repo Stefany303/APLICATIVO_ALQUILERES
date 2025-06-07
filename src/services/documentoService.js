@@ -1,11 +1,11 @@
 import api from './api';
-import { API_URL } from './authService';
+import { API_URL } from './environment';
 
 const documentoService = {
   // Obtener todos los documentos
   obtenerDocumentos: async () => {
     try {
-      const response = await api.get(`${API_URL}/documentos`);
+      const response = await api.get('/documentos');
       return response.data;
     } catch (error) {
       throw error;
@@ -15,7 +15,7 @@ const documentoService = {
   // Obtener un documento por ID
   obtenerDocumentoPorId: async (id) => {
     try {
-      const response = await api.get(`${API_URL}/documentos/${id}`);
+      const response = await api.get(`/documentos/${id}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -25,7 +25,7 @@ const documentoService = {
   // Obtener documentos por documentable_id y documentable_type(contrato,pago,gasto)
   obtenerDocumentosPorDocumentable: async (documentable_id, documentable_type) => {
     try {
-      const response = await api.get(`${API_URL}/documentos/documentable/${documentable_id}/${documentable_type}`);
+      const response = await api.get(`/documentos/documentable/${documentable_id}/${documentable_type}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -47,24 +47,8 @@ const documentoService = {
         documentable_type: documento.documentable_type
       };
 
-      const url = `${API_URL}/documentos`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(documentoEnviar)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Error ${response.status}: ${errorData.mensaje || response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data;
+      const response = await api.post('/documentos', documentoEnviar);
+      return response.data;
     } catch (error) {
       throw error;
     }
@@ -73,27 +57,8 @@ const documentoService = {
   // Actualizar un documento
   actualizarDocumento: async (id, documento) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No hay token de autenticación disponible');
-      }
-
-      const response = await fetch(`${API_URL}/documentos/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(documento)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Error ${response.status}: ${errorData.mensaje || response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data;
+      const response = await api.put(`/documentos/${id}`, documento);
+      return response.data;
     } catch (error) {
       throw error;
     }
@@ -102,25 +67,8 @@ const documentoService = {
   // Eliminar un documento
   eliminarDocumento: async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No hay token de autenticación disponible');
-      }
-
-      const response = await fetch(`${API_URL}/documentos/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Error ${response.status}: ${errorData.mensaje || response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data;
+      const response = await api.delete(`/documentos/${id}`);
+      return response.data;
     } catch (error) {
       throw error;
     }
@@ -129,25 +77,8 @@ const documentoService = {
   // Obtener documentos por documentable_id y documentable_type
   obtenerDocumentosPorTipo: async (documentable_id, documentable_type) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No hay token de autenticación disponible');
-      }
-
-      const response = await fetch(`${API_URL}/documentos/documentable/${documentable_id}/${documentable_type}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Error ${response.status}: ${errorData.mensaje || response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data;
+      const response = await api.get(`/documentos/documentable/${documentable_id}/${documentable_type}`);
+      return response.data;
     } catch (error) {
       throw error;
     }
@@ -190,33 +121,13 @@ const documentoService = {
         formData.append('usarCarpetaComun', 'true');
       }
 
-      // Enviar la solicitud al servidor
-      const response = await fetch(`${API_URL}/documentos/upload`, {
-        method: 'POST',
+      const response = await api.post('/documentos/upload', formData, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
-      // Log de la respuesta HTTP
-      
-      const responseData = await response.text();
-      
-      let data;
-      try {
-        data = JSON.parse(responseData);
-      } catch (e) {
-        console.error('Error al parsear la respuesta JSON:', e);
-        throw new Error(`Error al procesar la respuesta del servidor: ${responseData}`);
-      }
-
-      if (!response.ok || !data.ruta) {
-        console.error('Error detallado del servidor:', data);
-        throw new Error(data.mensaje || data.error || 'Error al subir el archivo');
-      }
-
-      return data;
+      return response.data;
     } catch (error) {
       console.error('Error al subir el archivo:', error);
       throw error;
@@ -248,18 +159,6 @@ const documentoService = {
       }
 
       const url = `${API_URL}/documentos/ver/${rutaRelativa}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
       window.open(`${url}?token=${token}`, '_blank');
       return true;
     } catch (error) {
@@ -274,26 +173,11 @@ const documentoService = {
         throw new Error('Ruta del documento no disponible');
       }
 
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No hay token de autenticación disponible');
-      }
-
-      const url = `${API_URL}/documentos/descargar/${rutaRelativa}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await api.get(`/documentos/descargar/${rutaRelativa}`, {
+        responseType: 'blob'
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.mensaje || `Error ${response.status}: ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
+      const blob = response.data;
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;

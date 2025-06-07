@@ -1,7 +1,5 @@
-import axios from 'axios';
 import api from './api';
 import tipoEspacioService from './tipoespacioService';
-import { API_URL, environment } from '../environment';
 
 // Definir endpoints base para espacios
 const ENDPOINT_BASE = '/espacios';
@@ -22,7 +20,7 @@ const espacioService = {
   // Obtener todos los espacios con tipo incluido (ruta /api/obtenerespacios)
   obtenerEspaciosConTipo: async () => {
     try {
-      const response = await api.get(`${API_URL}/obtenerespacios`);
+      const response = await api.get('/obtenerespacios');
       return response.data;
     } catch (error) {
       console.error('Error al obtener espacios con tipo:', error);
@@ -76,10 +74,6 @@ const espacioService = {
         baño: espacioData.bano ? 'propio' : 'compartido',
         estado: espacioData.estado || 0
       };
-
-      if (environment.DEBUG) {
-       
-      }
 
       // Usar la instancia de api que ya tiene configurada la autenticación y manejo de errores
       const response = await api.post(
@@ -140,7 +134,6 @@ const espacioService = {
       if (datosActualizados.estado !== undefined) {
         datosActualizados.estado = parseInt(datosActualizados.estado);
       }
-      
 
       const response = await api.put(
         `${ENDPOINT_INMUEBLES}/${inmuebleId}/pisos/${pisoId}/espacios/${espacioId}`,

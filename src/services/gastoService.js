@@ -1,19 +1,9 @@
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
-
-// Configuración de axios para incluir el token de autenticación
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import api from './api';
 
 const gastoService = {
   obtenerGastos: async () => {
     try {
-      const response = await axios.get(`${API_URL}/gastos`, {
-        headers: getAuthHeader()
-      });
+      const response = await api.get('/gastos');
       return response.data;
     } catch (error) {
       // console.error('Error al obtener gastos:', error);
@@ -23,9 +13,7 @@ const gastoService = {
 
   obtenerGastoPorId: async (id) => {
     try {
-      const response = await axios.get(`${API_URL}/gastos/${id}`, {
-        headers: getAuthHeader()
-      });
+      const response = await api.get(`/gastos/${id}`);
       return response.data;
     } catch (error) {
       // console.error('Error al obtener el gasto:', error);
@@ -35,9 +23,7 @@ const gastoService = {
 
   obtenerGastosPorInmueble: async (inmuebleId) => {
     try {
-      const response = await axios.get(`${API_URL}/gastos/inmueble/${inmuebleId}`, {
-        headers: getAuthHeader()
-      });
+      const response = await api.get(`/gastos/inmueble/${inmuebleId}`);
       return response.data;
     } catch (error) {
       // console.error('Error al obtener gastos por inmueble:', error);
@@ -47,9 +33,8 @@ const gastoService = {
 
   buscarGastos: async (termino) => {
     try {
-      const response = await axios.get(`${API_URL}/gastos/buscar`, {
-        params: { termino },
-        headers: getAuthHeader()
+      const response = await api.get('/gastos/buscar', {
+        params: { termino }
       });
       return response.data;
     } catch (error) {
@@ -71,9 +56,7 @@ const gastoService = {
         observaciones: gastoData.observaciones
       };
 
-      const response = await axios.post(`${API_URL}/gastos`, datosMapeados, {
-        headers: getAuthHeader()
-      });
+      const response = await api.post('/gastos', datosMapeados);
       
       // Verificar que la respuesta tenga el formato esperado
       if (response.data && response.data.mensaje === 'Gasto creado' && response.data.id) {
@@ -100,9 +83,7 @@ const gastoService = {
         observaciones: gastoData.observaciones
       };
 
-      const response = await axios.put(`${API_URL}/gastos/${id}`, datosMapeados, {
-        headers: getAuthHeader()
-      });
+      const response = await api.put(`/gastos/${id}`, datosMapeados);
       return response.data;
     } catch (error) {
       console.error('Error al actualizar el gasto:', error);
@@ -112,9 +93,7 @@ const gastoService = {
 
   eliminarGasto: async (id) => {
     try {
-      await axios.delete(`${API_URL}/gastos/${id}`, {
-        headers: getAuthHeader()
-      });
+      await api.delete(`/gastos/${id}`);
     } catch (error) {
       console.error('Error al eliminar el gasto:', error);
       throw error;
