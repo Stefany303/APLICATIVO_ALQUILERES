@@ -5,41 +5,22 @@ import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext();
 
-// Funciones de utilidad para el manejo de tokens
 const TOKEN_STORAGE = {
-  getToken: () => {
-    const token = localStorage.getItem('token');
-    return token;
-  },
-  getRefreshToken: () => {
-    const refreshToken = localStorage.getItem('refreshToken');
-    return refreshToken;
-  },
+  getToken: () => localStorage.getItem('token'),
+  getRefreshToken: () => localStorage.getItem('refreshToken'),
   getUser: () => {
     try {
       const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
-      return user;
-    } catch (error) {
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
       return null;
     }
   },
   setTokens: (token, refreshToken, user) => {
-    try {
-      localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('lastActivity', Date.now().toString());
-      
-      // Verificar que se guardaron correctamente
-      const savedToken = localStorage.getItem('token');
-      const savedRefreshToken = localStorage.getItem('refreshToken');
-      const savedUser = localStorage.getItem('user');
-      
-     
-    } catch (error) {
-      throw error;
-    }
+    localStorage.setItem('token', token);
+    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('lastActivity', Date.now().toString());
   },
   clearTokens: () => {
     localStorage.removeItem('token');
@@ -48,106 +29,36 @@ const TOKEN_STORAGE = {
     localStorage.removeItem('lastActivity');
   },
   isAuthenticated: () => {
-    const hasToken = !!localStorage.getItem('token');
-    const hasRefreshToken = !!localStorage.getItem('refreshToken');
-    return hasToken && hasRefreshToken;
+    return !!localStorage.getItem('token') && !!localStorage.getItem('refreshToken');
   }
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    return TOKEN_STORAGE.getUser();
-  });
+  const [user, setUser] = useState(() => TOKEN_STORAGE.getUser());
   const [cargando, setCargando] = useState(true);
-  const [lastActivity, setLastActivity] = useState(Date.now());
-  const navigate = useNavigate();
   const [refreshTimer, setRefreshTimer] = useState(null);
+  const navigate = useNavigate();
 
-  // Constante para el tiempo de inactividad (15 minutos)
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
 
-  // Función para verificar si el usuario está inactivo
-  const isUserInactive = () => {
-    const lastActivityTime = parseInt(localStorage.getItem('lastActivity') || Date.now());
-    const inactive = Date.now() - lastActivityTime >= INACTIVITY_TIMEOUT;
-    return inactive;
-  };
-
-  // Función para actualizar la última actividad
   const updateLastActivity = () => {
-    const newTime = Date.now();
-    setLastActivity(newTime);
-    localStorage.setItem('lastActivity', newTime.toString());
+    const now = Date.now();
+    localStorage.setItem('lastActivity', now.toString());
   };
 
-  // Función para verificar el token con el backend
-  const verificarToken = async (token = TOKEN_STORAGE.getToken()) => {
-    if (!token) {
-      return false;
-    }
-    
-    try {
-      const response = await api.get('/auth/perfil');
-      return true;
-    } catch (error) {
-      if (error.response?.status === 401) {
-        const refreshSuccess = await refreshAccessToken(true);
-        if (!refreshSuccess) {
-          await logout();
-          navigate('/login');
-        }
-        return refreshSuccess;
-      }
-      return false;
-    }
+  const isUserInactive = () => {
+    const last = parseInt(localStorage.getItem('lastActivity') || Date.now());
+    return Date.now() - last >= INACTIVITY_TIMEOUT;
   };
 
-  // Configurar interceptor global para manejar errores 401
-  useEffect(() => {
-    const interceptor = api.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (error.response?.status === 401 && !error.config._retry) {
-          error.config._retry = true;
-          try {
-            const refreshSuccess = await refreshAccessToken(true);
-            if (refreshSuccess) {
-              // Reintentar la petición original con el nuevo token
-              const token = TOKEN_STORAGE.getToken();
-              error.config.headers['Authorization'] = `Bearer ${token}`;
-              return api(error.config);
-            } else {
-              await logout();
-              navigate('/login');
-            }
-          } catch (refreshError) {
-            await logout();
-            navigate('/login');
-          }
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => {
-      api.interceptors.response.eject(interceptor);
-    };
-  }, [navigate]);
-
-  // Función para refrescar el token
   const refreshAccessToken = async (forceRefresh = false) => {
     try {
       const refreshToken = TOKEN_STORAGE.getRefreshToken();
-      if (!refreshToken) {
-        throw new Error('No hay refresh token disponible');
-      }
-
-      if (!forceRefresh && isUserInactive()) {
-        throw new Error('Usuario inactivo');
+      if (!refreshToken || (!forceRefresh && isUserInactive())) {
+        throw new Error('Refresh no válido');
       }
 
       const { data } = await api.post('/auth/renovar-token', { refreshToken });
-      
       if (data.token && data.refreshToken) {
         TOKEN_STORAGE.setTokens(data.token, data.refreshToken, user);
         if (data.expiresIn) {
@@ -155,94 +66,97 @@ export const AuthProvider = ({ children }) => {
         }
         return true;
       }
+
       return false;
-    } catch (error) {
+    } catch {
+      await logout();
       return false;
     }
   };
 
-  // Configurar el temporizador para refrescar el token
-  const setupTokenRefresh = (expiresIn) => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
-    }
+  const verificarToken = async () => {
+    const token = TOKEN_STORAGE.getToken();
+    if (!token) return false;
 
-    const refreshTime = (expiresIn - 60) * 1000;
-    const timer = setTimeout(() => refreshAccessToken(true), refreshTime);
+    try {
+      const response = await api.get('/auth/perfil');
+      return response.status === 200;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        const refreshed = await refreshAccessToken(true);
+        if (!refreshed) await logout();
+        return refreshed;
+      }
+      return false;
+    }
+  };
+
+  const setupTokenRefresh = (expiresIn) => {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    const timer = setTimeout(() => refreshAccessToken(true), (expiresIn - 60) * 1000);
     setRefreshTimer(timer);
   };
 
-  // Efecto para verificar y restaurar la autenticación al cargar/refrescar la página
   useEffect(() => {
-    const verificarAutenticacion = async () => {
-      try {
-        setCargando(true);
-
-        if (!TOKEN_STORAGE.isAuthenticated()) {
-          TOKEN_STORAGE.clearTokens();
-          setUser(null);
-          return;
-        }
-
-        let tokenValido = await verificarToken();
-        if (!tokenValido) {
-          tokenValido = await refreshAccessToken(true);
-        }
-
-        if (tokenValido) {
-          const userData = TOKEN_STORAGE.getUser();
-          setUser(userData);
-          updateLastActivity();
-        } else {
-          await logout();
-        }
-      } catch (error) {
-        await logout();
-      } finally {
+    const verificar = async () => {
+      if (window.location.pathname === '/login') {
         setCargando(false);
+        return;
       }
+
+      if (!TOKEN_STORAGE.isAuthenticated()) {
+        TOKEN_STORAGE.clearTokens();
+        setUser(null);
+        window.location.href = '/login';
+        return;
+      }
+
+      const valido = await verificarToken();
+      if (valido) {
+        setUser(TOKEN_STORAGE.getUser());
+        updateLastActivity();
+      } else {
+        await logout();
+      }
+
+      setCargando(false);
     };
 
-    verificarAutenticacion();
+    verificar();
 
-    // Agregar event listener para beforeunload
-    const handleBeforeUnload = () => {
-      // No hacemos nada, solo aseguramos que no se limpie el localStorage
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    const eventos = ['mousemove', 'keydown', 'click', 'scroll'];
+    const actualizarActividad = () => updateLastActivity();
+    eventos.forEach(e => window.addEventListener(e, actualizarActividad));
 
     return () => {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-      }
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      eventos.forEach(e => window.removeEventListener(e, actualizarActividad));
+      if (refreshTimer) clearTimeout(refreshTimer);
     };
   }, []);
 
   const login = async (usuario, contraseña) => {
     try {
       const { data } = await api.post("/auth/login", { usuario, contraseña });
-      
+
       if (data.token && data.persona && data.refreshToken) {
         TOKEN_STORAGE.setTokens(data.token, data.refreshToken, data.persona);
         setUser(data.persona);
         updateLastActivity();
-        
+
         if (data.expiresIn) {
           setupTokenRefresh(data.expiresIn);
         }
-        
-        navigate("/admin-dashboard");
+
         return { success: true };
       } else {
-        throw new Error("Respuesta de login inválida");
+        return { success: false, message: data.mensaje || "Respuesta de login inválida" };
       }
     } catch (error) {
       let mensajeError = "Error de conexión";
       if (error.response) {
-        mensajeError = error.response.data.mensaje || 
-                      error.response.data.error ||
-                      "Credenciales inválidas";
+        mensajeError = error.response.data.mensaje ||
+                       error.response.data.error ||
+                       "Credenciales inválidas";
       }
       return { success: false, message: mensajeError };
     }
@@ -250,21 +164,25 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      const refreshToken = TOKEN_STORAGE.getRefreshToken();
-      if (refreshToken) {
-        await api.post('/auth/logout', { refreshToken }).catch(() => {});
+      const token = TOKEN_STORAGE.getToken();
+      if (token) {
+        try {
+          await api.post('/auth/logout');
+        } catch {
+          // No importa si falla
+        }
       }
     } finally {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-      }
       TOKEN_STORAGE.clearTokens();
       setUser(null);
-      navigate('/login');
+      if (refreshTimer) clearTimeout(refreshTimer);
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
   };
 
-  const valorContexto = {
+  const contextValue = {
     user,
     cargando,
     login,
@@ -275,7 +193,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={valorContexto}>
+    <AuthContext.Provider value={contextValue}>
       {!cargando && children}
     </AuthContext.Provider>
   );

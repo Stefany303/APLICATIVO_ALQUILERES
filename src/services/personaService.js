@@ -1,7 +1,6 @@
 import api from './api';
 
 const personaService = {
-  // Obtener todas las personas (público)
   obtenerPersonas: async () => {
     try {
       const response = await api.get('/personas');
@@ -12,6 +11,7 @@ const personaService = {
     }
   },
 
+
   obtenerInquilinos: async () => {
     try {
       const response = await api.get('/personas/inquilinosObtener');
@@ -21,7 +21,7 @@ const personaService = {
       throw error;
     }
   },
-  // Obtener una persona por ID (público)
+
   obtenerPersonaPorId: async (id) => {
     try {
       const response = await api.get(`/personas/${id}`);
@@ -32,7 +32,6 @@ const personaService = {
     }
   },
 
-  // Obtener una persona por email (público)
   obtenerPersonaPorEmail: async (email) => {
     try {
       const response = await api.get(`/personas/email/${email}`);
@@ -43,14 +42,12 @@ const personaService = {
     }
   },
 
-  // Obtener una persona por documento (DNI, RUC, etc.)
   obtenerPersonaPorDocumento: async (documento) => {
     try {
       const response = await api.get(`/personas/dni/${documento}`);
       return response.data;
     } catch (error) {
-      // Si es 404, significa que no existe la persona
-      if (error.response && error.response.status === 404) {
+      if (error.response?.status === 404) {
         return null;
       }
       console.error('Error al buscar persona por documento:', error);
@@ -58,7 +55,6 @@ const personaService = {
     }
   },
 
-  // Crear una nueva persona (protegido, solo administradores)
   crearPersona: async (personaData) => {
     try {
       const response = await api.post('/personas', personaData);
@@ -68,8 +64,8 @@ const personaService = {
       throw error;
     }
   },
-   // Crear una nueva persona y usuario (protegido, solo administradores)
-   crearPersonaYUsuario: async (personaData) => {
+
+  crearPersonaYUsuario: async (personaData) => {
     try {
       const response = await api.post('/auth/registrar', personaData);
       return response.data;
@@ -79,7 +75,20 @@ const personaService = {
     }
   },
 
-  // Actualizar una persona existente (protegido, solo administradores)
+  //cambio de contraseña
+  cambiarContrasena: async (contrasenaActual, nuevaContrasena) => {
+    try {
+      const response = await api.post('/auth/cambiar-contrasena', {
+        contraseñaActual: contrasenaActual,
+        nuevaContraseña: nuevaContrasena
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error al cambiar la contraseña:', error);
+      throw error;
+    }
+  },
+
   actualizarPersona: async (id, personaData) => {
     try {
       const response = await api.put(`/personas/${id}`, personaData);
@@ -90,7 +99,6 @@ const personaService = {
     }
   },
 
-  // Eliminar una persona (protegido, solo administradores)
   eliminarPersona: async (id) => {
     try {
       const response = await api.delete(`/personas/${id}`);
@@ -100,6 +108,10 @@ const personaService = {
       throw error;
     }
   },
+
+  registrarPersonaYUsuario: async (personaData) => {
+    return await personaService.crearPersonaYUsuario(personaData);
+  }
 };
 
 export default personaService;

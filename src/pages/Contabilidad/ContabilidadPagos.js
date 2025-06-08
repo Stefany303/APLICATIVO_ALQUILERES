@@ -18,6 +18,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import moment from 'moment';
 import "../../assets/styles/select-components.css";
 import { plusicon, refreshicon, searchnormal, pdficon, pdficon3, pdficon4 } from '../../components/imagepath';
+import contratoService from '../../services/contratoService';
 
 const ContabilidadPagos = () => {
   const [loading, setLoading] = useState(true);
@@ -37,6 +38,11 @@ const ContabilidadPagos = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState('dni'); // 'dni' o 'nombre'
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    // Obtener fecha actual en horario de Lima/Peru
+    const limaTime = new Date().toLocaleString("en-US", { timeZone: "America/Lima" });
+    return new Date(limaTime).getMonth(); // 0-11
+  });
   const [inmuebles, setInmuebles] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
@@ -58,6 +64,8 @@ const ContabilidadPagos = () => {
   const [searchText, setSearchText] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [updatedData, setUpdatedData] = useState(null);
+  const [showInactiveContractModal, setShowInactiveContractModal] = useState(false);
+  const [inactiveContractInfo, setInactiveContractInfo] = useState(null);
   
   /*useEffect(() => {
     if (!searchText.trim()) {
@@ -114,21 +122,42 @@ const ContabilidadPagos = () => {
     { value: 'otros', label: 'Otros' }
   ];
 
+  const meses = [
+    { value: 0, label: 'Enero' },
+    { value: 1, label: 'Febrero' },
+    { value: 2, label: 'Marzo' },
+    { value: 3, label: 'Abril' },
+    { value: 4, label: 'Mayo' },
+    { value: 5, label: 'Junio' },
+    { value: 6, label: 'Julio' },
+    { value: 7, label: 'Agosto' },
+    { value: 8, label: 'Septiembre' },
+    { value: 9, label: 'Octubre' },
+    { value: 10, label: 'Noviembre' },
+    { value: 11, label: 'Diciembre' }
+  ];
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // console.log("Iniciando carga de datos...");
         
         // Obtener inmuebles para referencia
         const inmueblesData = await inmuebleService.obtenerInmuebles();
         setInmuebles(inmueblesData);
         
-        // Cargar TODOS los pagos al iniciar - SIN FILTROS
-        await cargarTodosPagos();
+        // Cargar pagos con información del contrato
+        const pagosData = await pagoService.obtenerPagos();
+        const pagosFiltrados = Array.isArray(pagosData) ? pagosData.filter(pago => {
+          if (!pago.fecha_pago) return false;
+          const fechaPago = new Date(pago.fecha_pago);
+          return fechaPago.getMonth() === selectedMonth;
+        }) : [];
+        
+        setPagos(pagosFiltrados);
         
       } catch (error) {
-        // console.error('Error en la carga inicial:', error);
+        console.error('Error en la carga inicial:', error);
         setError('Error al cargar los datos iniciales');
       } finally {
         setLoading(false);
@@ -137,38 +166,41 @@ const ContabilidadPagos = () => {
 
     // Cargar datos al montar el componente
     fetchData();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedMonth]);
 
   const buscarInquilino = async () => {
     try {
       setLoading2(true);
       
-      // Si el campo de búsqueda está vacío, mostrar todos los pagos
-      if (!searchTerm.trim()) {
-        const todosLosPagos = await pagoService.obtenerPagos();
-        setPagos(Array.isArray(todosLosPagos) ? todosLosPagos : []);
-        setLoading2(false);
-        return;
-      }
-      
-      // Si hay término de búsqueda, realizar la búsqueda específica
+      // Si el campo de búsqueda está vacío, mostrar pagos filtrados solo por mes
       let resultados;
-      
-      if (searchType === 'dni') {
-        resultados = await pagoService.obtenerPagosPorInquilino(searchTerm, null);
+      if (!searchTerm.trim()) {
+        resultados = await pagoService.obtenerPagos();
       } else {
-        resultados = await pagoService.obtenerPagosPorInquilino(null, searchTerm);
+        // Si hay término de búsqueda, realizar la búsqueda específica
+        if (searchType === 'dni') {
+          resultados = await pagoService.obtenerPagosPorInquilino(searchTerm, null);
+        } else {
+          resultados = await pagoService.obtenerPagosPorInquilino(null, searchTerm);
+        }
       }
       
-      setPagos(Array.isArray(resultados) ? resultados : []);
+      // Filtrar por mes seleccionado
+      const pagosFiltrados = Array.isArray(resultados) ? resultados.filter(pago => {
+        if (!pago.fecha_pago) return false;
+        const fechaPago = new Date(pago.fecha_pago);
+        return fechaPago.getMonth() === selectedMonth;
+      }) : [];
       
-      if (resultados.length === 0) {
-        alert('No se encontraron pagos para este inquilino');
+      setPagos(pagosFiltrados);
+      
+      if (pagosFiltrados.length === 0) {
+        message.info('No se encontraron pagos para este período');
       }
     } catch (error) {
-      console.error('Error al buscar pagos del inquilino:', error);
-      alert('Error al buscar los pagos del inquilino');
-      setPagos([]); // Asegurar que pagos sea un array vacío en caso de error
+      console.error('Error al buscar pagos:', error);
+      message.error('Error al buscar los pagos');
+      setPagos([]);
     } finally {
       setLoading2(false);
     }
@@ -946,20 +978,22 @@ const ContabilidadPagos = () => {
   const cargarTodosPagos = async () => {
     try {
       setLoading2(true);
-      //console.log("Cargando todos los pagos...");
       
-      const todosLosPagos = await pagoService.obtenerPagos();
+      const pagosData = await pagoService.obtenerPagos();
+      const pagosFiltrados = Array.isArray(pagosData) ? pagosData.filter(pago => {
+        if (!pago.fecha_pago) return false;
+        const fechaPago = new Date(pago.fecha_pago);
+        return fechaPago.getMonth() === selectedMonth;
+      }) : [];
       
-      setPagos(Array.isArray(todosLosPagos) ? todosLosPagos : []);
+      setPagos(pagosFiltrados);
       
-      // Si hay resultados, mostrar mensaje
-      if (Array.isArray(todosLosPagos) && todosLosPagos.length > 0) {
-      } else {
-        console.warn("No se encontraron pagos en el sistema");
+      if (pagosFiltrados.length === 0) {
+        message.info('No se encontraron pagos para este período');
       }
     } catch (error) {
       console.error('Error al cargar todos los pagos:', error);
-      alert('Error al cargar todos los pagos');
+      message.error('Error al cargar los pagos');
       setPagos([]);
     } finally {
       setLoading2(false);
@@ -967,11 +1001,55 @@ const ContabilidadPagos = () => {
   };
 
   // Función para manejar el registro de pago
-  const handleRegistrarPago = (pago) => {
-    setPagoARegistrar(pago);
-    setComprobanteFile(null);
-    setMetodoPagoRegistro(pago.metodo_pago || null);
-    setModalRegistroVisible(true);
+  const handleRegistrarPago = async (pago) => {
+    console.log('=== INICIO DE REGISTRO DE PAGO ===');
+    console.log('Datos del pago recibidos:', pago);
+    console.log('ID del contrato a verificar:', pago.contrato_id);
+
+    try {
+      console.log('Intentando obtener información del contrato...');
+      // Verificar si el contrato está activo usando el contrato_id
+      const contrato = await contratoService.obtenerContratoPorId(pago.contrato_id);
+      
+      console.log('Respuesta del servicio de contrato:', contrato);
+      
+      if (!contrato) {
+        console.error('No se encontró el contrato');
+        message.error('No se pudo obtener la información del contrato');
+        return;
+      }
+
+      console.log('Estado del contrato:', contrato.estado);
+
+      if (contrato.estado === 'inactivo') {
+        console.log('Contrato inactivo detectado - Bloqueando registro de pago');
+        setInactiveContractInfo({
+          inquilino: `${pago.inquilino_nombre} ${pago.inquilino_apellido}`,
+          contratoId: contrato.id,
+          fechaInicio: contrato.fecha_inicio,
+          fechaFin: contrato.fecha_fin
+        });
+        setShowInactiveContractModal(true);
+        return;
+      }
+
+      console.log('Contrato activo - Procediendo con el registro de pago');
+      // Si el contrato está activo, proceder con el registro
+      setPagoARegistrar(pago);
+      setComprobanteFile(null);
+      setMetodoPagoRegistro(pago.metodo_pago || null);
+      setModalRegistroVisible(true);
+      console.log('Modal de registro abierto');
+    } catch (error) {
+      console.error('Error en el proceso de registro de pago:', error);
+      console.error('Detalles del error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      message.error('Error al verificar el estado del contrato');
+    }
+    console.log('=== FIN DE REGISTRO DE PAGO ===');
   };
 
   // Función para manejar el cambio del archivo de comprobante
@@ -1329,7 +1407,23 @@ const ContabilidadPagos = () => {
                       
                     </div>
                     
-                    <div className="col-12 col-md-4">
+                    <div className="col-12 col-md-3">
+                      <div className="form-group">
+                        <label>Mes</label>
+                        <Select
+                          options={meses}
+                          value={meses.find(m => m.value === selectedMonth)}
+                          onChange={(selected) => {
+                            setSelectedMonth(selected.value);
+                            buscarInquilino(); // Actualizar búsqueda al cambiar el mes
+                          }}
+                          placeholder="Seleccionar mes"
+                          classNamePrefix="select"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="col-12 col-md-3">
                       <div className="form-group">
                         <label>Buscar por</label>
                         <Select
@@ -1345,7 +1439,7 @@ const ContabilidadPagos = () => {
                       </div>
                     </div>
                     
-                    <div className="col-12 col-md-6">
+                    <div className="col-12 col-md-4">
                       <div className="form-group">
                         <label>Término de búsqueda</label>
                         <input
@@ -1980,6 +2074,43 @@ const ContabilidadPagos = () => {
                   <li><strong>Observaciones:</strong> {updatedData.observacion || 'No especificadas'}</li>
                 </ul>
               )}
+            </div>
+          </Modal>
+
+          {/* Modal de Contrato Inactivo */}
+          <Modal
+            title={<div className="text-danger"><i className="fas fa-exclamation-triangle me-2"></i>Contrato Inactivo</div>}
+            open={showInactiveContractModal}
+            onOk={() => setShowInactiveContractModal(false)}
+            onCancel={() => setShowInactiveContractModal(false)}
+            okText="Entendido"
+            cancelButtonProps={{ style: { display: 'none' } }}
+            centered
+          >
+            <div className="p-3">
+              <div className="alert alert-danger mb-3">
+                <i className="fas fa-ban me-2"></i>
+                No se puede realizar el pago porque el contrato está inactivo.
+              </div>
+              
+              {inactiveContractInfo && (
+                <div className="contract-details">
+                  <h6 className="mb-3">Detalles del Contrato:</h6>
+                  <ul className="list-unstyled">
+                    <li><strong>Inquilino:</strong> {inactiveContractInfo.inquilino}</li>
+                    <li><strong>ID del Contrato:</strong> {inactiveContractInfo.contratoId}</li>
+                    <li><strong>Fecha de Inicio:</strong> {new Date(inactiveContractInfo.fechaInicio).toLocaleDateString()}</li>
+                    <li><strong>Fecha de Fin:</strong> {new Date(inactiveContractInfo.fechaFin).toLocaleDateString()}</li>
+                  </ul>
+                </div>
+              )}
+              
+              <div className="mt-3 text-muted">
+                <small>
+                  <i className="fas fa-info-circle me-1"></i>
+                  Para realizar el pago, el contrato debe estar activo. Por favor, contacte al administrador si necesita activar el contrato.
+                </small>
+              </div>
             </div>
           </Modal>
         </div>

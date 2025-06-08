@@ -25,6 +25,10 @@ const InquilinosRegistrar = () => {
   const [espacios, setEspacios] = useState([]);
   const [inquilinoExistente, setInquilinoExistente] = useState(null);
   const [documentoVerificado, setDocumentoVerificado] = useState(false);
+  const [espacioSeleccionado, setEspacioSeleccionado] = useState({
+    tipo: '',
+    precio: 0
+  });
   
   // Obtener la fecha actual en formato YYYY-MM-DD para prellenar la fecha de inicio
   const fechaActual = new Date().toISOString().split('T')[0];
@@ -260,6 +264,25 @@ const InquilinosRegistrar = () => {
       setDocumentoVerificado(false);
       setInquilinoExistente(null);
     }
+
+    // Lógica especial para cuando se selecciona un espacio
+    if (name === 'espacioId') {
+      const espacioSelec = espacios.find(esp => esp.id.toString() === value.toString());
+      if (espacioSelec) {
+        setEspacioSeleccionado({
+          tipo: espacioSelec.tipo_espacio,
+          precio: parseFloat(espacioSelec.precio)
+        });
+        // Actualizar automáticamente el monto mensual con el precio del espacio
+        setFormData(prev => ({
+          ...prev,
+          [name]: value,
+          montoMensual: espacioSelec.precio
+        }));
+      } else {
+        setEspacioSeleccionado({ tipo: '', precio: 0 });
+      }
+    }
     
     // Limitar la longitud de los campos numéricos
     if (name === 'telefono') {
@@ -384,9 +407,46 @@ const InquilinosRegistrar = () => {
 
   // Función para generar los pagos mensuales
   const generarPagosMensuales = async (contratoId, montoMensual, fechaInicio, fechaFin) => {
+    // Si es un Local, generar los dos pagos especiales
+    if (espacioSeleccionado.tipo === 'Local') {
+      const montoPrimerPago = parseFloat(montoMensual) * 0.3; // 30% del monto
+      const montoSegundoPago = parseFloat(montoMensual) * 0.7; // 70% del monto
+      
+      // Primer pago (30% - fecha actual)
+      const primerPago = {
+        contrato_id: parseInt(contratoId),
+        monto: montoPrimerPago,
+        fecha_pago: new Date().toISOString().split('T')[0],
+        metodo_pago: "EFECTIVO",
+        tipo_pago: "ALQUILER",
+        estado: "PENDIENTE",
+        observacion: "Primer pago - 30% del alquiler",
+        fecha_registro: new Date().toISOString().split('T')[0],
+        usuario_id: user?.id || null
+      };
+
+      // Segundo pago (70% - fecha de inicio)
+      const segundoPago = {
+        contrato_id: parseInt(contratoId),
+        monto: montoSegundoPago,
+        fecha_pago: fechaInicio,
+        metodo_pago: "EFECTIVO",
+        tipo_pago: "ALQUILER",
+        estado: "PENDIENTE",
+        observacion: "Segundo pago - 70% del alquiler",
+        fecha_registro: new Date().toISOString().split('T')[0],
+        usuario_id: user?.id || null
+      };
+
+      await Promise.all([
+        pagoService.crearPago(primerPago),
+        pagoService.crearPago(segundoPago)
+      ]);
+      
+    } else {
+      // Lógica original para otros tipos de espacios
     const fechasPago = calcularFechasPago(fechaInicio, fechaFin);
     
-    // Crear pagos para cada fecha
     const promises = fechasPago.map((fecha, i) => {
       const pagoData = {
         contrato_id: parseInt(contratoId),
@@ -404,6 +464,7 @@ const InquilinosRegistrar = () => {
     });
     
     await Promise.all(promises);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -917,7 +978,10 @@ const InquilinosRegistrar = () => {
 
                           <div className="col-12 col-md-6">
                           <div className="form-group local-forms">
-                              <label>Monto Mensual <span className="login-danger">*</span></label>
+                              <label>
+                                {espacioSeleccionado.tipo === 'Local' ? 'Monto de alquiler' : 'Monto Mensual'} 
+                                <span className="login-danger">*</span>
+                              </label>
                               <input
                                 type="number"
                               className="form-control"

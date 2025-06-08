@@ -6,7 +6,7 @@ const inmuebleService = {
   obtenerInmuebles: async () => {
     try {
       const response = await api.get('/inmuebles');
-      
+
       // Verificar si la respuesta tiene la estructura esperada
       if (response.data && Array.isArray(response.data)) {
         return response.data;

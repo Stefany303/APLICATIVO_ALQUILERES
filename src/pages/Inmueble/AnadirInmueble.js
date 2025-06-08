@@ -25,6 +25,8 @@ const AnadirInmueble = () => {
     direccion: "",
     ubigeo: "",
     cantidad_pisos: "",
+    tiene_sotanos: false,
+    cantidad_sotanos: ""
   });
 
   const [propietarios, setPropietarios] = useState([]);
@@ -72,6 +74,10 @@ const AnadirInmueble = () => {
         return value && !isNaN(value) && Number(value) > 0
           ? ""
           : "La cantidad de pisos debe ser un número mayor que 0";
+      case "cantidad_sotanos":
+        return !formData.tiene_sotanos || (value && !isNaN(value) && Number(value) > 0)
+          ? ""
+          : "La cantidad de sótanos debe ser un número mayor que 0";
       default:
         return "";
     }
@@ -88,12 +94,23 @@ const AnadirInmueble = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const newValue = type === 'checkbox' ? checked : value;
+    
+    // Si se desmarca el checkbox de sótanos, resetear la cantidad
+    if (name === 'tiene_sotanos' && !checked) {
+      setFormData(prev => ({
+        ...prev,
+        [name]: newValue,
+        cantidad_sotanos: ""
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: newValue }));
+    }
 
-    // Validar solo ese campo en particular al cambiar
-    const error = validateField(name, value);
-    setFormErrors((prev) => ({ ...prev, [name]: error }));
+    // Validar el campo
+    const error = validateField(name, newValue);
+    setFormErrors(prev => ({ ...prev, [name]: error }));
   };
 
   const handleSelectChange = (selected, name) => {
@@ -117,7 +134,13 @@ const AnadirInmueble = () => {
     }
 
     try {
-      const response = await inmuebleService.crearInmueble(formData);
+      // Preparar los datos para enviar
+      const dataToSend = {
+        ...formData,
+        cantidad_sotanos: formData.tiene_sotanos ? Number(formData.cantidad_sotanos) : 0
+      };
+
+      const response = await inmuebleService.crearInmueble(dataToSend);
 
       if (response) {
         Swal.fire({
@@ -285,6 +308,40 @@ const AnadirInmueble = () => {
                           />
                           {formErrors.cantidad_pisos && (
                             <div className="invalid-feedback">{formErrors.cantidad_pisos}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="col-12 col-md-6 col-xl-6">
+                        <div className="form-group">
+                          <div className="checkbox">
+                            <label className="mb-2">
+                              <input
+                                type="checkbox"
+                                name="tiene_sotanos"
+                                checked={formData.tiene_sotanos}
+                                onChange={handleChange}
+                              /> ¿El edificio tiene sótanos?
+                            </label>
+                          </div>
+                          {formData.tiene_sotanos && (
+                            <div className="mt-2">
+                              <label>
+                                Cantidad de Sótanos <span className="login-danger">*</span>
+                              </label>
+                              <input
+                                className={`form-control ${formErrors.cantidad_sotanos ? "is-invalid" : ""}`}
+                                type="number"
+                                min="1"
+                                name="cantidad_sotanos"
+                                value={formData.cantidad_sotanos}
+                                onChange={handleChange}
+                                required
+                              />
+                              {formErrors.cantidad_sotanos && (
+                                <div className="invalid-feedback">{formErrors.cantidad_sotanos}</div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

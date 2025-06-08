@@ -41,7 +41,7 @@ const pagoService = {
       return response.data;
     } catch (error) {
       if (error.response && error.response.data && error.response.data.message) {
-        throw new Error(`Error del servidor: ${error.response.data.message}`);
+          throw new Error(`Error del servidor: ${error.response.data.message}`);
       } else if (error.request) {
         throw new Error('No se pudo conectar con el servidor. Verifique su conexión a internet.');
       }
@@ -67,7 +67,7 @@ const pagoService = {
           datosActualizados[campo] = moment(datosActualizados[campo]).format('YYYY-MM-DD');
         }
       });
-
+      
       // Validar campos requeridos
       const camposRequeridos = ['contrato_id', 'monto', 'tipo_pago', 'estado', 'fecha_pago'];
       const camposFaltantes = camposRequeridos.filter(campo => 
@@ -82,7 +82,7 @@ const pagoService = {
       return response.data;
     } catch (error) {
       if (error.response && error.response.data && error.response.data.message) {
-        throw new Error(`Error del servidor: ${error.response.data.message}`);
+          throw new Error(`Error del servidor: ${error.response.data.message}`);
       }
       throw error;
     }

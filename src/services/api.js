@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_URL, environment } from './environment';
+import { message } from 'antd';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -8,7 +9,7 @@ const api = axios.create({
     "Content-Type": "application/json",
     "Accept": "application/json"
   },
-  withCredentials: false // Deshabilitamos withCredentials ya que no lo necesitamos para este caso
+  withCredentials: false
 });
 
 // Variable para controlar si ya estamos redirigiendo
@@ -30,11 +31,32 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+// Función para limpiar la sesión
+const clearSession = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  localStorage.removeItem('lastActivity');
+};
+
+// Función para manejar la expiración del token
+const handleTokenExpiration = () => {
+  if (isRedirecting) return; // Evitar múltiples redirecciones
+  
+  isRedirecting = true;
+  clearSession();
+  
+  // Mostrar mensaje al usuario
+  message.error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+  
+  // Redirigir al login
+  window.location.href = '/login';
+};
+
 // Interceptor para agregar el token de autenticación a todas las peticiones
 api.interceptors.request.use(
   (config) => {
     // Si estamos enviando un FormData, no establecer Content-Type
-    // Axios lo configurará automáticamente con el boundary correcto
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -56,12 +78,60 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
-    // Si recibimos un 401 Unauthorized, el token puede haber expirado
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token'); // Limpiar token
-      window.location.href = '/login'; // Redirigir al login
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Si recibimos un 401 Unauthorized y no es una petición de refresh
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/auth/renovar-token')) {
+      console.log('[API] 401 detectado. Intentando refresh de token...');
+      if (isRefreshing) {
+        // Si ya estamos refrescando, encolar la petición
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(token => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch(err => {
+            return Promise.reject(err);
+          });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          console.log('[API] No refresh token disponible.');
+          throw new Error('No refresh token available');
+        }
+
+        const response = await api.post('/auth/renovar-token', { refreshToken });
+        const { token } = response.data;
+        console.log('[API] Token refrescado correctamente.');
+
+        localStorage.setItem('token', token);
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        originalRequest.headers['Authorization'] = `Bearer ${token}`;
+
+        processQueue(null, token);
+        return api(originalRequest);
+      } catch (refreshError) {
+        console.log('[API] Error al refrescar token. Limpiando sesión...');
+        processQueue(refreshError, null);
+        handleTokenExpiration();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
+    if (error.response?.status === 401) {
+      console.log('[API] 401 detectado. Token inválido. Limpiando sesión...');
+    }
+
     return Promise.reject(error);
   }
 );

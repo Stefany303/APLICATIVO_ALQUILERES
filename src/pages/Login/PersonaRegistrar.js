@@ -18,6 +18,8 @@ const PersonaRegistrar = () => {
     telefono: '',
     direccion: '',
     rol: '', // Valor por defecto
+    usuario: '', // Nuevo campo para usuario de sistema
+    password: '', // Nuevo campo para contraseña de sistema
   });
 
   const [formErrors, setFormErrors] = useState({});
@@ -39,6 +41,10 @@ const PersonaRegistrar = () => {
         return value ? "" : "La dirección es requerida";
       case "rol":
         return value ? "" : "El rol es requerido";
+      case "usuario":
+        return createAccount && !value ? "El usuario es requerido" : "";
+      case "password":
+        return createAccount && (!value || value.length < 6) ? "La contraseña debe tener al menos 6 caracteres" : "";
       default:
         return "";
     }
@@ -77,33 +83,73 @@ const PersonaRegistrar = () => {
     }
 
     try {
-      await personaService.crearPersona(formData);
-      Swal.fire({
-        title: "¡Éxito!",
-        text: "La persona ha sido registrada correctamente",
-        icon: "success",
-        confirmButtonText: "Aceptar"
-      }).then(() => {
-        // Limpiar el formulario después de un registro exitoso
-        setFormData({
-          dni: '',
-          nombre: '',
-          apellido: '',
-          email: '',
-          telefono: '',
-          direccion: '',
-          rol: '',
+      if (createAccount) {
+        // Enviar a /api/auth/registrar
+        await personaService.registrarPersonaYUsuario({
+          dni: formData.dni,
+          nombre: formData.nombre,
+          apellido: formData.apellido,
+          email: formData.email,
+          telefono: formData.telefono,
+          direccion: formData.direccion,
+          rol: formData.rol,
+          usuario: formData.usuario,
+          contraseña: formData.password
         });
-        setCreateAccount(false);
-      });
+        Swal.fire({
+          title: "¡Éxito!",
+          text: "La persona y el usuario han sido registrados correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar"
+        }).then(() => {
+          setFormData({
+            dni: '', nombre: '', apellido: '', email: '', telefono: '', direccion: '', rol: '', usuario: '', password: ''
+          });
+          setCreateAccount(false);
+        });
+      } else {
+        // Enviar a /api/personas/
+        await personaService.crearPersona({
+          dni: formData.dni,
+          nombre: formData.nombre,
+          apellido: formData.apellido,
+          email: formData.email,
+          telefono: formData.telefono,
+          direccion: formData.direccion,
+          rol: formData.rol
+        });
+        Swal.fire({
+          title: "¡Éxito!",
+          text: "La persona ha sido registrada correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar"
+        }).then(() => {
+          setFormData({
+            dni: '', nombre: '', apellido: '', email: '', telefono: '', direccion: '', rol: '', usuario: '', password: ''
+          });
+          setCreateAccount(false);
+        });
+      }
     } catch (error) {
       console.error('Error registrando persona:', error);
-      Swal.fire({
-        title: "Error",
-        text: error.response?.data?.mensaje || "Error al registrar la persona",
-        icon: "error",
-        confirmButtonText: "Aceptar"
-      });
+      // Depuración: ver la respuesta del backend
+      console.log('Respuesta del backend:', error.response);
+      const mensaje = error.response?.data?.mensaje;
+      if (mensaje === "El email ya está registrado") {
+        Swal.fire({
+          title: "Email duplicado",
+          text: mensaje,
+          icon: "warning",
+          confirmButtonText: "Aceptar"
+        });
+      } else {
+        Swal.fire({
+          title: "Error",
+          text: mensaje || "Error al registrar la persona o usuario",
+          icon: "error",
+          confirmButtonText: "Aceptar"
+        });
+      }
     }
   };
 
@@ -125,6 +171,8 @@ const PersonaRegistrar = () => {
           telefono: '',
           direccion: '',
           rol: '',
+          usuario: '',
+          password: '',
         });
         setCreateAccount(false);
         setFormErrors({});
@@ -328,15 +376,34 @@ const PersonaRegistrar = () => {
                       <>
                         <div className="col-12 col-md-6 col-xl-6">
                           <div className="form-group local-forms">
-                            <label>Usuario</label>
-                            <input className="form-control" type="text" />
+                            <label>Usuario <span className="login-danger">*</span></label>
+                            <input
+                              className={`form-control ${formErrors.usuario ? "is-invalid" : ""}`}
+                              name="usuario"
+                              value={formData.usuario}
+                              onChange={handleChange}
+                              type="text"
+                              required
+                            />
+                            {formErrors.usuario && (
+                              <div className="invalid-feedback">{formErrors.usuario}</div>
+                            )}
                           </div>
                         </div>
-                        
                         <div className="col-12 col-md-6 col-xl-6">
                           <div className="form-group local-forms">
                             <label>Contraseña <span className="login-danger">*</span></label>
-                            <input className="form-control" type="password" required />
+                            <input
+                              className={`form-control ${formErrors.password ? "is-invalid" : ""}`}
+                              name="password"
+                              value={formData.password}
+                              onChange={handleChange}
+                              type="password"
+                              required
+                            />
+                            {formErrors.password && (
+                              <div className="invalid-feedback">{formErrors.password}</div>
+                            )}
                           </div>
                         </div>
                       </>

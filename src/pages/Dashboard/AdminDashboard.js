@@ -54,7 +54,7 @@ const AdminDashboard = () => {
         if (!estadisticas) {
           throw new Error('No se recibieron datos del dashboard');
         }
-
+        
         // Calcular tendencia de ingresos
         const calcularTendenciaIngresos = () => {
           const arr = estadisticas.ingresos_mensuales;
@@ -67,7 +67,7 @@ const AdminDashboard = () => {
           }
           return 0;
         };
-
+        
         // Calcular tendencia de ocupación
         const calcularTendenciaOcupacion = () => {
           const esp = estadisticas.espacios;
@@ -223,14 +223,14 @@ const AdminDashboard = () => {
                 </ul>
               </Col>
             </Row>
-          </div>
+              </div>
           
           <div className="dashboard-header">
             <div className="welcome-section">
               <div className="welcome-text">
                 <h2>Bienvenido, <span>{user?.nombre || ''} {user?.apellido || ''}</span></h2>
-                <p>Panel de control del sistema de alquileres - {moment().format('DD/MM/YYYY')}</p>
-              </div>
+                  <p>Panel de control del sistema de alquileres - {moment().format('DD/MM/YYYY')}</p>
+                </div>
               <div className="dashboard-actions">
                 <div className="year-selector">
                   <span>Seleccionar año:</span>
@@ -256,75 +256,75 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
-
+          
           <div className="kpi-grid">
             <div className="kpi-card clientes-card">
               <div className="kpi-icon">
                 <FaUsers />
-              </div>
+                </div>
               <div className="kpi-content">
-                <h4>Total Clientes</h4>
-                <h2>
+                  <h4>Total Clientes</h4>
+                  <h2>
                   <CountUp end={dashboardData.inquilinos.total} duration={0.6} />
-                </h2>
-                <p>
+                  </h2>
+                  <p>
                   <span className="kpi-subtext">
                     {dashboardData.inquilinos.activos} activos
                   </span>
-                </p>
+                  </p>
+                </div>
               </div>
-            </div>
 
             <div className="kpi-card espacios-card">
               <div className="kpi-icon">
                 <FaHome />
-              </div>
+            </div>
               <div className="kpi-content">
-                <h4>Espacios Disponibles</h4>
-                <h2>
+                  <h4>Espacios Disponibles</h4>
+                  <h2>
                   <CountUp end={dashboardData.espacios.disponibles} duration={0.6} />
-                </h2>
-                <p>
+                  </h2>
+                  <p>
                   <span className="kpi-subtext">
                     {calcularPorcentaje(dashboardData.espacios.disponibles, dashboardData.espacios.total)}% del total
                   </span>
-                </p>
+                  </p>
+                </div>
               </div>
-            </div>
 
             <div className="kpi-card ingresos-card">
               <div className="kpi-icon">
                 <FaMoneyBillWave />
-              </div>
+            </div>
               <div className="kpi-content">
-                <h4>Ingresos Mensuales</h4>
-                <h2>
+                  <h4>Ingresos Mensuales</h4>
+                  <h2>
                   S/<CountUp 
                     end={ingresoMesActual}
                     duration={0.6}
                     decimals={2}
                   />
-                </h2>
-                <p>
+                  </h2>
+                  <p>
                   {renderTendencia(dashboardData.tendencias.ingresos)} vs mes anterior
-                </p>
+                  </p>
+                </div>
               </div>
-            </div>
 
             <div className="kpi-card contratos-card">
               <div className="kpi-icon">
                 <FaFileContract />
-              </div>
+            </div>
               <div className="kpi-content">
                 <h4>Contratos por Vencer</h4>
                 <h2>
                   <CountUp end={dashboardData.contratosPorVencer.length} duration={0.6} />
-                </h2>
+                  </h2>
                 <p>En los próximos 30 días</p>
               </div>
             </div>
           </div>
-
+          
           <div className="dashboard-widgets">
             <div className="widget-card">
               <div className="widget-header">
@@ -333,34 +333,34 @@ const AdminDashboard = () => {
               </div>
               <div className="widget-content">
                 <div className="ocupacion-progress">
-                  <Progress
-                    type="circle"
+                    <Progress 
+                      type="circle" 
                     percent={calcularPorcentaje(
                       dashboardData.espacios.ocupados,
                       dashboardData.espacios.total
                     )}
-                    strokeColor={{
+                      strokeColor={{
                       '0%': '#4361ee',
                       '100%': '#06d6a0'
-                    }}
+                      }}
                     strokeWidth={10}
                     width={150}
                     format={percent => `${percent}%`}
-                  />
+                    />
                   <div className="ocupacion-stats">
                     <div className="stat-item">
                       <span className="stat-label">Ocupados</span>
                       <span className="stat-value">{dashboardData.espacios.ocupados}</span>
-                    </div>
+                  </div>
                     <div className="stat-item">
                       <span className="stat-label">Disponibles</span>
                       <span className="stat-value">{dashboardData.espacios.disponibles}</span>
-                    </div>
+                                  </div>
                     <div className="stat-item">
                       <span className="stat-label">Total</span>
                       <span className="stat-value">{dashboardData.espacios.total}</span>
-                    </div>
-                  </div>
+                                  </div>
+                                </div>
                 </div>
                 <div className="tendencia-ocupacion">
                   <span>Tendencia: </span>
@@ -369,21 +369,21 @@ const AdminDashboard = () => {
                       dashboardData.espacios.ocupados,
                       dashboardData.espacios.total
                   ))}
+                    </div>
                 </div>
               </div>
-            </div>
 
             <div className="widget-card">
               <div className="widget-header">
                 <FaFileContract className="widget-icon" />
                 <h3>Contratos por Vencer</h3>
-              </div>
+            </div>
               <div className="widget-content">
                 <div className="contratos-summary">
                   <div className="contratos-count">
                     <span className="count">{dashboardData.contratosPorVencer.length}</span>
                     <span>contratos próximos a vencer</span>
-                  </div>
+                    </div>
                   <div className="contratos-warning">
                     <FaExclamationTriangle className="warning-icon" />
                     <span>Revise los detalles</span>
@@ -393,47 +393,47 @@ const AdminDashboard = () => {
                 {dashboardData.contratosPorVencer.length > 0 ? (
                   <div className="contratos-table">
                     <table>
-                      <thead>
-                        <tr>
-                          <th>Inquilino</th>
-                          <th>Espacio</th>
-                          <th>Días</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                          <thead>
+                            <tr>
+                              <th>Inquilino</th>
+                              <th>Espacio</th>
+                              <th>Días</th>
+                            </tr>
+                          </thead>
+                          <tbody>
                         {dashboardData.contratosPorVencer.slice(0, 5).map((contrato) => (
-                          <tr key={contrato.id}>
+                              <tr key={contrato.id}>
                             <td title={contrato.inquilino_nombre}>
                               {contrato.inquilino_nombre.length > 15
                                 ? contrato.inquilino_nombre.substring(0, 12) + "..."
                                 : contrato.inquilino_nombre}
                             </td>
-                            <td title={contrato.espacio_nombre}>{contrato.espacio_nombre}</td>
+                                <td title={contrato.espacio_nombre}>{contrato.espacio_nombre}</td>
                             <td className={contrato.dias_restantes <= 7 ? "dias-peligro" : "dias-advertencia"}>
-                              {contrato.dias_restantes}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                  {contrato.dias_restantes}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                 ) : (
                   <div className="no-contratos">
                     <p>No hay contratos próximos a vencer</p>
-                  </div>
-                )}
+                    </div>
+                  )}
                 
                 <Link to="/contrato-registros" className="widget-link">
                   Ver todos los contratos <FaChevronRight />
                 </Link>
+                </div>
               </div>
-            </div>
 
             <div className="widget-card">
               <div className="widget-header">
                 <FaMoneyBillWave className="widget-icon" />
                 <h3>Pagos Registrados (Mes)</h3>
-              </div>
+            </div>
               <div className="widget-content">
                 <div className="ingresos-summary">
                   <div className="ingresos-amount">
@@ -442,7 +442,7 @@ const AdminDashboard = () => {
                       duration={0.6}
                       decimals={2}
                     />
-                  </div>
+                    </div>
                   <div className="ingresos-tendencia">
                     {renderTendencia(dashboardData.tendencias.ingresos)}
                   </div>
@@ -455,8 +455,8 @@ const AdminDashboard = () => {
                       const mesFormateado = moment(item.mes, "YYYY-MM").format("MMM");
                       const maxVal = Math.max(...dashboardData.ingresosMensuales.map(i => i.total_ingresos), 1000);
                       const height = (item.total_ingresos / maxVal) * 100;
-                      
-                      return (
+                            
+                            return (
                         <div className="bar-container" key={index}>
                           <div className="bar-label">{mesFormateado}</div>
                           <div className="bar-bg">
@@ -467,50 +467,50 @@ const AdminDashboard = () => {
                           </div>
                           <div className="bar-value">S/{item.total_ingresos.toFixed(0)}</div>
                         </div>
-                      );
-                    })}
-                  </div>
+                            );
+                          })}
+                    </div>
                 </div>
-                
+
                 <Link to="/contabilidad-pagos" className="widget-link">
                   Ver todos los ingresos <FaChevronRight />
-                </Link>
+                  </Link>
               </div>
             </div>
           </div>
-
+          
           <div className="charts-container">
             <div className="chart-card">
               <div className="chart-header">
                 <FaChartLine className="chart-icon" />
                 <h3>Tendencias de Ingresos</h3>
-              </div>
+                    </div>
               <div className="chart-content">
                 <TendenciasIngresosChart
                   ingresos={ingresosFiltrados}
                   ingresosPrevistos={ingresosPrevistosFiltrados}
                   selectedYear={selectedYear}
                 />
-              </div>
             </div>
+          </div>
 
             <div className="chart-card">
               <div className="chart-header">
                 <FaChartLine className="chart-icon" />
                 <h3>Análisis Financiero</h3>
-              </div>
+                      </div>
               <div className="chart-content">
-                <IngresosGastosChart
+                  <IngresosGastosChart
                   ingresos={ingresosFiltrados}
                   ingresosPrevistos={ingresosPrevistosFiltrados}
                   gastos={gastosFiltrados}
                   selectedYear={selectedYear}
-                />
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
       <style jsx>{`
         .page-wrapper {

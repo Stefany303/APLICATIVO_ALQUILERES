@@ -4,7 +4,7 @@ import { API_URL } from './environment';
 // Configurar axios para manejar errores de conexión
 api.defaults.timeout = 10000; // 10 segundos de timeout
 api.defaults.validateStatus = function (status) {
-  return status >= 200 && status < 500; // Aceptar cualquier status que no sea error del servidor
+  return status >= 200 && status < 300; // Solo 2xx es éxito
 };
 
 // Función para obtener el token del localStorage

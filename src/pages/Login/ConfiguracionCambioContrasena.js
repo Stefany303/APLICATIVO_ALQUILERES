@@ -1,9 +1,99 @@
-import React from 'react'
+import React, { useState } from 'react';
 import Sidebar from '../../components/Sidebar'
 import Header from '../../components/Header'
-import { Link } from 'react-router-dom'
-import { FaChevronRight } from 'react-icons/fa';
+import { Link, useNavigate } from 'react-router-dom'
+import { FaChevronRight, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import Swal from 'sweetalert2';
+import personaService from '../../services/personaService';
+
+const reglas = [
+  {
+    key: 'minLength',
+    label: 'Al menos 8 caracteres',
+    test: (v) => v.length >= 8,
+  },
+  {
+    key: 'mayuscula',
+    label: 'Al menos una mayúscula',
+    test: (v) => /[A-Z]/.test(v),
+  },
+  {
+    key: 'minuscula',
+    label: 'Al menos una minúscula',
+    test: (v) => /[a-z]/.test(v),
+  },
+  {
+    key: 'numero',
+    label: 'Al menos un número',
+    test: (v) => /[0-9]/.test(v),
+  },
+  {
+    key: 'simbolo',
+    label: 'Al menos un símbolo (!@#$%^&*)',
+    test: (v) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(v),
+  },
+];
+
 const ConfiguracionCambioContrasena = () => {
+  const [anterior, setAnterior] = useState('');
+  const [nueva, setNueva] = useState('');
+  const [confirmar, setConfirmar] = useState('');
+  const [tocado, setTocado] = useState(false);
+  const [cargando, setCargando] = useState(false);
+  const navigate = useNavigate();
+
+  // Validaciones
+  const reglasCumplidas = reglas.map(r => r.test(nueva));
+  const todasCumplidas = reglasCumplidas.every(Boolean);
+  const coincide = nueva === confirmar && nueva.length > 0;
+
+  const puedeGuardar = todasCumplidas && coincide && anterior.length > 0 && !cargando;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setTocado(true);
+  
+    if (!puedeGuardar) return;
+  
+    setCargando(true);
+    try {
+      await personaService.cambiarContrasena(anterior, nueva);
+  
+      Swal.fire({
+        title: '¡Éxito!',
+        text: 'La contraseña se cambió correctamente',
+        icon: 'success',
+        confirmButtonText: 'Aceptar'
+      }).then(() => {
+        navigate('/login');
+      });
+  
+      setAnterior('');
+      setNueva('');
+      setConfirmar('');
+      setTocado(false);
+    } catch (error) {
+      const mensajeError = error.response?.data?.mensaje;
+      let textoError = 'No se pudo cambiar la contraseña';
+      
+      if (mensajeError && mensajeError.toLowerCase().includes('incorrecta')) {
+        textoError = 'La contraseña actual es incorrecta';
+      } else if (mensajeError) {
+        textoError = mensajeError;
+      }
+
+      Swal.fire({
+        title: 'Error',
+        text: textoError,
+        icon: 'error',
+        confirmButtonText: 'Aceptar'
+      });
+    } finally {
+      setCargando(false);
+    }
+  };
+  
+
   return (
     <div>
         <Header/>
@@ -34,7 +124,7 @@ const ConfiguracionCambioContrasena = () => {
       <div className="col-md-12">
         <div className="card">
           <div className="card-body">
-            <form>
+            <form onSubmit={handleSubmit} autoComplete="off">
               <div className="row">
                 <h4 className="page-title">Cambio de Contraseña</h4>
                 <div className="col-12 col-md-6 col-xl-12">
@@ -44,8 +134,10 @@ const ConfiguracionCambioContrasena = () => {
                     </label>
                     <input
                       className="form-control"
-                      type="text"
-                      placeholder=""
+                      type="password"
+                      value={anterior}
+                      onChange={e => setAnterior(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
@@ -56,9 +148,20 @@ const ConfiguracionCambioContrasena = () => {
                     </label>
                     <input
                       className="form-control"
-                      type="text"
-                      placeholder=""
+                      type="password"
+                      value={nueva}
+                      onChange={e => setNueva(e.target.value)}
+                      required
+                      onBlur={() => setTocado(true)}
                     />
+                    <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: 10 }}>
+                      {reglas.map((r, i) => (
+                        <li key={r.key} style={{ color: reglasCumplidas[i] ? '#28a745' : '#dc3545', display: 'flex', alignItems: 'center', fontSize: 15 }}>
+                          {reglasCumplidas[i] ? <FaCheckCircle style={{ marginRight: 6 }} /> : <FaTimesCircle style={{ marginRight: 6 }} />}
+                          {r.label}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
                 <div className="col-12 col-md-6 col-xl-6">
@@ -68,9 +171,17 @@ const ConfiguracionCambioContrasena = () => {
                     </label>
                     <input
                       className="form-control"
-                      type="text"
-                      placeholder=""
+                      type="password"
+                      value={confirmar}
+                      onChange={e => setConfirmar(e.target.value)}
+                      required
+                      onBlur={() => setTocado(true)}
                     />
+                    {tocado && confirmar && !coincide && (
+                      <div style={{ color: '#dc3545', fontSize: 14, marginTop: 4 }}>
+                        Las contraseñas no coinciden
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="col-12">
@@ -78,8 +189,10 @@ const ConfiguracionCambioContrasena = () => {
                     <button
                       type="submit"
                       className="btn btn-primary submit-form me-2"
+                      disabled={!puedeGuardar}
+                      style={{ opacity: puedeGuardar ? 1 : 0.6 }}
                     >
-                      Guardar
+                      {cargando ? 'Guardando...' : 'Guardar'}
                     </button>
                   </div>
                 </div>
