@@ -42,6 +42,7 @@ const ContabilidadGastos = () => {
   const [modalDeleteVisible, setModalDeleteVisible] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [updatedData, setUpdatedData] = useState(null);
+  const [documentoExistente, setDocumentoExistente] = useState(null);
 
   const [inmuebles, setInmuebles] = useState([]);
 
@@ -292,13 +293,13 @@ const ContabilidadGastos = () => {
   };
 
   // Función para editar un gasto existente
-  const editarGasto = (gasto) => {
+  const editarGasto = async (gasto) => {
     setGastoSeleccionado(gasto);
     
     // Formatear fecha para el DatePicker (DD/MM/YYYY)
     let fechaFormateada = '';
-    if (gasto.fecha_gasto) {
-      const fecha = new Date(gasto.fecha_gasto);
+    if (gasto.fecha) {
+      const fecha = new Date(gasto.fecha);
       const dia = fecha.getDate().toString().padStart(2, '0');
       const mes = (fecha.getMonth() + 1).toString().padStart(2, '0');
       const anio = fecha.getFullYear();
@@ -307,11 +308,28 @@ const ContabilidadGastos = () => {
     
     setFormData({
       inmuebleId: gasto.inmueble_id,
-      concepto: gasto.concepto || '',
+      concepto: gasto.descripcion || '',
       monto: gasto.monto || '',
       fechaGasto: fechaFormateada,
-      categoria: gasto.categoria || '',
+      categoria: gasto.tipo_gasto || '',
     });
+
+    // Limpiar y preparar para posible cambio de documento
+    setDocumento(null);
+    setDocumentoExistente(null);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+    
+    // Buscar si hay un documento asociado
+    try {
+        const documentos = await documentoService.obtenerDocumentosPorTipo(gasto.id, 'gasto');
+        if (documentos && documentos.length > 0) {
+            setDocumentoExistente(documentos[0]);
+        }
+    } catch (error) {
+        console.error("Error al obtener documento existente:", error);
+    }
     
     setModalVisible(true);
   };
@@ -594,10 +612,21 @@ const ContabilidadGastos = () => {
     }));
   };
 
+  // ESTILOS CORREGIDOS PARA LOS SELECTS
   const customStyles = {
-    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    menuPortal: base => ({ 
+      ...base, 
+      zIndex: 9999,
+      backgroundColor: 'white'  // Fondo sólido para evitar transparencia
+    }),
+    menu: base => ({
+      ...base,
+      backgroundColor: 'white',
+      zIndex: 9999,
+    }),
     control: (base, state) => ({
       ...base,
+      backgroundColor: 'white',
       borderColor: state.isFocused ? "#2e37a4" : "rgba(46, 55, 164, 0.1)",
       boxShadow: state.isFocused ? "0 0 0 1px #2e37a4" : "none",
       "&:hover": {
@@ -606,6 +635,14 @@ const ContabilidadGastos = () => {
       borderRadius: "10px",
       fontSize: "14px",
       minHeight: "45px",
+    }),
+    placeholder: base => ({
+      ...base,
+      color: '#6c757d',
+    }),
+    singleValue: base => ({
+      ...base,
+      color: '#212529',
     }),
     dropdownIndicator: (base, state) => ({
       ...base,
@@ -725,9 +762,44 @@ const ContabilidadGastos = () => {
       // Actualizar el gasto
       await gastoService.actualizarGasto(gastoSeleccionado.id, gastoData);
 
+      // Si hay un nuevo documento, subirlo para reemplazar el anterior
+      if (documento) {
+        try {
+          const gastoID = gastoSeleccionado.id;
+          const respuestaArchivo = await documentoService.subirArchivo(
+            documento,
+            gastoID,
+            'gasto',
+            { carpetaDestino: 'documentos/gasto' }
+          );
+
+          if (!respuestaArchivo || !respuestaArchivo.ruta) {
+            throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
+          }
+
+          // Registrar el nuevo documento (asumiendo que el backend maneja el reemplazo)
+          const documentoData = {
+            nombre: documento.name,
+            ruta: respuestaArchivo.ruta,
+            documentable_id: gastoID,
+            documentable_type: 'gasto'
+          };
+          
+          await documentoService.crearDocumento(documentoData);
+          message.success('El documento se ha actualizado con éxito.');
+
+        } catch (docError) {
+          console.error('Error al subir el nuevo documento:', docError);
+          message.error(`El gasto se actualizó, pero hubo un error al subir el nuevo documento.`);
+        }
+      }
+
       // Guardar los datos actualizados y mostrar el modal de éxito
-      setUpdatedData(formData);
-      setModalEditVisible(false);
+      setUpdatedData({
+        ...gastoData,
+        inmueble_nombre: inmuebles.find(i => i.value === formData.inmuebleId)?.label || 'N/A'
+      });
+      setModalVisible(false);
       setShowSuccessModal(true);
 
       // Recargar la lista de gastos
@@ -902,7 +974,7 @@ const ContabilidadGastos = () => {
         </div>
       </div>
 
-      {/* Modal para agregar/editar gasto */}
+      {/* Modal para agregar/editar gasto - CORRECCIONES APLICADAS */}
       <Modal
         title={
           <span>
@@ -920,12 +992,14 @@ const ContabilidadGastos = () => {
         destroyOnClose={true}
         centered
         maskClosable={false}
+        style={{ zIndex: 1000 }}  // Asegurar z-index adecuado
       >
         <form onSubmit={gastoSeleccionado ? handleSubmitEdit : handleSubmit}>
           <div className="row">
+            {/* CAMPO INMUEBLE - CORREGIDO */}
             <div className="col-12 col-md-6">
-              <div className="form-group local-forms">
-                <label>
+              <div className="form-group local-forms" style={{ position: 'relative', zIndex: 1 }}>
+                <label className="form-label-highlight">
                   Inmueble
                   <span className="login-danger">*</span>
                 </label>
@@ -937,12 +1011,16 @@ const ContabilidadGastos = () => {
                   placeholder="Seleccionar inmueble"
                   value={inmuebles.find(i => i.value === formData.inmuebleId) || null}
                   required
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
                 />
               </div>
             </div>
+            
+            {/* CAMPO CONCEPTO */}
             <div className="col-12 col-md-6">
               <div className="form-group local-forms">
-                <label>
+                <label className="form-label-highlight">
                   Concepto
                   <span className="login-danger">*</span>
                 </label>
@@ -957,9 +1035,11 @@ const ContabilidadGastos = () => {
                 />
               </div>
             </div>
+            
+            {/* CAMPO FECHA */}
             <div className="col-12 col-md-6">
               <div className="form-group local-forms cal-icon">
-                <label>
+                <label className="form-label-highlight">
                   Fecha del Gasto
                   <span className="login-danger">*</span>
                 </label>
@@ -973,9 +1053,11 @@ const ContabilidadGastos = () => {
                 />
               </div>
             </div>
+            
+            {/* CAMPO MONTO */}
             <div className="col-12 col-md-6">
               <div className="form-group local-forms">
-                <label>
+                <label className="form-label-highlight">
                   Monto
                   <span className="login-danger">*</span>
                 </label>
@@ -992,9 +1074,11 @@ const ContabilidadGastos = () => {
                 />
               </div>
             </div>
+            
+            {/* CAMPO CATEGORÍA - CORREGIDO */}
             <div className="col-12 col-md-6">
-              <div className="form-group local-forms">
-                <label>
+              <div className="form-group local-forms" style={{ position: 'relative', zIndex: 1 }}>
+                <label className="form-label-highlight">
                   Categoría
                   <span className="login-danger">*</span>
                 </label>
@@ -1006,16 +1090,31 @@ const ContabilidadGastos = () => {
                   placeholder="Seleccionar categoría"
                   value={categoriasGasto.find(c => c.value === formData.categoria) || null}
                   required
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
                 />
               </div>
             </div>
             
+            {/* CAMPO DOCUMENTO */}
             <div className="col-12">
               <div className="form-group local-forms">
                 <label>Documento de Respaldo</label>
+
+                {/* Mostrar documento existente si estamos editando */}
+                {gastoSeleccionado && documentoExistente && (
+                  <div className="alert alert-info p-2 mt-2">
+                    <p className="mb-0">
+                      <FiFileText className="me-2" />
+                      Documento actual: <strong>{documentoExistente.nombre}</strong>
+                    </p>
+                    <small>Para reemplazarlo, simplemente seleccione un nuevo archivo.</small>
+                  </div>
+                )}
+
                 <input
                   type="file"
-                  className="form-control"
+                  className="form-control mt-2"
                   onChange={handleFileChange}
                   ref={fileInputRef}
                   accept=".pdf"
@@ -1026,6 +1125,7 @@ const ContabilidadGastos = () => {
               </div>
             </div>
             
+            {/* BOTONES */}
             <div className="col-12">
               <div className="doctor-submit text-end">
                 <button
@@ -1231,6 +1331,43 @@ const ContabilidadGastos = () => {
           )}
         </div>
       </Modal>
+
+      {/* Estilos adicionales para resolver problemas de superposición */}
+      <style>{`
+        /* Solución para labels superpuestos */
+        .form-label-highlight {
+          position: relative;
+          z-index: 1;
+          display: block;
+          margin-bottom: 8px;
+          font-weight: 500;
+        }
+        
+        /* Fondo sólido para selects */
+        .react-select__control {
+          background-color: white !important;
+        }
+        
+        /* Ajuste de z-index para modales */
+        .ant-modal-wrap {
+          z-index: 1050 !important;
+        }
+        
+        .ant-modal {
+          z-index: 1051 !important;
+        }
+        
+        /* Mejoras visuales para selects */
+        .react-select__menu {
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+          border-radius: 8px !important;
+          border: 1px solid #e8e8e8 !important;
+        }
+        
+        .react-select__option {
+          padding: 8px 12px !important;
+        }
+      `}</style>
     </>
   );
 };

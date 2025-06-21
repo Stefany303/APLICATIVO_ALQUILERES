@@ -7,13 +7,14 @@ import Sidebar from "../../components/Sidebar";
 import { plusicon, refreshicon, searchnormal, pdficon, pdficon3, pdficon4 } from '../../components/imagepath';
 import { FiChevronRight } from "react-icons/fi";
 import { onShowSizeChange, itemRender } from '../../components/Pagination';
-import { Table, DatePicker, message, Spin, Modal, Button, Form, Input, DatePicker as AntDatePicker } from 'antd';
-import Select from 'react-select';
+import { Table, DatePicker, Spin, Modal, Button, Form, Input, DatePicker as AntDatePicker, Select, App } from 'antd';
+import ReactSelect from 'react-select';
 import { useAuth } from "../../utils/AuthContext";
 import contratoService from "../../services/contratoService";
 import inmuebleService from "../../services/inmuebleService";
 import pisoService from "../../services/pisoService";
 import documentoService from "../../services/documentoService";
+import espacioService from "../../services/espacioService";
 import { API_URL } from "../../services/authService";
 import moment from 'moment';
 import { SearchOutlined, PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SaveOutlined, FileExcelOutlined } from '@ant-design/icons';
@@ -22,12 +23,13 @@ import * as XLSX from 'xlsx';
 const { TextArea } = Input;
 const { RangePicker } = AntDatePicker;
 
-const ContratoRegistros = () => {
+const ContratoRegistrosContent = () => {
   const navigate = useNavigate();
   const { estaAutenticado, getAuthToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [form] = Form.useForm();
+  const { message, modal } = App.useApp();
   
   // Estados para datos
   const [contratos, setContratos] = useState([]);
@@ -46,6 +48,7 @@ const ContratoRegistros = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [contratoSeleccionado, setContratoSeleccionado] = useState(null);
   const [loadingSave, setLoadingSave] = useState(false);
+  const [loadingFinalizar, setLoadingFinalizar] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false); // Modal para subir contrato firmado
   const [generatingPdf, setGeneratingPdf] = useState(false); // Estado para indicar generación de PDF
   const [uploadingDocument, setUploadingDocument] = useState(false); // Estado para carga de documento
@@ -83,44 +86,18 @@ const ContratoRegistros = () => {
     
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
       try {
-        // Cargar inmuebles para los filtros
-        const inmueblesData = await inmuebleService.obtenerInmuebles();
-        setInmuebles(inmueblesData);
-        
-        // Cargar contratos con detalles
-        const contratosData = await contratoService.obtenerContratosDetalles();
-        
-        if (Array.isArray(contratosData)) {
-          // Para cada contrato, obtener su documento si existe
-          const contratosConDocumentos = await Promise.all(
-            contratosData.map(async (contrato) => {
-              try {
-                const documentos = await documentoService.obtenerDocumentosPorDocumentable(
-                  contrato.id,
-                  'contrato'
-                );
-                return {
-                  ...contrato,
-                  documento: documentos && documentos.length > 0 ? documentos[0] : null
-                };
-              } catch (error) {
-                console.error(`Error al obtener documento para contrato ${contrato.id}:`, error);
-                return contrato;
-              }
-            })
-          );
-          
-          setContratos(contratosConDocumentos);
-          setFilteredContratos(contratosConDocumentos);
-        } else {
-          console.error('Los datos de contratos no son un array:', contratosData);
-          setContratos([]);
-          setFilteredContratos([]);
-        }
+        const [contratosData, inmueblesData] = await Promise.all([
+          contratoService.obtenerContratosDetalles(),
+          inmuebleService.obtenerInmuebles(),
+        ]);
+        setContratos(Array.isArray(contratosData) ? contratosData : []);
+        setFilteredContratos(Array.isArray(contratosData) ? contratosData : []);
+        setInmuebles(inmueblesData.map(item => ({ value: item.id, label: item.nombre })));
       } catch (err) {
-        console.error("Error al cargar datos:", err);
-        setError("Error al cargar los datos. Por favor, intente de nuevo más tarde.");
+        console.error("Error detallado al cargar datos:", err);
+        setError(`Error al cargar los datos: ${err.message || 'Error desconocido'}`);
         message.error("Error al cargar los datos");
       } finally {
         setLoading(false);
@@ -140,9 +117,9 @@ const ContratoRegistros = () => {
     const fetchPisos = async () => {
       try {
         const pisosData = await pisoService.obtenerPorInmueble(selectedInmueble);
-        setPisos(pisosData);
+        setPisos(pisosData.map(item => ({ value: item.id, label: item.nombre_piso })));
       } catch (err) {
-        console.error("Error al cargar pisos:", err);
+        console.error("Error detallado al cargar pisos:", err);
         setPisos([]);
         message.error("Error al cargar los pisos");
       }
@@ -255,17 +232,19 @@ const ContratoRegistros = () => {
     if (contrato) {
       setContratoSeleccionado(contrato);
       
+      // Convertir fechas a objetos moment correctamente
+      const fechaInicio = contrato.fecha_inicio ? moment(contrato.fecha_inicio) : null;
+      const fechaFin = contrato.fecha_fin ? moment(contrato.fecha_fin) : null;
+      const fechaPago = contrato.fecha_pago ? moment(contrato.fecha_pago) : null;
+      
       // Configurar valores iniciales del formulario
       form.setFieldsValue({
         monto_alquiler: contrato.monto_alquiler,
         monto_garantia: contrato.monto_garantia,
         descripcion: contrato.descripcion,
         estado: contrato.estado,
-        fechas: [
-          moment(contrato.fecha_inicio),
-          moment(contrato.fecha_fin)
-        ],
-        fecha_pago: moment(contrato.fecha_pago)
+        fechas: fechaInicio && fechaFin ? [fechaInicio, fechaFin] : null,
+        fecha_pago: fechaPago
       });
       
       setEditModalVisible(true);
@@ -341,6 +320,61 @@ const ContratoRegistros = () => {
       console.error("Error al eliminar contrato:", err);
       message.error("Error al eliminar el contrato");
     }
+  };
+
+  const handleFinalizarContrato = (contrato) => {
+    modal.confirm({
+      title: '¿Está seguro de que desea finalizar este contrato?',
+      content: `Esto marcará el contrato como "finalizado" y el espacio "${contrato.espacio_nombre}" como "desocupado". Esta acción no se puede deshacer.`,
+      okText: 'Sí, finalizar',
+      okType: 'danger',
+      cancelText: 'No, cancelar',
+      onOk: async () => {
+        try {
+          setLoadingFinalizar(true);
+          message.loading('Finalizando contrato...', 0);
+          
+          // 1. Actualizar el estado del contrato a 'finalizado'
+          // Se envían todos los datos del contrato para asegurar la validación en el backend
+          const contratoData = {
+            monto_alquiler: contrato.monto_alquiler,
+            monto_garantia: contrato.monto_garantia,
+            descripcion: contrato.descripcion,
+            estado: 'finalizado', // El nuevo estado
+            fecha_inicio: moment(contrato.fecha_inicio).format('YYYY-MM-DD'),
+            fecha_fin: moment(contrato.fecha_fin).format('YYYY-MM-DD'),
+            fecha_pago: moment(contrato.fecha_pago).format('YYYY-MM-DD'),
+          };
+
+          await contratoService.actualizarContrato(contrato.id, contratoData);
+  
+          // 2. Actualizar el estado del espacio a 'desocupado' (estado: 0)
+          if (contrato.espacio_id && contrato.inmueble_id && contrato.piso_id) {
+            await espacioService.actualizarEspacio(
+              contrato.inmueble_id,
+              contrato.piso_id,
+              contrato.espacio_id,
+              { estado: 0 } // 0 para desocupado
+            );
+          } else {
+            throw new Error('Falta información del espacio (inmueble, piso o espacio ID) para poder actualizarlo.');
+          }
+  
+          message.destroy();
+          message.success('El contrato ha sido finalizado y el espacio ha sido liberado.');
+          
+          // Recargar la lista de contratos
+          handleRefresh();
+
+        } catch (error) {
+          message.destroy();
+          console.error("Error al finalizar el contrato:", error);
+          message.error(`Error al finalizar el contrato: ${error.message}`);
+        } finally {
+          setLoadingFinalizar(false);
+        }
+      },
+    });
   };
 
   const handleLimpiarFiltros = () => {
@@ -533,30 +567,19 @@ const ContratoRegistros = () => {
       }
 
       setLoadingUpload(true);
-      message.loading('Subiendo contrato firmado...', 0);
+      message.loading('Subiendo y activando contrato...', 0);
 
       try {
-        // Subir el documento
-        const respuestaArchivo = await documentoService.subirArchivo(
-          selectedFile,
-          contratoSeleccionado.id,
-          'contrato',
-          { carpetaDestino: 'documentos/contrato' }
-        );
+        // Subir el documento firmado
+        const documentoData = await documentoService.subirDocumento({
+          tipo_documento: 'contrato_firmado',
+          archivo: selectedFile
+        });
 
-        if (!respuestaArchivo || !respuestaArchivo.ruta) {
-          throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
-        }
-
-        // Registrar el documento en la base de datos
-        const documentoData = {
-          nombre: selectedFile.name,
-          ruta: respuestaArchivo.ruta,
-          documentable_id: contratoSeleccionado.id,
-          documentable_type: 'contrato'
-        };
-
-        await documentoService.crearDocumento(documentoData);
+        // Actualizar el contrato con la URL del documento
+        await contratoService.actualizarContrato(contratoSeleccionado.id, {
+          documento_firmado_url: documentoData.url
+        });
 
         // Actualizar el estado del contrato a activo
         await contratoService.actualizarContrato(contratoSeleccionado.id, {
@@ -568,17 +591,12 @@ const ContratoRegistros = () => {
         setModalUploadVisible(false);
         setSelectedFile(null);
         if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+          fileInputRef.current.value = "";
         }
-        
-        // Actualizar la lista de contratos
-        const contratosActualizados = await contratoService.obtenerContratosDetalles();
-        setContratos(contratosActualizados);
-        setFilteredContratos(contratosActualizados);
-        
+        handleRefresh();
       } catch (uploadError) {
         message.destroy(); // Eliminar el mensaje de carga
-        console.error('Error al subir contrato firmado:', uploadError);
+        console.error('Error al subir el contrato:', uploadError);
         message.error(`Error al subir el contrato: ${uploadError.message}`);
       }
     } catch (error) {
@@ -727,13 +745,24 @@ const ContratoRegistros = () => {
           >
             <EyeOutlined />
           </button>
-          <button 
+{/*           <button 
             className="btn btn-sm btn-warning me-1"
             onClick={() => handleEdit(record.id)}
             title="Editar contrato"
           >
             <EditOutlined />
-          </button>
+          </button> */}
+          
+       {/*    {record.estado === 'activo' && (
+            <button
+              className="btn btn-sm btn-dark me-1"
+              onClick={() => handleFinalizarContrato(record)}
+              title="Finalizar Contrato"
+              disabled={loadingFinalizar}
+            >
+              <i className="fas fa-flag-checkered"></i>
+            </button>
+          )} */}
           <button
             className="btn btn-sm btn-info me-1"
             onClick={() => handleGenerarContratoPDF(record.id)}
@@ -862,14 +891,14 @@ const ContratoRegistros = () => {
                             <div className="col-12 col-md-4 mb-3">
                               <div className="form-group local-forms">
                                 <label>Inmueble</label>
-                                <Select
+                                <ReactSelect
                                   placeholder="Seleccionar inmueble"
                                   isClearable
-                                  value={selectedInmueble ? { value: selectedInmueble, label: inmuebles.find(i => i.id === selectedInmueble)?.nombre } : null}
+                                  value={selectedInmueble ? { value: selectedInmueble, label: inmuebles.find(i => i.value === selectedInmueble)?.label } : null}
                                   onChange={(option) => handleInmuebleChange(option?.value)}
                                   options={inmuebles.map(inmueble => ({
-                                    value: inmueble.id,
-                                    label: inmueble.nombre
+                                    value: inmueble.value,
+                                    label: inmueble.label
                                   }))}
                                   classNamePrefix="select"
                                 />
@@ -878,14 +907,14 @@ const ContratoRegistros = () => {
                             <div className="col-12 col-md-4 mb-3">
                               <div className="form-group local-forms">
                                 <label>Piso</label>
-                                <Select
+                                <ReactSelect
                                   placeholder="Seleccionar piso"
                                   isClearable
-                                  value={selectedPiso ? { value: selectedPiso, label: pisos.find(p => p.id === selectedPiso)?.nombre } : null}
+                                  value={selectedPiso ? { value: selectedPiso, label: pisos.find(p => p.value === selectedPiso)?.label } : null}
                                   onChange={(option) => handlePisoChange(option?.value)}
                                   options={pisos.map(piso => ({
-                                    value: piso.id,
-                                    label: piso.nombre
+                                    value: piso.value,
+                                    label: piso.label
                                   }))}
                                   isDisabled={!selectedInmueble}
                                   classNamePrefix="select"
@@ -895,7 +924,7 @@ const ContratoRegistros = () => {
                             <div className="col-12 col-md-4 mb-3">
                               <div className="form-group local-forms">
                                 <label>Estado del contrato</label>
-                                <Select
+                                <ReactSelect
                                   placeholder="Seleccionar estado"
                                   isClearable
                                   value={selectedEstado ? { value: selectedEstado, label: selectedEstado.charAt(0).toUpperCase() + selectedEstado.slice(1) } : null}
@@ -1044,7 +1073,7 @@ const ContratoRegistros = () => {
         )}
       </Modal>
 
-      {/* Modal de Edición */}
+      {/* Modal de Edición - CORREGIDO */}
       <Modal
         title="Editar Contrato"
         open={editModalVisible}
@@ -1062,6 +1091,7 @@ const ContratoRegistros = () => {
             Guardar Cambios
           </Button>
         ]}
+        width={800}
       >
         <Form
           form={form}
@@ -1086,14 +1116,20 @@ const ContratoRegistros = () => {
             label="Período del Contrato"
             rules={[{ required: true, message: 'Por favor seleccione el período del contrato' }]}
           >
-            <RangePicker style={{ width: '100%' }} />
+            <RangePicker 
+              style={{ width: '100%' }} 
+              format="DD/MM/YYYY"
+            />
           </Form.Item>
           <Form.Item
             name="fecha_pago"
             label="Fecha de Pago Mensual"
             rules={[{ required: true, message: 'Por favor seleccione la fecha de pago' }]}
           >
-            <AntDatePicker style={{ width: '100%' }} />
+            <AntDatePicker 
+              style={{ width: '100%' }} 
+              format="DD/MM/YYYY"
+            />
           </Form.Item>
           <Form.Item
             name="estado"
@@ -1193,6 +1229,14 @@ const ContratoRegistros = () => {
         </div>
       </Modal>
     </>
+  );
+};
+
+const ContratoRegistros = () => {
+  return (
+    <App>
+      <ContratoRegistrosContent />
+    </App>
   );
 };
 

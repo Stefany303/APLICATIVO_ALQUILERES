@@ -123,6 +123,7 @@ const ContabilidadPagos = () => {
   ];
 
   const meses = [
+    { value: null, label: 'Todos los meses' },
     { value: 0, label: 'Enero' },
     { value: 1, label: 'Febrero' },
     { value: 2, label: 'Marzo' },
@@ -142,17 +143,19 @@ const ContabilidadPagos = () => {
       try {
         setLoading(true);
         
-        // Obtener inmuebles para referencia
         const inmueblesData = await inmuebleService.obtenerInmuebles();
         setInmuebles(inmueblesData);
         
-        // Cargar pagos con información del contrato
         const pagosData = await pagoService.obtenerPagos();
-        const pagosFiltrados = Array.isArray(pagosData) ? pagosData.filter(pago => {
-          if (!pago.fecha_pago) return false;
-          const fechaPago = new Date(pago.fecha_pago);
-          return fechaPago.getMonth() === selectedMonth;
-        }) : [];
+        
+        // Filtrar solo si se ha seleccionado un mes específico
+        const pagosFiltrados = Array.isArray(pagosData) ? 
+          pagosData.filter(pago => {
+            if (!pago.fecha_pago) return false;
+            if (selectedMonth === null) return true; // Mostrar todos si es null
+            const fechaPago = new Date(pago.fecha_pago);
+            return fechaPago.getMonth() === selectedMonth;
+          }) : [];
         
         setPagos(pagosFiltrados);
         
@@ -164,7 +167,6 @@ const ContabilidadPagos = () => {
       }
     };
 
-    // Cargar datos al montar el componente
     fetchData();
   }, [selectedMonth]);
 
@@ -1163,6 +1165,24 @@ const ContabilidadPagos = () => {
       render: (text) => text || "N/A",
     },
     {
+      title: "Inmueble",
+      dataIndex: "nombre_inmueble",
+      sorter: (a, b) => a.nombre_inmueble?.localeCompare(b.nombre_inmueble || ''),
+      render: (text) => text || "N/A",
+    },
+    {
+      title: "Piso",
+      dataIndex: "piso",
+      sorter: (a, b) => a.piso?.localeCompare(b.piso || ''),
+      render: (text) => text || "N/A",
+    },
+    {
+      title: "Habitación",
+      dataIndex: "nombre_habitacion",
+      sorter: (a, b) => a.nombre_habitacion?.localeCompare(b.nombre_habitacion || ''),
+      render: (text) => text || "N/A",
+    },
+    {
       title: "Monto",
       dataIndex: "monto",
       sorter: (a, b) => (parseFloat(a.monto) || 0) - (parseFloat(b.monto) || 0),
@@ -1849,6 +1869,22 @@ const ContabilidadPagos = () => {
                   </div>
                 </div>
                 
+                <div className="col-12 mb-4">
+                  <h5 className="text-primary">Información del Espacio</h5>
+                  <hr />
+                  <div className="row">
+                    <div className="col-md-6">
+                      <p><strong>Inmueble:</strong> {pagoVisualizando.nombre_inmueble || 'N/A'}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <p><strong>Piso:</strong> {pagoVisualizando.piso || 'N/A'}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <p><strong>Habitación:</strong> {pagoVisualizando.nombre_habitacion || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="col-12 mb-4">
                   <h5 className="text-primary">Detalles del Pago</h5>
                   <hr />
