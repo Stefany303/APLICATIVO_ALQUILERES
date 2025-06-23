@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import Sidebar from "../../components/Sidebar";
 import { plusicon, refreshicon, searchnormal, pdficon, pdficon3, pdficon4 } from '../../components/imagepath';
-import { FiChevronRight } from "react-icons/fi";
+import { FiChevronRight, FiFileText, FiDownload, FiEye, FiUpload } from "react-icons/fi";
 import { onShowSizeChange, itemRender } from '../../components/Pagination';
 import { Table, DatePicker, Spin, Modal, Button, Form, Input, DatePicker as AntDatePicker, Select, App } from 'antd';
 import ReactSelect from 'react-select';
@@ -49,12 +49,18 @@ const ContratoRegistrosContent = () => {
   const [contratoSeleccionado, setContratoSeleccionado] = useState(null);
   const [loadingSave, setLoadingSave] = useState(false);
   const [loadingFinalizar, setLoadingFinalizar] = useState(false);
-  const [uploadModalVisible, setUploadModalVisible] = useState(false); // Modal para subir contrato firmado
-  const [generatingPdf, setGeneratingPdf] = useState(false); // Estado para indicar generación de PDF
-  const [uploadingDocument, setUploadingDocument] = useState(false); // Estado para carga de documento
-  const [contratoFile, setContratoFile] = useState(null); // Archivo de contrato firmado
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [contratoFile, setContratoFile] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [updatedData, setUpdatedData] = useState(null);
+  
+  // Estados para manejo de documentos
+  const [documento, setDocumento] = useState(null);
+  const [documentoError, setDocumentoError] = useState(false);
+  const [loadingDoc, setLoadingDoc] = useState(false);
+  const [documentoExistente, setDocumentoExistente] = useState(null);
   
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   
@@ -204,23 +210,26 @@ const ContratoRegistrosContent = () => {
   const handleView = (id) => {
     const contrato = contratos.find(c => c.id === id);
     if (contrato) {
-      // Obtener el documento actualizado
+      setLoadingDoc(true);
+      setDocumentoError(false);
+      setDocumentoExistente(null);
+      
+      // Obtener el documento existente
       documentoService.obtenerDocumentosPorDocumentable(id, 'contrato')
         .then(documentos => {
           if (documentos && documentos.length > 0) {
-            setContratoSeleccionado({
-              ...contrato,
-              documento: documentos[0]
-            });
-          } else {
-            setContratoSeleccionado(contrato);
+            setDocumentoExistente(documentos[0]);
           }
+          setContratoSeleccionado(contrato);
           setViewModalVisible(true);
         })
         .catch(error => {
           console.error("Error al obtener documento:", error);
-          setContratoSeleccionado(contrato);
-          setViewModalVisible(true);
+          setDocumentoExistente(null);
+          setDocumentoError(true);
+        })
+        .finally(() => {
+          setLoadingDoc(false);
         });
     } else {
       message.error("No se encontró el contrato seleccionado");
@@ -536,103 +545,155 @@ const ContratoRegistrosContent = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.type !== 'application/pdf') {
+        message.error('Solo se permiten archivos PDF');
+        e.target.value = '';
+        return;
+      }
       setSelectedFile(file);
+    }
+  };
+
+  // Función para ver documento directamente usando el servicio
+  const handleViewDocument = async (keyDocumento) => {
+    try {
+      if (!keyDocumento) {
+        throw new Error('Key del documento no disponible');
+      }
+      
+      const response = await documentoService.verDocumento(keyDocumento);
+      if (response.url) {
+        window.open(response.url, '_blank');
+      } else {
+        throw new Error('URL no disponible en la respuesta');
+      }
+    } catch (error) {
+      console.error('Error al ver el documento:', error);
+      message.error('Error al abrir el documento. Por favor, intente descargarlo.');
+    }
+  };
+
+  // Función para descargar documento directamente usando el servicio
+  const handleDownloadDocument = async (keyDocumento, nombreArchivo) => {
+    try {
+      if (!keyDocumento) {
+        throw new Error('Key del documento no disponible');
+      }
+      
+      const response = await documentoService.descargarDocumento(keyDocumento);
+      if (response.url) {
+        // Crear un enlace temporal para la descarga
+        const link = document.createElement('a');
+        link.href = response.url;
+        link.setAttribute('download', response.nombre || nombreArchivo || 'documento.pdf');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        throw new Error('URL no disponible en la respuesta');
+      }
+    } catch (error) {
+      console.error('Error al descargar el documento:', error);
+      message.error('Error al descargar el documento. Por favor, intente más tarde.');
     }
   };
 
   const handleUploadAndActivate = async () => {
     try {
       if (!selectedFile) {
-        message.error('Por favor, seleccione un archivo PDF para subir');
+        message.error('Debe cargar un documento de respaldo para el contrato');
         return;
       }
 
       if (!contratoSeleccionado) {
-        message.error('No se ha seleccionado ningún contrato');
+        message.error('Debe seleccionar un contrato primero');
         return;
       }
 
-      // Verificar que el archivo sea PDF
+      // Validar que el archivo sea PDF
       if (selectedFile.type !== 'application/pdf') {
         message.error('Solo se permiten archivos PDF');
         return;
       }
 
-      // Verificar que el token esté disponible
-      const token = localStorage.getItem('token');
-      if (!token) {
-        message.error('Error de autenticación. Por favor, inicie sesión nuevamente.');
-        navigate('/login');
-        return;
-      }
-
-      setLoadingUpload(true);
-      message.loading('Subiendo y activando contrato...', 0);
-
+      setUploadingDocument(true);
+      
       try {
-        // Subir el documento firmado
-        const documentoData = await documentoService.subirDocumento({
-          tipo_documento: 'contrato_firmado',
-          archivo: selectedFile
-        });
-
-        // Actualizar el contrato con la URL del documento
-        await contratoService.actualizarContrato(contratoSeleccionado.id, {
-          documento_firmado_url: documentoData.url
-        });
-
-        // Actualizar el estado del contrato a activo
-        await contratoService.actualizarContrato(contratoSeleccionado.id, {
-          estado: 'activo'
-        });
-
-        message.destroy(); // Eliminar el mensaje de carga
-        message.success('Contrato firmado subido y activado correctamente');
-        setModalUploadVisible(false);
+        // Verificar que el ID del contrato sea válido y esté disponible
+        if (!contratoSeleccionado.id) {
+          throw new Error('El ID del contrato no es válido');
+        }
+        
+        // Asegurarse de que el ID sea un entero
+        const idContrato = parseInt(contratoSeleccionado.id);
+        if (isNaN(idContrato)) {
+          throw new Error('El ID del contrato no es un número válido');
+        }
+        
+        // PASO 1: Activar el contrato PRIMERO (igual que ContabilidadPagos actualiza el pago primero)
+        console.log('Activando contrato antes de subir documento...');
+        await contratoService.activarContrato(idContrato);
+        console.log('Contrato activado exitosamente');
+        
+        // Formatear fechas correctamente
+        const fechaActual = new Date();
+        const anioActual = fechaActual.getFullYear();
+        const mesActual = String(fechaActual.getMonth() + 1).padStart(2, '0');
+        const diaActual = String(fechaActual.getDate()).padStart(2, '0');
+        const horaActual = String(fechaActual.getHours()).padStart(2, '0');
+        const minutosActual = String(fechaActual.getMinutes()).padStart(2, '0');
+        const segundosActual = String(fechaActual.getSeconds()).padStart(2, '0');
+        
+        // Crear un nombre de archivo cifrado basado en la fecha actual y el ID del contrato
+        // Formato: contrato_YYYYMMDD_HHMMSS_ID.pdf
+        const nombreArchivo = `contrato_${anioActual}${mesActual}${diaActual}_${horaActual}${minutosActual}${segundosActual}_${idContrato}.pdf`;
+        
+        // Crear un objeto File con el nuevo nombre
+        const nuevoArchivo = new File([selectedFile], nombreArchivo, { type: selectedFile.type });
+        
+        // Incluir un timeout para evitar problemas de concurrencia
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // PASO 2: Subir el archivo (el servicio ya crea el documento automáticamente)
+        console.log('Subiendo archivo...');
+        const respuestaArchivo = await documentoService.subirArchivo(
+          nuevoArchivo, 
+          idContrato, 
+          'contrato',
+          { usarCarpetaComun: true }
+        );
+        console.log('Archivo subido y documento creado exitosamente:', respuestaArchivo);
+        
+        message.success('Contrato activado correctamente y documento subido al servidor.');
+        
+        // Reset form and search
         setSelectedFile(null);
         if (fileInputRef.current) {
-          fileInputRef.current.value = "";
+          fileInputRef.current.value = '';
         }
-        handleRefresh();
-      } catch (uploadError) {
-        message.destroy(); // Eliminar el mensaje de carga
-        console.error('Error al subir el contrato:', uploadError);
-        message.error(`Error al subir el contrato: ${uploadError.message}`);
+        
+        // Cerrar modal de subida
+        setModalUploadVisible(false);
+        
+        // Recargar los contratos
+        await handleRefresh();
+        setContratoSeleccionado(null);
+        
+      } catch (docError) {
+        console.error('Error en el proceso de documento:', docError);
+        message.error(`Error en el proceso: ${docError.message || 'Revise la consola para más detalles'}`);
+        throw docError;
       }
+      
     } catch (error) {
-      message.destroy(); // Eliminar el mensaje de carga
-      console.error('Error general:', error);
-      message.error('Ocurrió un error al procesar la solicitud');
+      console.error('Error detallado:', error);
+      if (error.response && error.response.data) {
+        message.error(`Error: ${error.response.data.mensaje || error.message}`);
+      } else {
+        message.error('Error al procesar el contrato o documento');
+      }
     } finally {
-      setLoadingUpload(false);
-    }
-  };
-
-  // Función para ver documento
-  const handleViewDocument = async (rutaDocumento) => {
-    try {
-        if (!rutaDocumento) {
-            throw new Error('Ruta del documento no disponible');
-        }
-        
-        await documentoService.verDocumento(rutaDocumento);
-    } catch (error) {
-        console.error('Error al abrir documento:', error);
-        message.error('Error al abrir el documento: ' + error.message);
-    }
-  };
-
-  // Función para descargar documento
-  const handleDownloadDocument = async (rutaDocumento, nombreArchivo) => {
-    try {
-        if (!rutaDocumento) {
-            throw new Error('Ruta del documento no disponible');
-        }
-        
-        await documentoService.descargarDocumento(rutaDocumento, nombreArchivo);
-    } catch (error) {
-        console.error('Error al descargar documento:', error);
-        message.error('Error al descargar el documento: ' + error.message);
+      setUploadingDocument(false);
     }
   };
 
@@ -996,13 +1057,34 @@ const ContratoRegistrosContent = () => {
       <Modal
         title="Detalles del Contrato"
         open={viewModalVisible}
-        onCancel={() => setViewModalVisible(false)}
+        onCancel={() => {
+          setViewModalVisible(false);
+          setContratoSeleccionado(null);
+          setDocumentoExistente(null);
+          setSelectedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }}
         footer={[
-          <Button key="close" onClick={() => setViewModalVisible(false)}>
+          <Button 
+            key="close" 
+            onClick={() => {
+              setViewModalVisible(false);
+              setContratoSeleccionado(null);
+              setDocumentoExistente(null);
+              setSelectedFile(null);
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+            }}
+          >
             Cerrar
           </Button>
         ]}
         width={800}
+        destroyOnClose={true}
+        centered
       >
         {contratoSeleccionado && (
           <div className="contrato-details">
@@ -1038,29 +1120,106 @@ const ContratoRegistrosContent = () => {
             <div className="row mt-4">
               <div className="col-12">
                 <h4>Documentos</h4>
-                {contratoSeleccionado.documento ? (
-                  <div className="document-actions">
-                    <Button
-                      type="primary"
-                      icon={<EyeOutlined />}
-                      onClick={() => handleViewDocument(contratoSeleccionado.documento.ruta)}
-                      className="me-2"
-                    >
-                      Ver Documento
-                    </Button>
-                    <Button
-                      type="default"
-                      icon={<i className="fas fa-download"></i>}
-                      onClick={() => handleDownloadDocument(contratoSeleccionado.documento.ruta, contratoSeleccionado.documento.nombre)}
-                    >
-                      Descargar
-                    </Button>
+                {loadingDoc ? (
+                  <div className="text-center p-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Cargando...</span>
+                    </div>
+                    <p className="mt-2">Buscando documento...</p>
+                  </div>
+                ) : documentoExistente ? (
+                  <div className="document-container p-3 border rounded">
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <div className="document-info d-flex align-items-center">
+                        <span className="document-icon me-3">
+                          <FiFileText size={24} className="text-primary" />
+                        </span>
+                        <span className="document-name">
+                          {documentoExistente.nombre}
+                          {documentoError && (
+                            <span className="text-danger ms-2">(No disponible)</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="document-actions">
+                        <Button
+                          type="default"
+                          icon={<FiDownload className="me-1" />}
+                          onClick={() => handleDownloadDocument(documentoExistente.key, documentoExistente.nombre)}
+                          className="me-2"
+                          disabled={documentoError}
+                        >
+                          Descargar
+                        </Button>
+                        <Button
+                          type="primary"
+                          icon={<FiEye className="me-1" />}
+                          onClick={() => handleViewDocument(documentoExistente.key)}
+                          disabled={documentoError}
+                        >
+                          Ver documento
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {documentoError && (
+                      <div className="alert alert-warning mt-3">
+                        <p className="mb-0">
+                          <i className="fas fa-exclamation-triangle me-2"></i>
+                          El documento no se encuentra disponible en estos momentos.
+                        </p>
+                        <p className="small mb-0 mt-2">
+                          Esto puede deberse a que:
+                        </p>
+                        <ul className="small mb-0">
+                          <li>El documento fue eliminado o movido</li>
+                          <li>No tienes permisos para acceder al documento</li>
+                          <li>La ruta del documento es incorrecta</li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <p>No hay documentos asociados a este contrato.</p>
+                  <div className="alert alert-warning">
+                    <p className="mb-0">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      No hay documentos asociados a este contrato.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
+            
+            {/* Sección para subir nuevo documento */}
+            {/* <div className="row mt-4">
+              <div className="col-12">
+                <h4>Subir Nuevo Documento</h4>
+                <div className="form-group">
+                  <label>Seleccionar archivo PDF:</label>
+                  <input
+                    type="file"
+                    className="form-control"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    ref={fileInputRef}
+                  />
+                  <small className="form-text text-muted">
+                    Solo se permiten archivos PDF (máx. 5MB)
+                  </small>
+                </div>
+                <Button
+                  type="primary"
+                  icon={<FiUpload className="me-1" />}
+                  loading={uploadingDocument}
+                  onClick={handleUploadAndActivate}
+                  disabled={!selectedFile}
+                  className="mt-2"
+                >
+                  Subir Documento
+                </Button>
+              </div>
+            </div> */}
+            
             {contratoSeleccionado.descripcion && (
               <div className="row mt-4">
                 <div className="col-12">
@@ -1073,7 +1232,7 @@ const ContratoRegistrosContent = () => {
         )}
       </Modal>
 
-      {/* Modal de Edición - CORREGIDO */}
+      {/* Modal de Edición */}
       <Modal
         title="Editar Contrato"
         open={editModalVisible}
@@ -1198,6 +1357,16 @@ const ContratoRegistrosContent = () => {
             Solo se permiten archivos PDF. El contrato debe estar firmado por todas las partes.
           </small>
         </div>
+        
+        {documentoExistente && (
+          <div className="alert alert-info mt-3">
+            <p className="mb-0">
+              <FiFileText className="me-2" />
+              Documento actual: <strong>{documentoExistente.nombre}</strong>
+            </p>
+            <small>Para reemplazarlo, suba un nuevo archivo</small>
+          </div>
+        )}
       </Modal>
 
       {/* Modal de éxito */}
@@ -1228,6 +1397,42 @@ const ContratoRegistrosContent = () => {
           )}
         </div>
       </Modal>
+      
+      {/* Estilos adicionales para documentos */}
+      <style>{`
+        .document-container {
+          background-color: #f8f9fa;
+          border-radius: 8px;
+          padding: 15px;
+          margin-bottom: 15px;
+        }
+        
+        .document-info {
+          display: flex;
+          align-items: center;
+        }
+        
+        .document-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .document-name {
+          font-weight: 500;
+        }
+        
+        .document-actions {
+          display: flex;
+          gap: 10px;
+        }
+        
+        .upload-section {
+          margin-top: 20px;
+          padding-top: 20px;
+          border-top: 1px solid #eee;
+        }
+      `}</style>
     </>
   );
 };

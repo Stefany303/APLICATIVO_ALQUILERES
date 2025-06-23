@@ -299,251 +299,38 @@ const ContabilidadPagos = () => {
     }
   };
 
+  // Función para ver detalles de un pago
   const verPago = async (pago) => {
     setPagoVisualizando(pago);
     setDocumentoError(false);
     setLoadingDoc(true);
     
-    // Intentar obtener el documento asociado al pago
     try {
-      try {
-        // Buscar documentos asociados a este pago
-        const documentos = await documentoService.obtenerDocumentosPorTipo(pago.id, 'pago');
+      const documentos = await documentoService.obtenerDocumentosPorTipo(pago.id, 'pago');
+      
+      if (documentos && documentos.length > 0) {
+        const doc = documentos[0];
         
-        if (documentos && documentos.length > 0) {
-          
-          // Determinar el tipo de documento basado en la extensión
-          let tipoDocumento = 'pdf'; // valor predeterminado
-          const nombreArchivo = documentos[0].nombre || '';
-          if (nombreArchivo.toLowerCase().endsWith('.jpg') || 
-              nombreArchivo.toLowerCase().endsWith('.jpeg') || 
-              nombreArchivo.toLowerCase().endsWith('.png') || 
-              nombreArchivo.toLowerCase().endsWith('.gif')) {
-            tipoDocumento = 'imagen';
-          }
-          
-          // Construir la URL completa con base en el dominio actual
-          let rutaDocumento = documentos[0].ruta;
-          
-          // Si la ruta no comienza con http/https o //, asumimos que es una ruta relativa
-          if (!rutaDocumento.startsWith('http') && !rutaDocumento.startsWith('//')) {
-            // Asegurarnos de que comience con /
-            if (!rutaDocumento.startsWith('/')) {
-              rutaDocumento = '/' + rutaDocumento;
-            }
-            
-            // Obtener la base URL del servidor
-            const baseUrl = window.location.origin;
-            rutaDocumento = baseUrl + rutaDocumento;
-          }
-          
-          // Verificar si el documento existe
-          const existeArchivo = await verificarExistenciaArchivo(rutaDocumento);
-          
-          if (existeArchivo) {
-            setDocumento({ 
-              nombre: documentos[0].nombre || `Comprobante-${pago.id}.pdf`,
-              ruta: rutaDocumento,
-              tipo: tipoDocumento
-            });
-            setDocumentoError(false);
-          } else {
-            console.error(`El documento no existe en la ruta: ${rutaDocumento}`);
-            
-            // NUEVO: Intentar buscar en la carpeta común donde están realmente guardados
-            const baseUrl = window.location.origin;
-            const rutaComun = `${baseUrl}/PUBLIC/PAGO/1/${documentos[0].nombre}`;
-            const rutaComunAlternativa = `${baseUrl}/public/pago/1/${documentos[0].nombre}`;
-            
-            let existeEnRutaComun = await verificarExistenciaArchivo(rutaComun);
-            
-            if (existeEnRutaComun) {
-              setDocumento({ 
-                nombre: documentos[0].nombre || `Comprobante-${pago.id}.pdf`,
-                ruta: rutaComun,
-                tipo: tipoDocumento
-              });
-              setDocumentoError(false);
-            } else {
-              // Probar con la ruta alternativa en minúsculas
-              existeEnRutaComun = await verificarExistenciaArchivo(rutaComunAlternativa);
-              
-              if (existeEnRutaComun) {
-                setDocumento({ 
-                  nombre: documentos[0].nombre || `Comprobante-${pago.id}.pdf`,
-                  ruta: rutaComunAlternativa,
-                  tipo: tipoDocumento
-                });
-                setDocumentoError(false);
-              } else {
-                setDocumento({ 
-                  nombre: documentos[0].nombre || `Comprobante-${pago.id}.pdf`,
-                  ruta: rutaDocumento,
-                  tipo: tipoDocumento
-                });
-                setDocumentoError(true);
-              }
-            }
-          }
-        } else {
-          
-          // Intentar buscar en la carpeta común donde se guardan realmente los documentos
-          const posiblesRutas = [
-            `/PUBLIC/PAGO/1/pago_${pago.id}.pdf`, // Ubicación real indicada por el usuario
-            `/public/pago/1/pago_${pago.id}.pdf`, // Misma ubicación en minúsculas
-            `/PUBLIC/PAGO/1/${pago.id}.pdf`, // Alternativa con solo el ID
-            `/public/pago/1/${pago.id}.pdf`, // Alternativa con solo el ID en minúsculas
-            `/PUBLIC/PAGO/1/documento_${pago.id}.pdf`, // Otra posible nomenclatura
-            `/public/pago/1/documento_${pago.id}.pdf`,
-            `/pago/pago_${pago.id}.pdf`, // Ubicaciones anteriores por si acaso
-            `/pago/${pago.id}.pdf`,
-            `/pago/${pago.id}/documento.pdf`,
-          ];
-          
-          // Obtener la base URL del servidor
-          const baseUrl = window.location.origin;
-          
-          // Verificar cada ruta posible
-          let documentoEncontrado = false;
-          
-          for (const rutaRelativa of posiblesRutas) {
-            const rutaCompleta = baseUrl + rutaRelativa;
-            
-            const existeArchivo = await verificarExistenciaArchivo(rutaCompleta);
-            
-            if (existeArchivo) {
-              
-              // Determinar el tipo basado en la extensión
-              let tipo = 'pdf';
-              if (rutaRelativa.toLowerCase().endsWith('.jpg') || 
-                  rutaRelativa.toLowerCase().endsWith('.jpeg') || 
-                  rutaRelativa.toLowerCase().endsWith('.png') || 
-                  rutaRelativa.toLowerCase().endsWith('.gif')) {
-                tipo = 'imagen';
-              }
-              
-              setDocumento({
-                nombre: `Comprobante de pago #${pago.id}`,
-                ruta: rutaCompleta,
-                tipo: tipo
-              });
-              setDocumentoError(false);
-              documentoEncontrado = true;
-              break;
-            }
-          }
-          
-          if (!documentoEncontrado) {
-            // Como último recurso, buscar cualquier archivo en la carpeta común
-            
-            try {
-              // Esta parte sería mejor con una API del lado del servidor que liste archivos
-              // Por ahora, intentamos algunas variantes comunes de formato de nombre
-              const formatosFecha = [
-                "", // Sin fecha
-                "_20", // Años 2020+
-                "_202", // Años 2020+
-              ];
-              
-              let encontrado = false;
-              
-              for (const formatoFecha of formatosFecha) {
-                const rutaBusqueda = `${baseUrl}/PUBLIC/PAGO/1/pago${formatoFecha}`;
-                const rutaBusquedaMinusculas = `${baseUrl}/public/pago/1/pago${formatoFecha}`;
-                
-                
-                // Intentar con algunas posibles combinaciones
-                const posiblesArchivos = [
-                  `${rutaBusqueda}_${pago.id}.pdf`,
-                  `${rutaBusquedaMinusculas}_${pago.id}.pdf`,
-                  `${rutaBusqueda}*_${pago.id}.pdf`, // No funcionará directamente, solo es ilustrativo
-                  `${rutaBusquedaMinusculas}*_${pago.id}.pdf`
-                ];
-                
-                for (const posibleArchivo of posiblesArchivos) {
-                  if (posibleArchivo.includes('*')) continue; // Saltamos los patrones con comodines
-                  
-                  const existe = await verificarExistenciaArchivo(posibleArchivo);
-                  
-                  if (existe) {
-                    setDocumento({
-                      nombre: `Comprobante de pago #${pago.id}.pdf`,
-                      ruta: posibleArchivo,
-                      tipo: 'pdf'
-                    });
-                    setDocumentoError(false);
-                    encontrado = true;
-                    break;
-                  }
-                }
-                
-                if (encontrado) break;
-              }
-              
-              if (!encontrado) {
-                console.error(`No se pudo encontrar el documento para el pago ${pago.id} en ninguna ubicación`);
-                // Establecer información de documento pero marcar como error
-                setDocumento({
-                  nombre: `Comprobante de pago #${pago.id}.pdf`,
-                  ruta: `${baseUrl}/PUBLIC/PAGO/1/pago_${pago.id}.pdf`, // Ruta probable aunque no existe
-                  tipo: 'pdf'
-                });
-                setDocumentoError(true);
-              }
-            } catch (err) {
-              console.error("Error al buscar en carpeta común:", err);
-              setDocumento({
-                nombre: `Comprobante de pago #${pago.id}.pdf`,
-                ruta: `${baseUrl}/PUBLIC/PAGO/1/documento.pdf`, // Ruta probable aunque no existe
-                tipo: 'pdf'
-              });
-              setDocumentoError(true);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error al obtener documentos del servicio:', error);
+        setDocumento({
+          id: doc.id,
+          nombre: doc.nombre,
+          url: doc.url,
+          key: doc.key,
+          tipo: doc.tipo || 'application/pdf'
+        });
         
-        // Como es un error del servicio, intentar directamente en la carpeta común
-        const baseUrl = window.location.origin;
-        const rutaDirecta = `${baseUrl}/PUBLIC/PAGO/1/pago_${pago.id}.pdf`;
-        const rutaDirectaMinusculas = `${baseUrl}/public/pago/1/pago_${pago.id}.pdf`;
-        
-        const existeDirecta = await verificarExistenciaArchivo(rutaDirecta);
-        
-        if (existeDirecta) {
-          setDocumento({
-            nombre: `Comprobante de pago #${pago.id}.pdf`,
-            ruta: rutaDirecta,
-            tipo: 'pdf'
-          });
-          setDocumentoError(false);
-        } else {
-          const existeDirectaAlt = await verificarExistenciaArchivo(rutaDirectaMinusculas);
-          
-          if (existeDirectaAlt) {
-          
-            setDocumento({
-              nombre: `Comprobante de pago #${pago.id}.pdf`,
-              ruta: rutaDirectaMinusculas,
-              tipo: 'pdf'
-            });
-            setDocumentoError(false);
-          } else {
-            setDocumento(null);
-            setDocumentoError(true);
-          }
-        }
+        setDocumentoError(false);
+      } else {
+        setDocumento(null);
       }
     } catch (error) {
-      console.error('Error general al obtener el documento:', error);
+      console.error('Error al obtener el documento:', error);
       setDocumento(null);
       setDocumentoError(true);
     } finally {
       setLoadingDoc(false);
     }
     
-    // Abrir el modal de visualización
     setModalViewVisible(true);
   };
 
@@ -1066,81 +853,82 @@ const ContabilidadPagos = () => {
   const handleSubmitRegistro = async (e) => {
     e.preventDefault();
     
-    if (!pagoARegistrar) {
-      message.error('No se ha seleccionado ningún pago');
-      return;
-    }
-
-    if (!comprobanteFile) {
-      message.error('Debe subir un comprobante de pago');
-      return;
-    }
-
-    // Verificar que el archivo sea PDF
-    if (comprobanteFile.type !== 'application/pdf') {
-      message.error('Solo se permiten archivos PDF');
-      return;
-    }
-
-    if (!metodoPagoRegistro) {
-      message.error('Debe seleccionar el método de pago');
-      return;
-    }
-
     try {
-      setLoadingRegistro(true);
-      message.loading('Registrando pago...', 0);
-
-      // Subir el comprobante
-      const respuestaArchivo = await documentoService.subirArchivo(
-        comprobanteFile,
-        pagoARegistrar.id,
-        'pago',
-        { carpetaDestino: 'documentos/pago' }
-      );
-
-      if (!respuestaArchivo || !respuestaArchivo.ruta) {
-        throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
+      // Validar campos obligatorios
+      if (!pagoARegistrar) {
+        message.error('No se ha seleccionado ningún pago');
+        return;
       }
 
-      // Registrar el documento en la base de datos
-      const documentoData = {
-        nombre: comprobanteFile.name,
-        ruta: respuestaArchivo.ruta,
-        documentable_id: pagoARegistrar.id,
-        documentable_type: 'pago'
-      };
+      if (!comprobanteFile) {
+        message.error('Debe subir un comprobante de pago');
+        return;
+      }
 
-      await documentoService.crearDocumento(documentoData);
+      // Validar que si hay documento, sea un PDF
+      if (comprobanteFile.type !== 'application/pdf') {
+        message.error('Solo se permiten archivos PDF como documentos de respaldo');
+        return;
+      }
 
-      // Actualizar el estado del pago a pagado y el método de pago
-      await pagoService.actualizarPago(pagoARegistrar.id, {
-        estado: 'pagado',
-        fecha_real_pago: new Date().toISOString().split('T')[0],
-        metodo_pago: metodoPagoRegistro,
+      if (!metodoPagoRegistro) {
+        message.error('Debe seleccionar el método de pago');
+        return;
+      }
+
+      setLoadingRegistro(true);
+      
+      // Actualizar el pago primero
+      const pagoData = {
         contrato_id: pagoARegistrar.contrato_id,
         monto: pagoARegistrar.monto,
-        tipo_pago: pagoARegistrar.tipo_pago,
-        fecha_pago: pagoARegistrar.fecha_pago
-      });
+        tipo_pago: pagoARegistrar.tipo_pago || 'alquiler',
+        estado: 'pagado',
+        metodo_pago: metodoPagoRegistro,
+        fecha_pago: pagoARegistrar.fecha_pago,
+        fecha_real_pago: new Date().toISOString().split('T')[0],
+        observacion: ''
+      };
 
-      message.destroy();
+      // Actualizar el pago
+      await pagoService.actualizarPago(pagoARegistrar.id, pagoData);
+      
+      // Si hay documento, subirlo
+      if (comprobanteFile) {
+        try {
+          const respuestaArchivo = await documentoService.subirArchivo(
+            comprobanteFile,
+            pagoARegistrar.id,
+            'pago'
+          );
+
+          if (!respuestaArchivo || !respuestaArchivo.id) {
+            throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
+          }
+
+          message.success('Documento subido exitosamente');
+        } catch (docError) {
+          console.error('Error al subir documento:', docError);
+          message.error(`El pago se registró correctamente, pero hubo un error al subir el documento: ${docError.message || ''}`);
+        }
+      }
+
       message.success('Pago registrado correctamente');
       setModalRegistroVisible(false);
+      
+      // Limpiar el formulario
       setComprobanteFile(null);
       setMetodoPagoRegistro(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-
-      // Actualizar la lista de pagos
-      const pagosActualizados = await pagoService.obtenerPagos();
-      setPagos(Array.isArray(pagosActualizados) ? pagosActualizados : []);
+      
+      // Actualizar los datos
+      await refreshData();
 
     } catch (error) {
-      message.destroy();
       console.error('Error al registrar el pago:', error);
-      message.error(`Error al registrar el pago: ${error.message}`);
+      message.error('Error al registrar el pago');
     } finally {
       setLoadingRegistro(false);
     }
@@ -1293,11 +1081,19 @@ const ContabilidadPagos = () => {
       if (!rutaDocumento) {
         throw new Error('Ruta del documento no disponible');
       }
-      const rutaRelativa = getRutaRelativa(rutaDocumento);
-      await documentoService.verDocumento(rutaRelativa);
+      
+      // Extraer la key del documento de la ruta
+      const key = rutaDocumento.split('/').pop();
+      
+      const response = await documentoService.verDocumento(key);
+      if (response.url) {
+        window.open(response.url, '_blank');
+      } else {
+        throw new Error('URL no disponible en la respuesta');
+      }
     } catch (error) {
-      console.error('Error al abrir documento:', error);
-      message.error('Error al abrir el documento: ' + error.message);
+      console.error('Error al ver el documento:', error);
+      message.error('Error al abrir el documento. Por favor, intente descargarlo.');
     }
   };
 
@@ -1307,11 +1103,25 @@ const ContabilidadPagos = () => {
       if (!rutaDocumento) {
         throw new Error('Ruta del documento no disponible');
       }
-      const rutaRelativa = getRutaRelativa(rutaDocumento);
-      await documentoService.descargarDocumento(rutaRelativa, nombreArchivo);
+      
+      // Extraer la key del documento de la ruta
+      const key = rutaDocumento.split('/').pop();
+      
+      const response = await documentoService.descargarDocumento(key);
+      if (response.url) {
+        // Crear un enlace temporal para la descarga
+        const link = document.createElement('a');
+        link.href = response.url;
+        link.setAttribute('download', response.nombre || nombreArchivo || 'documento.pdf');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        throw new Error('URL no disponible en la respuesta');
+      }
     } catch (error) {
       console.error('Error al descargar el documento:', error);
-      message.error('Error al descargar el documento: ' + error.message);
+      message.error('Error al descargar el documento. Por favor, intente más tarde.');
     }
   };
 
@@ -1913,6 +1723,7 @@ const ContabilidadPagos = () => {
                   </div>
                 </div>
                 
+                {/* Sección de documento */}
                 {pagoVisualizando.estado !== 'pendiente' && (
                   <div className="col-12">
                     <h5 className="text-primary">Documento Adjunto</h5>
@@ -1942,29 +1753,37 @@ const ContabilidadPagos = () => {
                             </span>
                           </div>
                           <div className="document-actions">
-                            <Button 
-                              type="default"
-                              icon={<FiDownload className="me-1" />} 
-                              className="me-2"
-                              onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
-                              size="small"
+                            <button 
+                              type="button" 
+                              className="btn btn-sm btn-outline-primary me-2"
+                              onClick={() => handleDownloadDocument(documento.key, documento.nombre)}
                             >
-                              Descargar
-                            </Button>
-                            <Button 
-                              type="primary"
-                              icon={<FiEye className="me-1" />} 
-                              onClick={() => handleViewDocument(documento.ruta)}
-                              size="small"
+                              <FiDownload className="me-1" /> Descargar
+                            </button>
+                            <button 
+                              type="button" 
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleViewDocument(documento.key)}
                             >
-                              Ver documento
-                            </Button>
+                              <FiEye className="me-1" /> Ver documento
+                            </button>
                           </div>
                         </div>
                       </div>
-                    ) : !loadingDoc && (
-                      <div className="alert alert-info">
-                        <FiFileText className="me-2" /> No hay documento adjunto para este pago.
+                    ) : !loadingDoc && documentoError && (
+                      <div className="alert alert-warning">
+                        <p className="mb-0">
+                          <i className="fas fa-exclamation-triangle me-2"></i>
+                          El documento no se encuentra disponible en estos momentos.
+                        </p>
+                        <p className="small mb-0 mt-2">
+                          Esto puede deberse a que:
+                        </p>
+                        <ul className="small mb-0">
+                          <li>El documento fue eliminado o movido</li>
+                          <li>No tienes permisos para acceder al documento</li>
+                          <li>La ruta del documento es incorrecta</li>
+                        </ul>
                       </div>
                     )}
                   </div>

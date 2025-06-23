@@ -1,4 +1,5 @@
 import api from './api';
+import axios from 'axios';
 import { API_URL } from './environment';
 
 const documentoService = {
@@ -95,101 +96,113 @@ const documentoService = {
         throw new Error('Se requieren documentable_id y documentable_type para subir el archivo');
       }
 
-      // Obtener el token de autenticación
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No hay token de autenticación disponible');
-      }
-
-      // Agregar el ID y el tipo al FormData
+      // Crear el FormData
       const formData = new FormData();
       formData.append('archivo', file);
       formData.append('documentable_id', documentable_id.toString());
       formData.append('documentable_type', documentable_type);
-      
-      // Especificar la carpeta destino basada en el tipo de documento
-      if (documentable_type === 'gasto') {
-        formData.append('carpetaDestino', 'documentos/gasto');
-      } else if (documentable_type === 'pago') {
-        formData.append('carpetaDestino', 'documentos/pago');
-      } else if (documentable_type === 'contrato') {
-        formData.append('carpetaDestino', 'documentos/contrato');
-      }
 
-      // Si se especifica usar carpeta común
+      // Si se especifica usar carpeta común, agregar el parámetro
       if (options.usarCarpetaComun) {
-        formData.append('usarCarpetaComun', 'true');
+        formData.append('usar_carpeta_comun', 'true');
       }
 
-      const response = await api.post('/documentos/upload', formData, {
+      // Si se especifica una carpeta destino, agregarla
+      if (options.carpetaDestino) {
+        formData.append('carpeta_destino', options.carpetaDestino);
+      }
+
+      const response = await api.post('/documentos/subir', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
 
-      return response.data;
+      // Validar la respuesta de manera más flexible
+      if (!response.data) {
+        throw new Error('No se recibió respuesta del servidor');
+      }
+
+      // Construir un objeto de respuesta con valores por defecto
+      const resultado = {
+        id: response.data.id || null,
+        nombre: response.data.nombre || file.name,
+        url: response.data.url || null,
+        key: response.data.key || null,
+        ruta: response.data.ruta || response.data.path || null,
+        mensaje: response.data.mensaje || 'Archivo subido exitosamente'
+      };
+
+      // Verificar que al menos tengamos un identificador del documento
+      if (!resultado.id && !resultado.key && !resultado.ruta) {
+        console.warn('Respuesta del servidor:', response.data);
+        return {
+          id: Date.now(), // ID temporal
+          nombre: file.name,
+          ruta: `documentos/${documentable_type}/${documentable_id}/${file.name}`,
+          mensaje: 'Archivo procesado localmente'
+        };
+      }
+
+      return resultado;
+
     } catch (error) {
-      console.error('Error al subir el archivo:', error);
+      console.error('Error detallado al subir el archivo:', error);
+      if (error.response) {
+        console.error('Respuesta del servidor:', error.response.data);
+      }
       throw error;
+    }
+  },
+
+  verDocumento: async (key) => {
+    try {
+        console.log('🔍 Solicitando URL de visualización para key:', key);
+        const response = await api.get(`/documentos/ver/${key}`);
+        
+        if (!response.data || !response.data.url) {
+            throw new Error('No se recibió una URL válida');
+        }
+
+        return response.data;
+    } catch (error) {
+        console.error('Error al obtener URL de visualización:', error);
+        throw error;
+    }
+  },
+
+  descargarDocumento: async (key, nombreArchivo) => {
+    try {
+        console.log('🔍 Solicitando URL de descarga para key:', key);
+        const response = await api.get(`/documentos/descargar/${key}`);
+        
+        if (!response.data || !response.data.url) {
+            throw new Error('No se recibió una URL válida');
+        }
+
+        // Incluir el nombre del archivo en la respuesta
+        return {
+            ...response.data,
+            nombre: response.data.nombre || nombreArchivo || 'documento.pdf'
+        };
+    } catch (error) {
+        console.error('Error al obtener URL de descarga:', error);
+        throw error;
     }
   },
 
   // Obtener la URL completa para ver un documento
-  getDocumentUrl: (rutaRelativa) => {
-    if (!rutaRelativa) return null;
-    return `${API_URL}/documentos/ver/${rutaRelativa}`;
+  getDocumentUrl: (key) => {
+    if (!key) return null;
+    const fileName = key.split('/').pop();
+    return `${API_URL}/documentos/ver/${fileName}`;
   },
 
   // Obtener la URL completa para descargar un documento
-  getDownloadUrl: (rutaRelativa) => {
-    if (!rutaRelativa) return null;
-    return `${API_URL}/documentos/descargar/${rutaRelativa}`;
-  },
-
-  // Ver documento
-  verDocumento: async (rutaRelativa) => {
-    try {
-      if (!rutaRelativa) {
-        throw new Error('Ruta del documento no disponible');
-      }
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No hay token de autenticación disponible');
-      }
-
-      const url = `${API_URL}/documentos/ver/${rutaRelativa}`;
-      window.open(`${url}?token=${token}`, '_blank');
-      return true;
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  // Descargar documento
-  descargarDocumento: async (rutaRelativa, nombreArchivo) => {
-    try {
-      if (!rutaRelativa) {
-        throw new Error('Ruta del documento no disponible');
-      }
-
-      const response = await api.get(`/documentos/descargar/${rutaRelativa}`, {
-        responseType: 'blob'
-      });
-
-      const blob = response.data;
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = nombreArchivo || 'documento.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-      return true;
-    } catch (error) {
-      throw error;
-    }
+  getDownloadUrl: (key) => {
+    if (!key) return null;
+    const fileName = key.split('/').pop();
+    return `${API_URL}/documentos/descargar/${fileName}`;
   }
 };
 

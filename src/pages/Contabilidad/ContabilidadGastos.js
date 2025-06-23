@@ -195,102 +195,96 @@ const ContabilidadGastos = () => {
     e.preventDefault();
     
     try {
-      // Validar campos obligatorios
-      if (!formData.inmuebleId || !formData.concepto || !formData.monto || !formData.fechaGasto || !formData.categoria) {
-        alert('Por favor, complete todos los campos obligatorios');
-        return;
-      }
+        // Validar campos obligatorios
+        if (!formData.inmuebleId || !formData.concepto || !formData.monto || !formData.fechaGasto || !formData.categoria) {
+            message.error('Por favor, complete todos los campos obligatorios');
+            return;
+        }
 
-      // Validar que si hay documento, sea un PDF
-      if (documento && documento.type !== 'application/pdf') {
-        alert('Solo se permiten archivos PDF como documentos de respaldo');
-        return;
-      }
-      
-      // Formatear fecha
-      let fechaGastoFormateada = '';
-      
-      if (formData.fechaGasto) {
-        const partes = formData.fechaGasto.split('/');
-        if (partes.length === 3) {
-          fechaGastoFormateada = `${partes[2]}-${partes[1]}-${partes[0]}`;
+        // Validar que si hay documento, sea un PDF
+        if (documento && documento.type !== 'application/pdf') {
+            message.error('Solo se permiten archivos PDF como documentos de respaldo');
+            return;
+        }
+        
+        // Formatear fecha
+        let fechaGastoFormateada = '';
+        if (formData.fechaGasto) {
+            const partes = formData.fechaGasto.split('/');
+            if (partes.length === 3) {
+                fechaGastoFormateada = `${partes[2]}-${partes[1]}-${partes[0]}`;
+            } else {
+                fechaGastoFormateada = formData.fechaGasto;
+            }
+        }
+        
+        // Datos del gasto
+        const gastoData = {
+            inmueble_id: formData.inmuebleId,
+            concepto: formData.concepto,
+            monto: formData.monto,
+            fecha_gasto: fechaGastoFormateada,
+            categoria: formData.categoria,
+        };
+        
+        let gastoID;
+        
+        // Si es un gasto existente, actualizarlo
+        if (gastoSeleccionado) {
+            await gastoService.actualizarGasto(gastoSeleccionado.id, gastoData);
+            gastoID = gastoSeleccionado.id;
+            
+            setUpdatedData({
+                ...gastoData,
+                inmueble_nombre: inmuebles.find(i => i.value === formData.inmuebleId)?.label || 'N/A'
+            });
+            
+            setModalVisible(false);
+            setShowSuccessModal(true);
         } else {
-          fechaGastoFormateada = formData.fechaGasto;
+            // Si es un nuevo gasto, crearlo
+            const respuestaGasto = await gastoService.crearGasto(gastoData);
+            gastoID = respuestaGasto.id;
+            message.success('Gasto registrado correctamente');
+            handleCancel();
         }
-      }
-      
-      // Datos del gasto
-      const gastoData = {
-        inmueble_id: formData.inmuebleId,
-        concepto: formData.concepto,
-        monto: formData.monto,
-        fecha_gasto: fechaGastoFormateada,
-        categoria: formData.categoria,
-      };
-      
-      
-      let gastoID;
-      
-      // Si es un gasto existente, actualizarlo
-      if (gastoSeleccionado) {
-        await gastoService.actualizarGasto(gastoSeleccionado.id, gastoData);
-        gastoID = gastoSeleccionado.id;
-        
-        // Guardar los datos actualizados para mostrar en el modal de éxito
-        setUpdatedData({
-          ...gastoData,
-          inmueble_nombre: inmuebles.find(i => i.value === formData.inmuebleId)?.label || 'N/A'
-        });
-        
-        // Cerrar modal de edición y mostrar modal de éxito
-        setModalVisible(false);
-        setShowSuccessModal(true);
-      } else {
-        // Si es un nuevo gasto, crearlo
-        const respuestaGasto = await gastoService.crearGasto(gastoData);
-        gastoID = respuestaGasto.id;
-        alert('Gasto registrado correctamente');
-        handleCancel();
-      }
 
-      // Si hay documento, subirlo
-      if (documento) {
-        try {
-          // Subir el documento
-          const respuestaArchivo = await documentoService.subirArchivo(
-            documento,
-            gastoID,
-            'gasto',
-            { carpetaDestino: 'documentos/gasto' }
-          );
+        // Si hay documento, subirlo
+        if (documento) {
+            try {
+                const respuestaArchivo = await documentoService.subirArchivo(
+                    documento,
+                    gastoID,
+                    'gasto'
+                );
 
-          if (!respuestaArchivo || !respuestaArchivo.ruta) {
-            throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
-          }
+                if (!respuestaArchivo || !respuestaArchivo.id) {
+                    throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
+                }
 
-          // Registrar el documento en la base de datos
-          const documentoData = {
-            nombre: documento.name,
-            ruta: respuestaArchivo.ruta,
-            documentable_id: gastoID,
-            documentable_type: 'gasto'
-          };
-          
-          await documentoService.crearDocumento(documentoData);
-        } catch (docError) {
-          console.error('Error al subir documento:', docError);
-          alert(`El gasto se registró correctamente, pero hubo un error al subir el documento: ${docError.message || ''}`);
+                message.success('Documento subido exitosamente');
+                
+                // Actualizar el documentoExistente con la nueva información
+                setDocumentoExistente({
+                    id: respuestaArchivo.id,
+                    nombre: respuestaArchivo.nombre,
+                    url: respuestaArchivo.url,
+                    key: respuestaArchivo.key
+                });
+            } catch (docError) {
+                console.error('Error al subir documento:', docError);
+                message.error(`El gasto se registró correctamente, pero hubo un error al subir el documento: ${docError.message || ''}`);
+            }
         }
-      }
-      
-      // Recargar datos
-      await cargarTodosGastos();
-      
+        
+        // Recargar datos
+        await cargarTodosGastos();
+        
     } catch (error) {
-      console.error('Error al registrar/actualizar el gasto:', error);
-      alert(`Error al ${gastoSeleccionado ? 'actualizar' : 'registrar'} el gasto`);
+        console.error('Error al registrar/actualizar el gasto:', error);
+        message.error(`Error al ${gastoSeleccionado ? 'actualizar' : 'registrar'} el gasto`);
     }
-  };
+};
 
   // Función para editar un gasto existente
   const editarGasto = async (gasto) => {
@@ -334,43 +328,55 @@ const ContabilidadGastos = () => {
     setModalVisible(true);
   };
 
-  // Función para ver documento directamente usando el servicio
+  // Función para ver documento
   const handleViewDocument = async (rutaDocumento) => {
     try {
-      if (!rutaDocumento) {
-        throw new Error('Ruta del documento no disponible');
-      }
-      
-      // Extraer el nombre del archivo de la ruta completa
-      const nombreArchivo = rutaDocumento.split('/').pop();
-      
-      // Usar la ruta común documentos/pago/1/
-      const rutaServicio = `documentos/pago/1/${nombreArchivo}`;
-      
-      await documentoService.verDocumento(rutaServicio);
+        if (!rutaDocumento) {
+            message.error('Ruta del documento no disponible');
+            return;
+        }
+        
+        // Extraer la key del documento de la ruta
+        const key = rutaDocumento.split('/').pop();
+        
+        const response = await documentoService.verDocumento(key);
+        if (response.url) {
+            window.open(response.url, '_blank');
+        } else {
+            throw new Error('URL no disponible en la respuesta');
+        }
     } catch (error) {
-      console.error('Error al ver el documento:', error);
-      alert('Error al abrir el documento. Por favor, intente descargarlo.');
+        console.error('Error al ver el documento:', error);
+        message.error('Error al abrir el documento. Por favor, intente descargarlo.');
     }
   };
 
-  // Función para descargar documento directamente usando el servicio
+  // Función para descargar documento
   const handleDownloadDocument = async (rutaDocumento, nombreArchivo) => {
     try {
-      if (!rutaDocumento) {
-        throw new Error('Ruta del documento no disponible');
-      }
-      
-      // Extraer el nombre del archivo de la ruta completa
-      const nombreArchivo = rutaDocumento.split('/').pop();
-      
-      // Usar la ruta común documentos/pago/1/
-      const rutaServicio = `documentos/pago/1/${nombreArchivo}`;
-      
-      await documentoService.descargarDocumento(rutaServicio, nombreArchivo);
+        if (!rutaDocumento) {
+            message.error('Ruta del documento no disponible');
+            return;
+        }
+        
+        // Extraer la key del documento de la ruta
+        const key = rutaDocumento.split('/').pop();
+        
+        const response = await documentoService.descargarDocumento(key);
+        if (response.url) {
+            // Crear un enlace temporal para la descarga
+            const link = document.createElement('a');
+            link.href = response.url;
+            link.setAttribute('download', response.nombre || nombreArchivo || 'documento.pdf');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            throw new Error('URL no disponible en la respuesta');
+        }
     } catch (error) {
-      console.error('Error al descargar el documento:', error);
-      alert('Error al descargar el documento. Por favor, intente más tarde.');
+        console.error('Error al descargar el documento:', error);
+        message.error('Error al descargar el documento. Por favor, intente más tarde.');
     }
   };
 
@@ -391,103 +397,32 @@ const ContabilidadGastos = () => {
     setDocumentoError(false);
     setLoadingDoc(true);
     
-    // Intentar obtener el documento asociado al gasto
     try {
-      try {
-        // Buscar documentos asociados a este gasto
         const documentos = await documentoService.obtenerDocumentosPorTipo(gasto.id, 'gasto');
         
         if (documentos && documentos.length > 0) {
-          
-          // Determinar el tipo de documento basado en la extensión
-          let tipoDocumento = 'pdf'; // valor predeterminado
-          const nombreArchivo = documentos[0].nombre || '';
-          if (nombreArchivo.toLowerCase().endsWith('.jpg') || 
-              nombreArchivo.toLowerCase().endsWith('.jpeg') || 
-              nombreArchivo.toLowerCase().endsWith('.png') || 
-              nombreArchivo.toLowerCase().endsWith('.gif')) {
-            tipoDocumento = 'imagen';
-          }
-          
-          // Construir la URL completa con base en el dominio actual
-          let rutaDocumento = documentos[0].ruta;
-          
-          // Si la ruta no comienza con http/https o //, asumimos que es una ruta relativa
-          if (!rutaDocumento.startsWith('http') && !rutaDocumento.startsWith('//')) {
-            // Asegurarnos de que comience con /
-            if (!rutaDocumento.startsWith('/')) {
-              rutaDocumento = '/' + rutaDocumento;
-            }
+            const doc = documentos[0];
             
-            // Obtener la base URL del servidor
-            const baseUrl = window.location.origin;
-            rutaDocumento = baseUrl + rutaDocumento;
-          }
-          
-          // Verificar si el documento existe
-          const existeArchivo = await verificarExistenciaArchivo(rutaDocumento);
-          
-          if (existeArchivo) {
-            setDocumento({ 
-              nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
-              ruta: rutaDocumento,
-              tipo: tipoDocumento
+            setDocumento({
+                id: doc.id,
+                nombre: doc.nombre,
+                url: doc.url,
+                key: doc.key,
+                tipo: doc.tipo || 'application/pdf'
             });
+            
             setDocumentoError(false);
-          } else {
-            console.error(`El documento no existe en la ruta: ${rutaDocumento}`);
-            
-            // Intentar buscar en la carpeta común donde están realmente guardados
-            const baseUrl = window.location.origin;
-            const rutaComun = `${baseUrl}/documentos/pago/1/${documentos[0].nombre}`;
-            const rutaComunAlternativa = `${baseUrl}/public/pago/1/${documentos[0].nombre}`;
-            
-            let existeEnRutaComun = await verificarExistenciaArchivo(rutaComun);
-            
-            if (existeEnRutaComun) {
-              setDocumento({ 
-                nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
-                ruta: rutaComun,
-                tipo: tipoDocumento
-              });
-              setDocumentoError(false);
-            } else {
-              // Probar con la ruta alternativa
-              existeEnRutaComun = await verificarExistenciaArchivo(rutaComunAlternativa);
-              
-              if (existeEnRutaComun) {
-                setDocumento({ 
-                  nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
-                  ruta: rutaComunAlternativa,
-                  tipo: tipoDocumento
-                });
-                setDocumentoError(false);
-              } else {
-                setDocumento({ 
-                  nombre: documentos[0].nombre || `Comprobante-${gasto.id}.pdf`,
-                  ruta: rutaDocumento,
-                  tipo: tipoDocumento
-                });
-                setDocumentoError(true);
-              }
-            }
-          }
         } else {
-          //console.log(`No se encontraron documentos para el gasto ${gasto.id}`);
-          setDocumento(null);
+            setDocumento(null);
         }
-      } catch (error) {
-        console.error('Error al obtener documentos del servicio:', error);
-        setDocumento(null);
-      }
     } catch (error) {
-      console.error('Error general al obtener el documento:', error);
-      setDocumento(null);
+        console.error('Error al obtener el documento:', error);
+        setDocumento(null);
+        setDocumentoError(true);
     } finally {
-      setLoadingDoc(false);
+        setLoadingDoc(false);
     }
     
-    // Abrir el modal de visualización
     setModalViewVisible(true);
   };
 
@@ -769,23 +704,13 @@ const ContabilidadGastos = () => {
           const respuestaArchivo = await documentoService.subirArchivo(
             documento,
             gastoID,
-            'gasto',
-            { carpetaDestino: 'documentos/gasto' }
+            'gasto'
           );
 
-          if (!respuestaArchivo || !respuestaArchivo.ruta) {
+          if (!respuestaArchivo || !respuestaArchivo.id) {
             throw new Error('No se recibió una respuesta válida del servidor al subir el archivo');
           }
 
-          // Registrar el nuevo documento (asumiendo que el backend maneja el reemplazo)
-          const documentoData = {
-            nombre: documento.name,
-            ruta: respuestaArchivo.ruta,
-            documentable_id: gastoID,
-            documentable_type: 'gasto'
-          };
-          
-          await documentoService.crearDocumento(documentoData);
           message.success('El documento se ha actualizado con éxito.');
 
         } catch (docError) {
@@ -1227,14 +1152,14 @@ const ContabilidadGastos = () => {
                           <button 
                             type="button" 
                             className="btn btn-sm btn-outline-primary me-2"
-                            onClick={() => handleDownloadDocument(documento.ruta, documento.nombre)}
+                            onClick={() => handleDownloadDocument(documento.key, documento.nombre)}
                           >
                             <FiDownload className="me-1" /> Descargar
                           </button>
                           <button 
                             type="button" 
                             className="btn btn-sm btn-primary"
-                            onClick={() => handleViewDocument(documento.ruta)}
+                            onClick={() => handleViewDocument(documento.key)}
                           >
                             <FiEye className="me-1" /> Ver documento
                           </button>
