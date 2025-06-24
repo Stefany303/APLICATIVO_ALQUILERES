@@ -12614,6 +12614,11 @@ a.status-grey {
   background-color: #ddd;
   color: #818181;
 }
+.status-light,
+a.status-light {
+  background-color: #f8f9fa;
+  color: #6c757d;
+}
 .btn-grey {
   background-color: #b2b2b2;
   border: 1px solid #b2b2b2;

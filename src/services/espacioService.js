@@ -159,6 +159,27 @@ const espacioService = {
       console.error(`Error al eliminar espacio ${espacioId}:`, error);
       throw error;
     }
+  },
+
+  // Actualizar el estado de un espacio
+  cambiarEstadoEspacio: async (espacioId, nuevoEstado) => {
+    try {
+      // Asegurar que el estado sea un número
+      const estadoFinal = parseInt(nuevoEstado);
+      
+      console.log(`Cambiando estado del espacio ${espacioId} a:`, estadoFinal);
+      
+      // Usar la ruta específica que funciona correctamente
+      const response = await api.put(
+        `${ENDPOINT_BASE}/estado/${espacioId}`,
+        { estado: estadoFinal }
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Error al cambiar estado del espacio ${espacioId}:`, error);
+      throw error;
+    }
   }
 };
 

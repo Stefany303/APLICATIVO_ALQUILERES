@@ -19,6 +19,7 @@ import { Link } from "react-router-dom";
 import CountUp from "react-countup";
 import { useAuth } from "../../utils/AuthContext";
 import reporteService from '../../services/reporteService';
+import pagoService from '../../services/pagoService';
 import { message, Spin, Row, Col, Progress } from 'antd';
 import moment from 'moment';
 
@@ -33,7 +34,14 @@ const AdminDashboard = () => {
     ingresosGarantia: 0,
     ingresosMensualesPrevistos: [],
     gastosMensuales: [],
-    tendencias: { ingresos: 0, ocupacion: 0 }
+    tendencias: { ingresos: 0, ocupacion: 0 },
+    estadisticasPagos: {
+      pagados: 0,
+      pendientes: 0,
+      vencidos: 0,
+      cancelados: 0,
+      total: 0
+    }
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -49,7 +57,12 @@ const AdminDashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const estadisticas = await reporteService.obtenerEstadisticasGenerales();
+        
+        // Obtener estadísticas generales y pagos en paralelo
+        const [estadisticas, todosLosPagos] = await Promise.all([
+          reporteService.obtenerEstadisticasGenerales(),
+          pagoService.obtenerPagos()
+        ]);
 
         if (!estadisticas) {
           throw new Error('No se recibieron datos del dashboard');
@@ -76,6 +89,40 @@ const AdminDashboard = () => {
             return tasa;
           }
           return 0;
+        };
+
+        // Calcular estadísticas de pagos por estado
+        const calcularEstadisticasPagos = () => {
+          if (!Array.isArray(todosLosPagos)) {
+            return { pagados: 0, pendientes: 0, vencidos: 0, cancelados: 0, total: 0 };
+          }
+
+          const estadisticas = todosLosPagos.reduce((acc, pago) => {
+            const estado = pago.estado?.toLowerCase();
+            acc.total++;
+            
+            switch (estado) {
+              case 'pagado':
+                acc.pagados++;
+                break;
+              case 'pendiente':
+                acc.pendientes++;
+                break;
+              case 'vencido':
+                acc.vencidos++;
+                break;
+              case 'cancelado':
+                acc.cancelados++;
+                break;
+              default:
+                // Estados no reconocidos se cuentan en total pero no en categorías específicas
+                break;
+            }
+            
+            return acc;
+          }, { pagados: 0, pendientes: 0, vencidos: 0, cancelados: 0, total: 0 });
+
+          return estadisticas;
         };
 
         // Estructurar datos
@@ -106,7 +153,8 @@ const AdminDashboard = () => {
           tendencias: {
             ingresos: calcularTendenciaIngresos(),
             ocupacion: calcularTendenciaOcupacion()
-          }
+          },
+          estadisticasPagos: calcularEstadisticasPagos()
         };
 
         setDashboardData(newDashboardData);
@@ -313,19 +361,90 @@ const AdminDashboard = () => {
 
             <div className="kpi-card contratos-card">
               <div className="kpi-icon">
-                <FaFileContract />
+                <FaExclamationTriangle />
             </div>
               <div className="kpi-content">
-                <h4>Contratos por Vencer</h4>
+                <h4>Pagos Vencidos</h4>
                 <h2>
-                  <CountUp end={dashboardData.contratosPorVencer.length} duration={0.6} />
+                  <CountUp end={dashboardData.estadisticasPagos.vencidos} duration={0.6} />
+                  {dashboardData.estadisticasPagos.vencidos > 0 && (
+                    <span className="pulse-alert">!</span>
+                  )}
                   </h2>
-                <p>En los próximos 30 días</p>
+                <p>
+                  <span className="kpi-subtext">
+                    {dashboardData.estadisticasPagos.vencidos > 0 
+                      ? "Requieren atención inmediata" 
+                      : "Todo al día"}
+                  </span>
+                </p>
               </div>
             </div>
           </div>
           
           <div className="dashboard-widgets">
+            <div className="widget-card">
+              <div className="widget-header">
+                <FaMoneyBillWave className="widget-icon" />
+                <h3>Estado de Pagos</h3>
+              </div>
+              <div className="widget-content">
+                <div className="pagos-grid">
+                  <div className="pago-stat pagado">
+                    <div className="pago-icon">✓</div>
+                    <div className="pago-info">
+                      <span className="pago-count">{dashboardData.estadisticasPagos.pagados}</span>
+                      <span className="pago-label">Pagados</span>
+                    </div>
+                  </div>
+                  
+                  <div className="pago-stat pendiente">
+                    <div className="pago-icon">⏱</div>
+                    <div className="pago-info">
+                      <span className="pago-count">{dashboardData.estadisticasPagos.pendientes}</span>
+                      <span className="pago-label">Pendientes</span>
+                    </div>
+                  </div>
+                  
+                  <div className="pago-stat vencido">
+                    <div className="pago-icon">⚠</div>
+                    <div className="pago-info">
+                      <span className="pago-count">{dashboardData.estadisticasPagos.vencidos}</span>
+                      <span className="pago-label">Vencidos</span>
+                    </div>
+                  </div>
+                  
+                  <div className="pago-stat cancelado">
+                    <div className="pago-icon">✕</div>
+                    <div className="pago-info">
+                      <span className="pago-count">{dashboardData.estadisticasPagos.cancelados}</span>
+                      <span className="pago-label">Cancelados</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="pagos-summary">
+                  <div className="summary-item">
+                    <span>Total de Pagos: </span>
+                    <strong>{dashboardData.estadisticasPagos.total}</strong>
+                  </div>
+                  <div className="summary-item">
+                    <span>Tasa de Cumplimiento: </span>
+                    <strong>
+                      {dashboardData.estadisticasPagos.total > 0 
+                        ? Math.round((dashboardData.estadisticasPagos.pagados / dashboardData.estadisticasPagos.total) * 100)
+                        : 0
+                      }%
+                    </strong>
+                  </div>
+                </div>
+                
+                <Link to="/reporte-pagos" className="widget-link">
+                  Ver reporte completo <FaChevronRight />
+                </Link>
+              </div>
+            </div>
+
             <div className="widget-card">
               <div className="widget-header">
                 <FaHome className="widget-icon" />
@@ -633,7 +752,7 @@ const AdminDashboard = () => {
         }
         
         .contratos-card .kpi-icon {
-          background: linear-gradient(135deg, #ff9e00 0%, #ef476f 100%);
+          background: linear-gradient(135deg, #ef476f 0%, #dc3545 100%);
         }
         
         .kpi-content h4 {
@@ -671,9 +790,10 @@ const AdminDashboard = () => {
           border-top: 3px solid;
         }
         
-        .widget-card:nth-child(1) { border-top-color: #42a5f5; }
-        .widget-card:nth-child(2) { border-top-color: #ffa726; }
-        .widget-card:nth-child(3) { border-top-color: #66bb6a; }
+        .widget-card:nth-child(1) { border-top-color: #66bb6a; }
+        .widget-card:nth-child(2) { border-top-color: #42a5f5; }
+        .widget-card:nth-child(3) { border-top-color: #ffa726; }
+        .widget-card:nth-child(4) { border-top-color: #ef476f; }
         
         .widget-card:hover {
           box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
@@ -814,6 +934,129 @@ const AdminDashboard = () => {
           text-align: center;
           padding: 30px 0;
           color: #6c757d;
+        }
+        
+        .pagos-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+        
+        .pago-stat {
+          display: flex;
+          align-items: center;
+          padding: 15px;
+          border-radius: 10px;
+          transition: all 0.3s ease;
+        }
+        
+        .pago-stat:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .pago-stat.pagado {
+          background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+          border-left: 4px solid #28a745;
+        }
+        
+        .pago-stat.pendiente {
+          background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+          border-left: 4px solid #ffc107;
+        }
+        
+        .pago-stat.vencido {
+          background: linear-gradient(135deg, #f8d7da 0%, #f1c2c7 100%);
+          border-left: 4px solid #dc3545;
+        }
+        
+        .pago-stat.cancelado {
+          background: linear-gradient(135deg, #e2e3e5 0%, #d1d3d4 100%);
+          border-left: 4px solid #6c757d;
+        }
+        
+        .pago-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          font-weight: bold;
+          margin-right: 12px;
+        }
+        
+        .pago-stat.pagado .pago-icon {
+          background: #28a745;
+          color: white;
+        }
+        
+        .pago-stat.pendiente .pago-icon {
+          background: #ffc107;
+          color: white;
+        }
+        
+        .pago-stat.vencido .pago-icon {
+          background: #dc3545;
+          color: white;
+        }
+        
+        .pago-stat.cancelado .pago-icon {
+          background: #6c757d;
+          color: white;
+        }
+        
+        .pago-info {
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .pago-count {
+          font-size: 24px;
+          font-weight: 700;
+          line-height: 1;
+          margin-bottom: 4px;
+        }
+        
+        .pago-stat.pagado .pago-count { color: #155724; }
+        .pago-stat.pendiente .pago-count { color: #856404; }
+        .pago-stat.vencido .pago-count { color: #721c24; }
+        .pago-stat.cancelado .pago-count { color: #495057; }
+        
+        .pago-label {
+          font-size: 14px;
+          font-weight: 500;
+          opacity: 0.8;
+        }
+        
+        .pagos-summary {
+          background: #f8f9fa;
+          border-radius: 8px;
+          padding: 15px;
+          margin-bottom: 20px;
+        }
+        
+        .summary-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        
+        .summary-item:last-child {
+          margin-bottom: 0;
+        }
+        
+        .summary-item span {
+          color: #6c757d;
+          font-size: 14px;
+        }
+        
+        .summary-item strong {
+          color: #495057;
+          font-size: 16px;
         }
         
         .ingresos-summary {
@@ -976,6 +1219,29 @@ const AdminDashboard = () => {
           border-radius: 12px;
         }
         
+        .pulse-alert {
+          color: #dc3545;
+          font-size: 16px;
+          margin-left: 8px;
+          animation: pulse-red 1.5s infinite;
+          font-weight: bold;
+        }
+        
+        @keyframes pulse-red {
+          0% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.7;
+            transform: scale(1.1);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
         @media (max-width: 992px) {
           .dashboard-widgets {
             grid-template-columns: 1fr;
@@ -988,6 +1254,11 @@ const AdminDashboard = () => {
           .ocupacion-progress {
             flex-direction: column;
             gap: 20px;
+          }
+          
+          .pagos-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
           }
         }
         

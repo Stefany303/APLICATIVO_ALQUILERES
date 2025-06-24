@@ -15,6 +15,7 @@ import inmuebleService from "../../services/inmuebleService";
 import pisoService from "../../services/pisoService";
 import documentoService from "../../services/documentoService";
 import espacioService from "../../services/espacioService";
+import pagoService from "../../services/pagoService";
 import { API_URL } from "../../services/authService";
 import moment from 'moment';
 import { SearchOutlined, PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SaveOutlined, FileExcelOutlined } from '@ant-design/icons';
@@ -61,6 +62,24 @@ const ContratoRegistrosContent = () => {
   const [documentoError, setDocumentoError] = useState(false);
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [documentoExistente, setDocumentoExistente] = useState(null);
+  
+  // Estados para cancelación de contrato
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [contratoACancelar, setContratoACancelar] = useState(null);
+  const [pagosCancelacion, setPagosCancelacion] = useState([]);
+  const [loadingCancelacion, setLoadingCancelacion] = useState(false);
+  const [loadingPagosCancelacion, setLoadingPagosCancelacion] = useState(false);
+  
+  // Estados para verificación de pagos y finalización
+  const [contratosConPagosPagados, setContratosConPagosPagados] = useState(new Set());
+  const [loadingVerificacionPagos, setLoadingVerificacionPagos] = useState(false);
+  const [estadisticasPagos, setEstadisticasPagos] = useState(new Map()); // Map para almacenar estadísticas de pagos por contrato
+  
+  // Estados para modal de finalización
+  const [finalizarModalVisible, setFinalizarModalVisible] = useState(false);
+  const [contratoAFinalizar, setContratoAFinalizar] = useState(null);
+  const [pagosFinalizacion, setPagosFinalizacion] = useState([]);
+  const [loadingPagosFinalizacion, setLoadingPagosFinalizacion] = useState(false);
   
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   
@@ -176,6 +195,13 @@ const ContratoRegistrosContent = () => {
     setFilteredContratos(filtered);
   }, [contratos, selectedInmueble, selectedPiso, selectedEstado, searchText]);
 
+  // Verificar pagos cuando cambien los contratos filtrados
+  useEffect(() => {
+    if (filteredContratos.length > 0) {
+      verificarPagosTodosContratos();
+    }
+  }, [filteredContratos]);
+
   const handleInmuebleChange = (value) => {
     setSelectedInmueble(value);
     setSelectedPiso(null); // Reiniciar piso al cambiar inmueble
@@ -199,6 +225,13 @@ const ContratoRegistrosContent = () => {
       const contratosData = await contratoService.obtenerContratosDetalles();
       setContratos(Array.isArray(contratosData) ? contratosData : []);
       message.success("Datos actualizados");
+      
+      // Verificar pagos después de actualizar contratos
+      if (Array.isArray(contratosData) && contratosData.length > 0) {
+        setTimeout(() => {
+          verificarPagosTodosContratos();
+        }, 500); // Pequeño delay para asegurar que los datos estén actualizados
+      }
     } catch (err) {
       console.error("Error al actualizar datos:", err);
       message.error("Error al actualizar los datos");
@@ -331,59 +364,136 @@ const ContratoRegistrosContent = () => {
     }
   };
 
-  const handleFinalizarContrato = (contrato) => {
-    modal.confirm({
-      title: '¿Está seguro de que desea finalizar este contrato?',
-      content: `Esto marcará el contrato como "finalizado" y el espacio "${contrato.espacio_nombre}" como "desocupado". Esta acción no se puede deshacer.`,
-      okText: 'Sí, finalizar',
-      okType: 'danger',
-      cancelText: 'No, cancelar',
-      onOk: async () => {
-        try {
-          setLoadingFinalizar(true);
-          message.loading('Finalizando contrato...', 0);
-          
-          // 1. Actualizar el estado del contrato a 'finalizado'
-          // Se envían todos los datos del contrato para asegurar la validación en el backend
-          const contratoData = {
-            monto_alquiler: contrato.monto_alquiler,
-            monto_garantia: contrato.monto_garantia,
-            descripcion: contrato.descripcion,
-            estado: 'finalizado', // El nuevo estado
-            fecha_inicio: moment(contrato.fecha_inicio).format('YYYY-MM-DD'),
-            fecha_fin: moment(contrato.fecha_fin).format('YYYY-MM-DD'),
-            fecha_pago: moment(contrato.fecha_pago).format('YYYY-MM-DD'),
-          };
+  const handleFinalizarContrato = async (contrato) => {
+    try {
+      setContratoAFinalizar(contrato);
+      setLoadingPagosFinalizacion(true);
+      setFinalizarModalVisible(true);
+      
+      // Obtener todos los pagos y filtrar por contrato_id
+      const todosLosPagos = await pagoService.obtenerPagos();
+      const pagosDelContrato = Array.isArray(todosLosPagos) ? 
+        todosLosPagos.filter(pago => pago.contrato_id && pago.contrato_id.toString() === contrato.id.toString()) : 
+        [];
+      
+      setPagosFinalizacion(pagosDelContrato);
+      
+    } catch (error) {
+      console.error('Error al obtener pagos del contrato:', error);
+      message.error('Error al cargar los pagos del contrato');
+      setPagosFinalizacion([]);
+    } finally {
+      setLoadingPagosFinalizacion(false);
+    }
+  };
 
-          await contratoService.actualizarContrato(contrato.id, contratoData);
-  
-          // 2. Actualizar el estado del espacio a 'desocupado' (estado: 0)
-          if (contrato.espacio_id && contrato.inmueble_id && contrato.piso_id) {
-            await espacioService.actualizarEspacio(
-              contrato.inmueble_id,
-              contrato.piso_id,
-              contrato.espacio_id,
-              { estado: 0 } // 0 para desocupado
-            );
-          } else {
-            throw new Error('Falta información del espacio (inmueble, piso o espacio ID) para poder actualizarlo.');
-          }
-  
-          message.destroy();
-          message.success('El contrato ha sido finalizado y el espacio ha sido liberado.');
-          
-          // Recargar la lista de contratos
-          handleRefresh();
-
-        } catch (error) {
-          message.destroy();
-          console.error("Error al finalizar el contrato:", error);
-          message.error(`Error al finalizar el contrato: ${error.message}`);
-        } finally {
-          setLoadingFinalizar(false);
+  // Función para confirmar la finalización del contrato (transaccional con rollback)
+  const handleConfirmarFinalizacion = async () => {
+    if (!contratoAFinalizar) return;
+    
+    // Variables para rollback
+    let contratoActualizado = false;
+    let espacioActualizado = false;
+    let estadoOriginalContrato = contratoAFinalizar.estado;
+    
+    try {
+      setLoadingFinalizar(true);
+      message.loading('Finalizando contrato...', 0);
+      
+      console.log('=== INICIO TRANSACCIÓN FINALIZACIÓN ===');
+      
+      // PASO 1: Actualizar el estado del contrato a 'finalizado'
+      try {
+        console.log('PASO 1: Finalizando contrato...');
+        const contratoData = {
+          monto_alquiler: contratoAFinalizar.monto_alquiler,
+          monto_garantia: contratoAFinalizar.monto_garantia,
+          descripcion: contratoAFinalizar.descripcion,
+          estado: 'finalizado', // El nuevo estado
+          fecha_inicio: moment(contratoAFinalizar.fecha_inicio).format('YYYY-MM-DD'),
+          fecha_fin: moment(contratoAFinalizar.fecha_fin).format('YYYY-MM-DD'),
+          fecha_pago: moment(contratoAFinalizar.fecha_pago).format('YYYY-MM-DD'),
+        };
+        
+        await contratoService.actualizarContrato(contratoAFinalizar.id, contratoData);
+        contratoActualizado = true;
+        console.log('✅ Contrato finalizado exitosamente');
+      } catch (error) {
+        console.log('❌ Error al finalizar contrato:', error.message);
+        throw new Error(`No se pudo finalizar el contrato: ${error.message}`);
+      }
+      
+      // PASO 2: Liberar el espacio
+      try {
+        if (!contratoAFinalizar.espacio_id) {
+          throw new Error('Falta información del espacio (espacio ID) para poder actualizarlo.');
         }
-      },
-    });
+        
+        console.log('PASO 2: Liberando espacio...');
+        await espacioService.cambiarEstadoEspacio(contratoAFinalizar.espacio_id, 0);
+        espacioActualizado = true;
+        console.log('✅ Espacio liberado exitosamente');
+      } catch (error) {
+        console.log('❌ Error al liberar espacio:', error.message);
+        throw new Error(`Error al liberar el espacio: ${error.message}`);
+      }
+
+      // Si llegamos aquí, todas las operaciones fueron exitosas
+      console.log('=== TRANSACCIÓN COMPLETADA EXITOSAMENTE ===');
+      message.destroy();
+      message.success('El contrato ha sido finalizado y el espacio ha sido liberado.');
+      
+      setFinalizarModalVisible(false);
+      setContratoAFinalizar(null);
+      setPagosFinalizacion([]);
+      
+      // Recargar la lista de contratos
+      handleRefresh();
+
+    } catch (error) {
+      // ROLLBACK: Revertir cambios realizados
+      console.log('=== INICIANDO ROLLBACK ===');
+      message.destroy();
+      message.loading('Revirtiendo cambios...', 0);
+      
+      try {
+        // Revertir espacio si fue actualizado
+        if (espacioActualizado && contratoAFinalizar.espacio_id) {
+          console.log('Revirtiendo estado del espacio...');
+          await espacioService.cambiarEstadoEspacio(contratoAFinalizar.espacio_id, 1); // 1 = ocupado
+        }
+        
+        // Revertir contrato si fue actualizado
+        if (contratoActualizado) {
+          console.log('Revirtiendo estado del contrato...');
+          const contratoData = {
+            monto_alquiler: contratoAFinalizar.monto_alquiler,
+            monto_garantia: contratoAFinalizar.monto_garantia,
+            descripcion: contratoAFinalizar.descripcion,
+            estado: estadoOriginalContrato,
+            fecha_inicio: moment(contratoAFinalizar.fecha_inicio).format('YYYY-MM-DD'),
+            fecha_fin: moment(contratoAFinalizar.fecha_fin).format('YYYY-MM-DD'),
+            fecha_pago: moment(contratoAFinalizar.fecha_pago).format('YYYY-MM-DD'),
+          };
+          await contratoService.actualizarContrato(contratoAFinalizar.id, contratoData);
+        }
+        
+        console.log('=== ROLLBACK COMPLETADO ===');
+        message.destroy();
+        message.error(`Error al finalizar el contrato: ${error.message}. Todos los cambios han sido revertidos.`);
+        
+      } catch (rollbackError) {
+        console.error('=== ERROR EN ROLLBACK ===', rollbackError);
+        message.destroy();
+        message.error(`Error crítico: No se pudo revertir completamente los cambios. Contacte al administrador. Error original: ${error.message}`);
+      }
+      
+      // Recargar datos para mostrar el estado actual
+      handleRefresh();
+      
+    } finally {
+      setLoadingFinalizar(false);
+    }
   };
 
   const handleLimpiarFiltros = () => {
@@ -391,6 +501,278 @@ const ContratoRegistrosContent = () => {
     setSelectedPiso(null);
     setSelectedEstado(null);
     setSearchText("");
+  };
+
+  // Función para verificar si todos los pagos de un contrato están pagados
+  const verificarPagosContrato = async (contratoId) => {
+    try {
+      // Obtener todos los pagos y filtrar por contrato_id
+      const todosLosPagos = await pagoService.obtenerPagos();
+      const pagosDelContrato = Array.isArray(todosLosPagos) ? 
+        todosLosPagos.filter(pago => pago.contrato_id && pago.contrato_id.toString() === contratoId.toString()) : 
+        [];
+      
+      // Verificar si todos los pagos están pagados
+      if (pagosDelContrato.length === 0) {
+        return false; // Si no hay pagos, no se puede finalizar
+      }
+      
+      const todosPagados = pagosDelContrato.every(pago => pago.estado === 'pagado');
+      return todosPagados;
+      
+    } catch (error) {
+      console.error('Error al verificar pagos del contrato:', error);
+      return false;
+    }
+  };
+
+  // Función para verificar pagos de todos los contratos activos
+  const verificarPagosTodosContratos = async () => {
+    try {
+      setLoadingVerificacionPagos(true);
+      
+      // Obtener todos los pagos una sola vez
+      const todosLosPagos = await pagoService.obtenerPagos();
+      const contratosActivos = filteredContratos.filter(contrato => contrato.estado === 'activo');
+      
+      const contratosConTodosPagados = new Set();
+      const estadisticasMap = new Map();
+      
+      for (const contrato of contratosActivos) {
+        const pagosDelContrato = Array.isArray(todosLosPagos) ? 
+          todosLosPagos.filter(pago => pago.contrato_id && pago.contrato_id.toString() === contrato.id.toString()) : 
+          [];
+        
+        // Contar pagos por estado
+        const pagosPagados = pagosDelContrato.filter(pago => pago.estado === 'pagado').length;
+        const totalPagos = pagosDelContrato.length;
+        
+        // Guardar estadísticas
+        estadisticasMap.set(contrato.id.toString(), {
+          pagados: pagosPagados,
+          total: totalPagos,
+          todosPagados: totalPagos > 0 && pagosPagados === totalPagos
+        });
+        
+        // Solo agregar si tiene pagos Y todos están pagados
+        if (totalPagos > 0 && pagosPagados === totalPagos) {
+          contratosConTodosPagados.add(contrato.id.toString());
+        }
+      }
+      
+      setContratosConPagosPagados(contratosConTodosPagados);
+      setEstadisticasPagos(estadisticasMap);
+      
+    } catch (error) {
+      console.error('Error al verificar pagos de todos los contratos:', error);
+      setContratosConPagosPagados(new Set());
+      setEstadisticasPagos(new Map());
+    } finally {
+      setLoadingVerificacionPagos(false);
+    }
+  };
+
+  // Función para cancelar contrato
+  const handleCancelarContrato = async (contrato) => {
+    try {
+      console.log('=== INICIO CANCELACIÓN DE CONTRATO ===');
+      console.log('Contrato seleccionado:', contrato);
+      console.log('ID del contrato:', contrato.id);
+      
+      setContratoACancelar(contrato);
+      setLoadingPagosCancelacion(true);
+      setCancelModalVisible(true);
+      
+      // Obtener todos los pagos y filtrar por contrato_id
+      console.log('Obteniendo todos los pagos...');
+      const todosLosPagos = await pagoService.obtenerPagos();
+      console.log('Total de pagos obtenidos:', todosLosPagos?.length || 0);
+      console.log('Primeros 3 pagos:', todosLosPagos?.slice(0, 3));
+      
+      const pagosDelContrato = Array.isArray(todosLosPagos) ? 
+        todosLosPagos.filter(pago => {
+          const coincide = pago.contrato_id && pago.contrato_id.toString() === contrato.id.toString();
+          if (coincide) {
+            console.log('Pago coincidente encontrado:', pago);
+          }
+          return coincide;
+        }) : 
+        [];
+      
+      console.log('Pagos filtrados para el contrato:', pagosDelContrato);
+      console.log('Cantidad de pagos del contrato:', pagosDelContrato.length);
+      
+      setPagosCancelacion(pagosDelContrato);
+      
+    } catch (error) {
+      console.error('Error al obtener pagos del contrato:', error);
+      message.error('Error al cargar los pagos del contrato');
+      setPagosCancelacion([]);
+    } finally {
+      setLoadingPagosCancelacion(false);
+      console.log('=== FIN CANCELACIÓN DE CONTRATO ===');
+    }
+  };
+
+  // Función para confirmar la cancelación del contrato (transaccional con rollback)
+  const handleConfirmarCancelacion = async () => {
+    if (!contratoACancelar) return;
+    
+    // Variables para rollback
+    let contratoActualizado = false;
+    let pagosActualizados = [];
+    let espacioActualizado = false;
+    let estadoOriginalContrato = contratoACancelar.estado;
+    
+    try {
+      setLoadingCancelacion(true);
+      message.loading('Cancelando contrato...', 0);
+      
+      const pagosPendientes = pagosCancelacion.filter(pago => 
+        pago.estado === 'pendiente' || pago.estado === 'vencido'
+      );
+      
+      console.log('=== INICIO TRANSACCIÓN CANCELACIÓN ===');
+      console.log('Pagos a cancelar:', pagosPendientes.length);
+      
+      // PASO 1: Actualizar el estado del contrato a 'cancelado'
+      try {
+        console.log('PASO 1: Cancelando contrato...');
+        const contratoData = {
+          monto_alquiler: contratoACancelar.monto_alquiler,
+          monto_garantia: contratoACancelar.monto_garantia,
+          descripcion: contratoACancelar.descripcion,
+          estado: 'cancelado',
+          fecha_inicio: moment(contratoACancelar.fecha_inicio).format('YYYY-MM-DD'),
+          fecha_fin: moment(contratoACancelar.fecha_fin).format('YYYY-MM-DD'),
+          fecha_pago: moment(contratoACancelar.fecha_pago).format('YYYY-MM-DD'),
+        };
+        
+        await contratoService.actualizarContrato(contratoACancelar.id, contratoData);
+        contratoActualizado = true;
+        console.log('✅ Contrato cancelado exitosamente');
+      } catch (error) {
+        console.log('❌ Error al cancelar contrato:', error.message);
+        throw new Error(`No se pudo cancelar el contrato: ${error.message}`);
+      }
+      
+      // PASO 2: Cancelar todos los pagos pendientes
+      for (const pago of pagosPendientes) {
+        try {
+          console.log(`PASO 2: Cancelando pago ${pago.id}...`);
+          const pagoData = {
+            contrato_id: pago.contrato_id,
+            monto: pago.monto,
+            metodo_pago: pago.metodo_pago,
+            tipo_pago: pago.tipo_pago || 'alquiler',
+            estado: 'cancelado',
+            fecha_pago: pago.fecha_pago,
+            fecha_real_pago: pago.fecha_real_pago,
+            observacion: pago.observacion || 'Cancelado por cancelación de contrato'
+          };
+          
+          await pagoService.actualizarPago(pago.id, pagoData);
+          pagosActualizados.push({id: pago.id, estadoOriginal: pago.estado});
+          console.log(`✅ Pago ${pago.id} cancelado exitosamente`);
+        } catch (error) {
+          console.log(`❌ Error al cancelar pago ${pago.id}:`, error.message);
+          throw new Error(`Error al cancelar el pago ${pago.id}: ${error.message}`);
+        }
+      }
+      
+      // PASO 3: Liberar el espacio
+      try {
+        if (!contratoACancelar.espacio_id) {
+          throw new Error('Falta información del espacio (espacio ID) para poder actualizarlo.');
+        }
+        
+        console.log('PASO 3: Liberando espacio...');
+        await espacioService.cambiarEstadoEspacio(contratoACancelar.espacio_id, 0);
+        espacioActualizado = true;
+        console.log('✅ Espacio liberado exitosamente');
+      } catch (error) {
+        console.log('❌ Error al liberar espacio:', error.message);
+        throw new Error(`Error al liberar el espacio: ${error.message}`);
+      }
+      
+      // Si llegamos aquí, todas las operaciones fueron exitosas
+      console.log('=== TRANSACCIÓN COMPLETADA EXITOSAMENTE ===');
+      message.destroy();
+      const mensajeExito = pagosPendientes.length > 0 
+        ? `El contrato ha sido cancelado exitosamente. ${pagosPendientes.length} pago(s) pendiente(s) también fueron cancelados.`
+        : 'El contrato ha sido cancelado exitosamente.';
+      
+      message.success(mensajeExito);
+      setCancelModalVisible(false);
+      setContratoACancelar(null);
+      setPagosCancelacion([]);
+      
+      // Recargar la lista de contratos
+      handleRefresh();
+      
+    } catch (error) {
+      // ROLLBACK: Revertir cambios realizados
+      console.log('=== INICIANDO ROLLBACK ===');
+      message.destroy();
+      message.loading('Revirtiendo cambios...', 0);
+      
+      try {
+        // Revertir espacio si fue actualizado
+        if (espacioActualizado && contratoACancelar.espacio_id) {
+          console.log('Revirtiendo estado del espacio...');
+          await espacioService.cambiarEstadoEspacio(contratoACancelar.espacio_id, 1); // 1 = ocupado
+        }
+        
+        // Revertir pagos actualizados
+        for (const pagoRevertir of pagosActualizados) {
+          console.log(`Revirtiendo pago ${pagoRevertir.id}...`);
+          const pagoOriginal = pagosCancelacion.find(p => p.id === pagoRevertir.id);
+          if (pagoOriginal) {
+            const pagoData = {
+              contrato_id: pagoOriginal.contrato_id,
+              monto: pagoOriginal.monto,
+              metodo_pago: pagoOriginal.metodo_pago,
+              tipo_pago: pagoOriginal.tipo_pago || 'alquiler',
+              estado: pagoRevertir.estadoOriginal,
+              fecha_pago: pagoOriginal.fecha_pago,
+              fecha_real_pago: pagoOriginal.fecha_real_pago,
+              observacion: pagoOriginal.observacion
+            };
+            await pagoService.actualizarPago(pagoRevertir.id, pagoData);
+          }
+        }
+        
+        // Revertir contrato si fue actualizado
+        if (contratoActualizado) {
+          console.log('Revirtiendo estado del contrato...');
+          const contratoData = {
+            monto_alquiler: contratoACancelar.monto_alquiler,
+            monto_garantia: contratoACancelar.monto_garantia,
+            descripcion: contratoACancelar.descripcion,
+            estado: estadoOriginalContrato,
+            fecha_inicio: moment(contratoACancelar.fecha_inicio).format('YYYY-MM-DD'),
+            fecha_fin: moment(contratoACancelar.fecha_fin).format('YYYY-MM-DD'),
+            fecha_pago: moment(contratoACancelar.fecha_pago).format('YYYY-MM-DD'),
+          };
+          await contratoService.actualizarContrato(contratoACancelar.id, contratoData);
+        }
+        
+        console.log('=== ROLLBACK COMPLETADO ===');
+        message.destroy();
+        message.error(`Error al cancelar el contrato: ${error.message}. Todos los cambios han sido revertidos.`);
+        
+      } catch (rollbackError) {
+        console.error('=== ERROR EN ROLLBACK ===', rollbackError);
+        message.destroy();
+        message.error(`Error crítico: No se pudo revertir completamente los cambios. Contacte al administrador. Error original: ${error.message}`);
+      }
+      
+      // Recargar datos para mostrar el estado actual
+      handleRefresh();
+      
+    } finally {
+      setLoadingCancelacion(false);
+    }
   };
 
   // Función para generar contrato en PDF
@@ -784,6 +1166,7 @@ const ContratoRegistrosContent = () => {
           activo: "text-success",
           inactivo: "text-warning",
           finalizado: "text-danger",
+          cancelado: "text-secondary",
         };
         return <span className={estadoColores[estado.toLowerCase()] || ""}>{estado}</span>;
       },
@@ -793,6 +1176,44 @@ const ContratoRegistrosContent = () => {
       dataIndex: "fecha_pago",
       sorter: (a, b) => new Date(a.fecha_pago || 0) - new Date(b.fecha_pago || 0),
       render: (fecha) => fecha ? new Date(fecha).toLocaleDateString() : "N/A",
+    },
+    {
+      title: "Pagos",
+      key: "pagos_estado",
+      render: (_, record) => {
+        if (record.estado !== 'activo') {
+          return <span className="text-muted">-</span>;
+        }
+        
+        if (loadingVerificacionPagos) {
+          return <span className="spinner-border spinner-border-sm text-primary" role="status"></span>;
+        }
+        
+        const estadisticas = estadisticasPagos.get(record.id.toString());
+        
+        if (!estadisticas || estadisticas.total === 0) {
+          return (
+            <span className="text-muted" title="Sin pagos registrados">
+              <i className="fas fa-minus-circle me-1"></i>
+              0/0
+            </span>
+          );
+        }
+        
+        const { pagados, total, todosPagados } = estadisticas;
+        
+        return todosPagados ? (
+          <span className="text-success" title="Todos los pagos están al día">
+            <i className="fas fa-check-circle me-1"></i>
+            {pagados}/{total}
+          </span>
+        ) : (
+          <span className="text-warning" title={`${pagados} de ${total} pagos completados`}>
+            <i className="fas fa-clock me-1"></i>
+            {pagados}/{total}
+          </span>
+        );
+      },
     },
     {
       title: "Acciones",
@@ -806,24 +1227,6 @@ const ContratoRegistrosContent = () => {
           >
             <EyeOutlined />
           </button>
-{/*           <button 
-            className="btn btn-sm btn-warning me-1"
-            onClick={() => handleEdit(record.id)}
-            title="Editar contrato"
-          >
-            <EditOutlined />
-          </button> */}
-          
-       {/*    {record.estado === 'activo' && (
-            <button
-              className="btn btn-sm btn-dark me-1"
-              onClick={() => handleFinalizarContrato(record)}
-              title="Finalizar Contrato"
-              disabled={loadingFinalizar}
-            >
-              <i className="fas fa-flag-checkered"></i>
-            </button>
-          )} */}
           <button
             className="btn btn-sm btn-info me-1"
             onClick={() => handleGenerarContratoPDF(record.id)}
@@ -840,6 +1243,25 @@ const ContratoRegistrosContent = () => {
               title="Subir contrato firmado y activar"
             >
               <i className="fas fa-upload"></i>
+            </button>
+          )}
+          {record.estado === 'activo' && contratosConPagosPagados.has(record.id.toString()) && (
+            <button
+              className="btn btn-sm btn-dark me-1"
+              onClick={() => handleFinalizarContrato(record)}
+              title="Finalizar Contrato"
+              disabled={loadingFinalizar}
+            >
+              <i className="fas fa-flag-checkered"></i>
+            </button>
+          )}
+          {(record.estado === 'activo' || record.estado === 'inactivo') && (
+            <button
+              className="btn btn-sm btn-danger me-1"
+              onClick={() => handleCancelarContrato(record)}
+              title="Cancelar contrato"
+            >
+              <i className="fas fa-times-circle"></i>
             </button>
           )}
           <button
@@ -993,7 +1415,8 @@ const ContratoRegistrosContent = () => {
                                   options={[
                                     { value: 'activo', label: 'Activo' },
                                     { value: 'inactivo', label: 'Inactivo' },
-                                    { value: 'finalizado', label: 'Finalizado' }
+                                    { value: 'finalizado', label: 'Finalizado' },
+                                    { value: 'cancelado', label: 'Cancelado' }
                                   ]}
                                   classNamePrefix="select"
                                 />
@@ -1106,7 +1529,12 @@ const ContratoRegistrosContent = () => {
             <div className="row mt-4">
               <div className="col-md-6">
                 <h4>Detalles del Contrato</h4>
-                <p><strong>Estado:</strong> <span className={`text-${contratoSeleccionado.estado === 'activo' ? 'success' : contratoSeleccionado.estado === 'inactivo' ? 'warning' : 'danger'}`}>{contratoSeleccionado.estado}</span></p>
+                <p><strong>Estado:</strong> <span className={`text-${
+                  contratoSeleccionado.estado === 'activo' ? 'success' : 
+                  contratoSeleccionado.estado === 'inactivo' ? 'warning' : 
+                  contratoSeleccionado.estado === 'cancelado' ? 'secondary' : 
+                  'danger'
+                }`}>{contratoSeleccionado.estado}</span></p>
                 <p><strong>Fecha Inicio:</strong> {new Date(contratoSeleccionado.fecha_inicio).toLocaleDateString()}</p>
                 <p><strong>Fecha Fin:</strong> {new Date(contratoSeleccionado.fecha_fin).toLocaleDateString()}</p>
                 <p><strong>Fecha Pago:</strong> {new Date(contratoSeleccionado.fecha_pago).toLocaleDateString()}</p>
@@ -1299,6 +1727,7 @@ const ContratoRegistrosContent = () => {
               <Select.Option value="activo">Activo</Select.Option>
               <Select.Option value="inactivo">Inactivo</Select.Option>
               <Select.Option value="finalizado">Finalizado</Select.Option>
+              <Select.Option value="cancelado">Cancelado</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item
@@ -1396,6 +1825,297 @@ const ContratoRegistrosContent = () => {
             </ul>
           )}
         </div>
+      </Modal>
+      
+      {/* Modal de Cancelación de Contrato */}
+      <Modal
+        title={<div className="text-danger"><i className="fas fa-times-circle me-2"></i>Cancelar Contrato</div>}
+        open={cancelModalVisible}
+        onCancel={() => {
+          setCancelModalVisible(false);
+          setContratoACancelar(null);
+          setPagosCancelacion([]);
+        }}
+        footer={[
+          <Button 
+            key="cancel" 
+            onClick={() => {
+              setCancelModalVisible(false);
+              setContratoACancelar(null);
+              setPagosCancelacion([]);
+            }}
+          >
+            Cancelar
+          </Button>,
+          <Button
+            key="confirm"
+            type="primary"
+            danger
+            loading={loadingCancelacion}
+            onClick={handleConfirmarCancelacion}
+          >
+            Confirmar Cancelación
+          </Button>
+        ]}
+        width={800}
+        destroyOnClose={true}
+        centered
+      >
+        {contratoACancelar && (
+          <div>
+            <div className="alert alert-warning mb-4">
+              <h5 className="alert-heading">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                ¡Atención! Esta acción no se puede deshacer
+              </h5>
+              <p className="mb-0">
+                Al cancelar este contrato, automáticamente se cancelarán todos los pagos pendientes asociados.
+                El espacio quedará disponible para nuevos inquilinos.
+              </p>
+            </div>
+
+            <div className="contract-info mb-4">
+              <h6>Información del Contrato:</h6>
+              <div className="row">
+                <div className="col-md-6">
+                  <p><strong>Inquilino:</strong> {contratoACancelar.inquilino_nombre} {contratoACancelar.inquilino_apellido}</p>
+                  <p><strong>Inmueble:</strong> {contratoACancelar.inmueble_nombre}</p>
+                  <p><strong>Espacio:</strong> {contratoACancelar.espacio_nombre}</p>
+                </div>
+                <div className="col-md-6">
+                  <p><strong>Estado Actual:</strong> <span className="text-capitalize">{contratoACancelar.estado}</span></p>
+                  <p><strong>Monto Alquiler:</strong> S/ {parseFloat(contratoACancelar.monto_alquiler || 0).toFixed(2)}</p>
+                  <p><strong>Período:</strong> {new Date(contratoACancelar.fecha_inicio).toLocaleDateString()} - {new Date(contratoACancelar.fecha_fin).toLocaleDateString()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="payments-info">
+              <h6>Pagos Asociados al Contrato:</h6>
+              {loadingPagosCancelacion ? (
+                <div className="text-center p-4">
+                  <Spin tip="Cargando pagos..." />
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-2">
+                    <small className="text-muted">
+                      Se encontraron {pagosCancelacion.length} pago(s) asociado(s) a este contrato
+                    </small>
+                  </div>
+                  <div className="table-responsive">
+                    <table className="table table-sm table-bordered">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Fecha Pago</th>
+                          <th>Monto</th>
+                          <th>Estado</th>
+                          <th>Tipo</th>
+                          <th>Método Pago</th>
+                          <th>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagosCancelacion.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" className="text-center text-muted">
+                              No hay pagos asociados a este contrato
+                            </td>
+                          </tr>
+                        ) : (
+                          pagosCancelacion.map((pago, index) => (
+                            <tr key={pago.id || index}>
+                              <td>{pago.fecha_pago ? new Date(pago.fecha_pago).toLocaleDateString() : 'N/A'}</td>
+                              <td>S/ {parseFloat(pago.monto || 0).toFixed(2)}</td>
+                              <td>
+                                <span className={`badge ${
+                                  pago.estado === 'pendiente' ? 'bg-warning text-dark' :
+                                  pago.estado === 'pagado' ? 'bg-success' :
+                                  pago.estado === 'vencido' ? 'bg-danger' :
+                                  pago.estado === 'cancelado' ? 'bg-secondary' : 'bg-light text-dark'
+                                }`}>
+                                  {pago.estado || 'Sin estado'}
+                                </span>
+                              </td>
+                              <td>{pago.tipo_pago || 'alquiler'}</td>
+                              <td>{pago.metodo_pago || 'N/A'}</td>
+                              <td>
+                                {(pago.estado === 'pendiente' || pago.estado === 'vencido') ? (
+                                  <span className="text-danger">
+                                    <i className="fas fa-times-circle me-1"></i>
+                                    Se cancelará
+                                  </span>
+                                ) : pago.estado === 'pagado' ? (
+                                  <span className="text-success">
+                                    <i className="fas fa-check-circle me-1"></i>
+                                    Mantendrá estado
+                                  </span>
+                                ) : pago.estado === 'cancelado' ? (
+                                  <span className="text-secondary">
+                                    <i className="fas fa-ban me-1"></i>
+                                    Ya cancelado
+                                  </span>
+                                ) : (
+                                  <span className="text-muted">Sin cambios</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {pagosCancelacion.filter(p => p.estado === 'pendiente' || p.estado === 'vencido').length > 0 && (
+              <div className="alert alert-info mt-3">
+                <i className="fas fa-info-circle me-2"></i>
+                Se cancelarán {pagosCancelacion.filter(p => p.estado === 'pendiente' || p.estado === 'vencido').length} pago(s) pendiente(s).
+                Los pagos ya realizados mantendrán su estado.
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+      
+      {/* Modal de Finalización de Contrato */}
+      <Modal
+        title={<div className="text-success"><i className="fas fa-flag-checkered me-2"></i>Finalizar Contrato</div>}
+        open={finalizarModalVisible}
+        onCancel={() => {
+          setFinalizarModalVisible(false);
+          setContratoAFinalizar(null);
+          setPagosFinalizacion([]);
+        }}
+        footer={[
+          <Button 
+            key="cancel" 
+            onClick={() => {
+              setFinalizarModalVisible(false);
+              setContratoAFinalizar(null);
+              setPagosFinalizacion([]);
+            }}
+          >
+            Cancelar
+          </Button>,
+          <Button
+            key="confirm"
+            type="primary"
+            loading={loadingFinalizar}
+            onClick={handleConfirmarFinalizacion}
+          >
+            Confirmar Finalización
+          </Button>
+        ]}
+        width={800}
+        destroyOnClose={true}
+        centered
+      >
+        {contratoAFinalizar && (
+          <div>
+            <div className="alert alert-success mb-4">
+              <h5 className="alert-heading">
+                <i className="fas fa-check-circle me-2"></i>
+                Todos los pagos están al día
+              </h5>
+              <p className="mb-0">
+                Este contrato está listo para ser finalizado. El espacio será liberado y estará disponible 
+                para nuevos inquilinos.
+              </p>
+            </div>
+
+            <div className="contract-info mb-4">
+              <h6>Información del Contrato:</h6>
+              <div className="row">
+                <div className="col-md-6">
+                  <p><strong>Inquilino:</strong> {contratoAFinalizar.inquilino_nombre} {contratoAFinalizar.inquilino_apellido}</p>
+                  <p><strong>Inmueble:</strong> {contratoAFinalizar.inmueble_nombre}</p>
+                  <p><strong>Espacio:</strong> {contratoAFinalizar.espacio_nombre}</p>
+                </div>
+                <div className="col-md-6">
+                  <p><strong>Estado Actual:</strong> <span className="text-success text-capitalize">{contratoAFinalizar.estado}</span></p>
+                  <p><strong>Monto Alquiler:</strong> S/ {parseFloat(contratoAFinalizar.monto_alquiler || 0).toFixed(2)}</p>
+                  <p><strong>Período:</strong> {new Date(contratoAFinalizar.fecha_inicio).toLocaleDateString()} - {new Date(contratoAFinalizar.fecha_fin).toLocaleDateString()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="payments-info">
+              <h6>Historial de Pagos del Contrato:</h6>
+              {loadingPagosFinalizacion ? (
+                <div className="text-center p-4">
+                  <Spin tip="Cargando pagos..." />
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-2">
+                    <small className="text-muted">
+                      Total de pagos: {pagosFinalizacion.length} | 
+                      Pagados: {pagosFinalizacion.filter(p => p.estado === 'pagado').length} |
+                      Otros: {pagosFinalizacion.filter(p => p.estado !== 'pagado').length}
+                    </small>
+                  </div>
+                  <div className="table-responsive">
+                    <table className="table table-sm table-bordered">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Fecha Pago</th>
+                          <th>Monto</th>
+                          <th>Estado</th>
+                          <th>Tipo</th>
+                          <th>Método Pago</th>
+                          <th>Fecha Real</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagosFinalizacion.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" className="text-center text-muted">
+                              No hay pagos registrados para este contrato
+                            </td>
+                          </tr>
+                        ) : (
+                          pagosFinalizacion.map((pago, index) => (
+                            <tr key={pago.id || index} className={pago.estado === 'pagado' ? 'table-success' : ''}>
+                              <td>{pago.fecha_pago ? new Date(pago.fecha_pago).toLocaleDateString() : 'N/A'}</td>
+                              <td>S/ {parseFloat(pago.monto || 0).toFixed(2)}</td>
+                              <td>
+                                <span className={`badge ${
+                                  pago.estado === 'pagado' ? 'bg-success' :
+                                  pago.estado === 'pendiente' ? 'bg-warning text-dark' :
+                                  pago.estado === 'vencido' ? 'bg-danger' :
+                                  pago.estado === 'cancelado' ? 'bg-secondary' : 'bg-light text-dark'
+                                }`}>
+                                  {pago.estado || 'Sin estado'}
+                                </span>
+                              </td>
+                              <td>{pago.tipo_pago || 'alquiler'}</td>
+                              <td>{pago.metodo_pago || 'N/A'}</td>
+                              <td>{pago.fecha_real_pago ? new Date(pago.fecha_real_pago).toLocaleDateString() : '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="alert alert-info mt-3">
+              <i className="fas fa-info-circle me-2"></i>
+              <strong>Al finalizar este contrato:</strong>
+              <ul className="mb-0 mt-2">
+                <li>El contrato cambiará a estado "finalizado"</li>
+                <li>El espacio "{contratoAFinalizar.espacio_nombre}" será liberado</li>
+                <li>Los pagos realizados mantendrán su historial</li>
+                <li>Esta acción no se puede deshacer</li>
+              </ul>
+            </div>
+          </div>
+        )}
       </Modal>
       
       {/* Estilos adicionales para documentos */}

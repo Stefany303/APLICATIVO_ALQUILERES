@@ -12,13 +12,14 @@ import Select from "react-select";
 import { DatePicker} from "antd";
 import inquilinoService from '../../services/inquilinoService';
 import contratoService from '../../services/contratoService';
-import { EyeOutlined, EditOutlined, DeleteOutlined, FileExcelOutlined } from '@ant-design/icons';
+import { EyeOutlined, EditOutlined, DeleteOutlined, FileExcelOutlined, HistoryOutlined } from '@ant-design/icons';
 import personaService from '../../services/personaService';
 import * as XLSX from 'xlsx';
 
 const InquilinosRegistros = () => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [inquilinos, setInquilinos] = useState([]);
+  const [todosLosContratos, setTodosLosContratos] = useState([]); // Estado para almacenar todos los contratos
   const [filteredInquilinos, setFilteredInquilinos] = useState([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,7 +27,9 @@ const InquilinosRegistros = () => {
   const [selectedInquilino, setSelectedInquilino] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalEditVisible, setModalEditVisible] = useState(false);
+  const [modalHistorialVisible, setModalHistorialVisible] = useState(false); // Modal para historial
   const [inquilinoSeleccionado, setInquilinoSeleccionado] = useState(null);
+  const [historialContratos, setHistorialContratos] = useState([]); // Contratos del inquilino seleccionado
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [updatedData, setUpdatedData] = useState(null);
   const [formData, setFormData] = useState({
@@ -51,30 +54,40 @@ const InquilinosRegistros = () => {
       // Asegurarnos de que los datos sean un array
       const contratosArray = Array.isArray(data) ? data : [data];
       
-      // Mapear los datos al formato exacto que espera la tabla
-      const formattedData = contratosArray.map(contrato => {
-        return {
-          key: contrato.id, // Añadir key para la tabla
-          id: contrato.id,
-          inquilino_nombre: contrato.inquilino_nombre || '',
-          inquilino_apellido: contrato.inquilino_apellido || '',
-          inquilino_dni: contrato.inquilino_dni || '',
-          inquilino_email: contrato.inquilino_email || '',
-          inquilino_telefono: contrato.inquilino_telefono || '',
-          inmueble_nombre: contrato.inmueble_nombre || '',
-          espacio_nombre: contrato.espacio_nombre || '',
-          fecha_inicio: contrato.fecha_inicio,
-          fecha_fin: contrato.fecha_fin,
-          monto_alquiler: contrato.monto_alquiler,
-          monto_garantia: contrato.monto_garantia,
-          estado: contrato.estado,
-          descripcion: contrato.descripcion,
-          fecha_pago: contrato.fecha_pago
-        };
+      // Guardar todos los contratos para usar en el historial
+      setTodosLosContratos(contratosArray);
+      
+      // Agrupar por inquilino y eliminar duplicados
+      const inquilinosUnicos = {};
+      
+      contratosArray.forEach(contrato => {
+        const dni = contrato.inquilino_dni;
+        if (dni && !inquilinosUnicos[dni]) {
+          // Encontrar el contrato más reciente (activo primero, luego por fecha)
+          const contratosDelInquilino = contratosArray.filter(c => c.inquilino_dni === dni);
+          const contratoActivo = contratosDelInquilino.find(c => c.estado === 'activo');
+          const contratoMostrar = contratoActivo || contratosDelInquilino[0];
+          
+          inquilinosUnicos[dni] = {
+            key: `inquilino_${dni}`, // Key único para cada inquilino
+            inquilino_dni: dni,
+            inquilino_nombre: contratoMostrar.inquilino_nombre || '',
+            inquilino_apellido: contratoMostrar.inquilino_apellido || '',
+            inquilino_email: contratoMostrar.inquilino_email || '',
+            inquilino_telefono: contratoMostrar.inquilino_telefono || '',
+            // Información del contrato principal (activo o más reciente)
+            contrato_actual: contratoMostrar,
+            total_contratos: contratosDelInquilino.length,
+            contratos_activos: contratosDelInquilino.filter(c => c.estado === 'activo').length
+          };
+        }
       });
-
-      setInquilinos(formattedData);
-      setFilteredInquilinos(formattedData);
+      
+      // Convertir el objeto a array
+      const inquilinosArray = Object.values(inquilinosUnicos);
+      
+      setInquilinos(inquilinosArray);
+      setFilteredInquilinos(inquilinosArray);
     } catch (error) {
       console.error('Error al cargar los contratos:', error);
       message.error('Error al cargar los contratos');
@@ -95,7 +108,22 @@ const InquilinosRegistros = () => {
   };
 
   const handleViewDetails = (inquilino) => {
-    setSelectedInquilino(inquilino);
+    // Crear un objeto compatible con el modal de detalles
+    const inquilinoConContrato = {
+      ...inquilino,
+      // Campos del contrato actual para compatibilidad
+      inmueble_nombre: inquilino.contrato_actual?.inmueble_nombre,
+      espacio_nombre: inquilino.contrato_actual?.espacio_nombre,
+      fecha_inicio: inquilino.contrato_actual?.fecha_inicio,
+      fecha_fin: inquilino.contrato_actual?.fecha_fin,
+      monto_alquiler: inquilino.contrato_actual?.monto_alquiler,
+      monto_garantia: inquilino.contrato_actual?.monto_garantia,
+      estado: inquilino.contrato_actual?.estado,
+      descripcion: inquilino.contrato_actual?.descripcion,
+      fecha_pago: inquilino.contrato_actual?.fecha_pago
+    };
+    
+    setSelectedInquilino(inquilinoConContrato);
     setModalVisible(true);
   };
 
@@ -110,6 +138,18 @@ const InquilinosRegistros = () => {
       direccion: inquilino.direccion || ''
     });
     setModalEditVisible(true);
+  };
+
+  // Nueva función para ver historial de contratos
+  const handleViewHistorial = (inquilino) => {
+    // Filtrar todos los contratos de este inquilino
+    const contratosInquilino = todosLosContratos.filter(
+      contrato => contrato.inquilino_dni === inquilino.inquilino_dni
+    );
+    
+    setInquilinoSeleccionado(inquilino);
+    setHistorialContratos(contratosInquilino);
+    setModalHistorialVisible(true);
   };
 
   const handleChange = (e) => {
@@ -205,28 +245,40 @@ const InquilinosRegistros = () => {
       // Asegurarnos de que los datos sean un array
       const contratosArray = Array.isArray(data) ? data : [data];
       
-      // Mapear los datos al formato exacto que espera la tabla
-      const formattedData = contratosArray.map(contrato => ({
-        key: contrato.id,
-        id: contrato.id,
-        inquilino_nombre: contrato.inquilino_nombre || '',
-        inquilino_apellido: contrato.inquilino_apellido || '',
-        inquilino_dni: contrato.inquilino_dni || '',
-        inquilino_email: contrato.inquilino_email || '',
-        inquilino_telefono: contrato.inquilino_telefono || '',
-        inmueble_nombre: contrato.inmueble_nombre || '',
-        espacio_nombre: contrato.espacio_nombre || '',
-        fecha_inicio: contrato.fecha_inicio,
-        fecha_fin: contrato.fecha_fin,
-        monto_alquiler: contrato.monto_alquiler,
-        monto_garantia: contrato.monto_garantia,
-        estado: contrato.estado,
-        descripcion: contrato.descripcion,
-        fecha_pago: contrato.fecha_pago
-      }));
+      // Guardar todos los contratos para usar en el historial
+      setTodosLosContratos(contratosArray);
+      
+      // Agrupar por inquilino y eliminar duplicados
+      const inquilinosUnicos = {};
+      
+      contratosArray.forEach(contrato => {
+        const dni = contrato.inquilino_dni;
+        if (dni && !inquilinosUnicos[dni]) {
+          // Encontrar el contrato más reciente (activo primero, luego por fecha)
+          const contratosDelInquilino = contratosArray.filter(c => c.inquilino_dni === dni);
+          const contratoActivo = contratosDelInquilino.find(c => c.estado === 'activo');
+          const contratoMostrar = contratoActivo || contratosDelInquilino[0];
+          
+          inquilinosUnicos[dni] = {
+            key: `inquilino_${dni}`, // Key único para cada inquilino
+            inquilino_dni: dni,
+            inquilino_nombre: contratoMostrar.inquilino_nombre || '',
+            inquilino_apellido: contratoMostrar.inquilino_apellido || '',
+            inquilino_email: contratoMostrar.inquilino_email || '',
+            inquilino_telefono: contratoMostrar.inquilino_telefono || '',
+            // Información del contrato principal (activo o más reciente)
+            contrato_actual: contratoMostrar,
+            total_contratos: contratosDelInquilino.length,
+            contratos_activos: contratosDelInquilino.filter(c => c.estado === 'activo').length
+          };
+        }
+      });
+      
+      // Convertir el objeto a array
+      const inquilinosArray = Object.values(inquilinosUnicos);
 
-      setInquilinos(formattedData);
-      setFilteredInquilinos(formattedData);
+      setInquilinos(inquilinosArray);
+      setFilteredInquilinos(inquilinosArray);
       message.success('Datos actualizados correctamente');
     } catch (error) {
       console.error('Error al actualizar los datos:', error);
@@ -281,21 +333,21 @@ const InquilinosRegistros = () => {
       key: 'telefono',
     },
     {
-      title: 'Inmueble',
-      dataIndex: 'inmueble_nombre',
-      key: 'inmueble',
+      title: 'Contratos',
+      key: 'contratos',
+      render: (_, record) => (
+        <div>
+          <div><strong>Total:</strong> {record.total_contratos}</div>
+          <div><strong>Activos:</strong> {record.contratos_activos}</div>
+        </div>
+      ),
     },
     {
-      title: 'Espacio',
-      dataIndex: 'espacio_nombre',
-      key: 'espacio',
-    },
-    {
-      title: 'Estado',
+      title: 'Estado Actual',
       key: 'estado',
       render: (_, record) => (
-        <Tag color={record.estado === 'activo' ? 'green' : 'red'}>
-          {record.estado === 'activo' ? 'Activo' : 'Inactivo'}
+        <Tag color={record.contrato_actual?.estado === 'activo' ? 'green' : record.contrato_actual?.estado === 'inactivo' ? 'orange' : 'red'}>
+          {record.contrato_actual?.estado || 'Sin contrato'}
         </Tag>
       ),
     },
@@ -308,15 +360,23 @@ const InquilinosRegistros = () => {
             className="btn btn-primary btn-sm mx-1"
             type="primary" 
             onClick={() => handleViewDetails(record)}
-            title="Ver detalles"
+            title="Ver detalles del contrato actual"
           >
             <EyeOutlined />
+          </Button>
+          <Button
+            className="btn btn-info btn-sm mx-1"
+            type="primary"
+            onClick={() => handleViewHistorial(record)}
+            title="Ver historial de contratos"
+          >
+            <HistoryOutlined />
           </Button>
           <Button
             className="btn btn-warning btn-sm mx-1"
             type="primary"
             onClick={() => handleEdit(record)}
-            title="Editar"
+            title="Editar inquilino"
           >
             <EditOutlined />
           </Button>
@@ -324,7 +384,7 @@ const InquilinosRegistros = () => {
             className="btn btn-danger btn-sm mx-1"
             type="primary"
             onClick={() => handleDelete(record)}
-            title="Eliminar"
+            title="Eliminar inquilino"
           >
             <DeleteOutlined />
           </Button>
@@ -386,9 +446,11 @@ const InquilinosRegistros = () => {
         'Documento': item.inquilino_dni,
         'Email': item.inquilino_email,
         'Teléfono': item.inquilino_telefono,
-        'Inmueble': item.inmueble_nombre,
-        'Espacio': item.espacio_nombre,
-        'Estado': item.estado
+        'Total Contratos': item.total_contratos,
+        'Contratos Activos': item.contratos_activos,
+        'Estado Actual': item.contrato_actual?.estado || 'Sin contrato',
+        'Inmueble Actual': item.contrato_actual?.inmueble_nombre || 'N/A',
+        'Espacio Actual': item.contrato_actual?.espacio_nombre || 'N/A'
       }));
       // Crear libro de Excel
       const ws = XLSX.utils.json_to_sheet(dataForExcel);
@@ -709,6 +771,141 @@ const InquilinosRegistros = () => {
           </ul>
         )}
       </div>
+    </Modal>
+
+    {/* Modal de Historial de Contratos */}
+    <Modal
+      title={<><HistoryOutlined className="me-2" />Historial de Contratos</>}
+      open={modalHistorialVisible}
+      onCancel={() => setModalHistorialVisible(false)}
+      footer={[
+        <Button key="close" onClick={() => setModalHistorialVisible(false)}>
+          Cerrar
+        </Button>
+      ]}
+      width={1200}
+      destroyOnClose={true}
+      centered
+    >
+      {inquilinoSeleccionado && (
+        <div>
+          <Card title="Información del Inquilino" className="mb-4">
+            <Row gutter={16}>
+              <Col span={8}>
+                <p><strong>Nombre:</strong> {inquilinoSeleccionado.inquilino_nombre} {inquilinoSeleccionado.inquilino_apellido}</p>
+              </Col>
+              <Col span={8}>
+                <p><strong>Documento:</strong> {inquilinoSeleccionado.inquilino_dni}</p>
+              </Col>
+              <Col span={8}>
+                <p><strong>Email:</strong> {inquilinoSeleccionado.inquilino_email}</p>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card title={`Historial de Contratos (${historialContratos.length} contrato${historialContratos.length !== 1 ? 's' : ''})`}>
+            <div className="table-responsive">
+              <Table
+                columns={[
+                  {
+                    title: 'ID Contrato',
+                    dataIndex: 'id',
+                    key: 'id',
+                    width: 100,
+                  },
+                  {
+                    title: 'Inmueble',
+                    dataIndex: 'inmueble_nombre',
+                    key: 'inmueble',
+                  },
+                  {
+                    title: 'Espacio',
+                    dataIndex: 'espacio_nombre',
+                    key: 'espacio',
+                  },
+                  {
+                    title: 'Fecha Inicio',
+                    dataIndex: 'fecha_inicio',
+                    key: 'fecha_inicio',
+                    render: (fecha) => fecha ? new Date(fecha).toLocaleDateString() : 'N/A',
+                  },
+                  {
+                    title: 'Fecha Fin',
+                    dataIndex: 'fecha_fin',
+                    key: 'fecha_fin',
+                    render: (fecha) => fecha ? new Date(fecha).toLocaleDateString() : 'N/A',
+                  },
+                  {
+                    title: 'Monto Alquiler',
+                    dataIndex: 'monto_alquiler',
+                    key: 'monto_alquiler',
+                    render: (monto) => monto ? `S/ ${parseFloat(monto).toFixed(2)}` : 'N/A',
+                  },
+                  {
+                    title: 'Estado',
+                    dataIndex: 'estado',
+                    key: 'estado',
+                    render: (estado) => (
+                      <Tag color={
+                        estado === 'activo' ? 'green' : 
+                        estado === 'inactivo' ? 'orange' : 
+                        estado === 'finalizado' ? 'blue' : 
+                        'red'
+                      }>
+                        {estado || 'Sin estado'}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: 'Acciones',
+                    key: 'acciones',
+                    render: (_, record) => (
+                      <Button
+                        type="link"
+                        onClick={() => {
+                          setSelectedInquilino({
+                            ...inquilinoSeleccionado,
+                            contrato_actual: record,
+                            // Agregar campos del contrato para compatibilidad
+                            inmueble_nombre: record.inmueble_nombre,
+                            espacio_nombre: record.espacio_nombre,
+                            fecha_inicio: record.fecha_inicio,
+                            fecha_fin: record.fecha_fin,
+                            monto_alquiler: record.monto_alquiler,
+                            monto_garantia: record.monto_garantia,
+                            estado: record.estado,
+                            descripcion: record.descripcion,
+                            fecha_pago: record.fecha_pago
+                          });
+                          setModalHistorialVisible(false);
+                          setModalVisible(true);
+                        }}
+                        title="Ver detalles de este contrato"
+                      >
+                        <EyeOutlined /> Ver
+                      </Button>
+                    ),
+                  },
+                ]}
+                dataSource={historialContratos}
+                rowKey="id"
+                pagination={{
+                  pageSize: 5,
+                  showTotal: (total, range) =>
+                    `Mostrando ${range[0]} a ${range[1]} de ${total} contratos`,
+                }}
+                size="small"
+              />
+            </div>
+            
+            {historialContratos.length === 0 && (
+              <div className="text-center p-4">
+                <p className="text-muted">No se encontraron contratos para este inquilino.</p>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </Modal>
 </>
     

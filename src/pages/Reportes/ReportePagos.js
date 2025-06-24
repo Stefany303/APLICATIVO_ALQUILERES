@@ -34,7 +34,9 @@ const ReportePagos = () => {
     const [payment, setPayment] = useState([
         { value: '', label: "Todos los estados" },
         { value: "pagado", label: "Pagado" },
-        { value: "pendiente", label: "Pendiente" }
+        { value: "pendiente", label: "Pendiente" },
+        { value: "vencido", label: "Vencido" },
+        { value: "cancelado", label: "Cancelado" }
     ]);
 
     // Cargar inmuebles al iniciar
@@ -185,20 +187,39 @@ const ReportePagos = () => {
             title: "Estado",
             dataIndex: "estado",
             sorter: (a, b) => a.estado?.localeCompare(b.estado),
-            render: (text) => (
-                <div>
-                    {text === "pagado" && (
-                        <span className="custom-badge status-green">
-                            Pagado
-                        </span>
-                    )}
-                    {text === "pendiente" && (
-                        <span className="custom-badge status-pink">
-                            Pendiente
-                        </span>
-                    )}
-                </div>
-            )
+            render: (text) => {
+                const estadoLowerCase = text?.toLowerCase();
+                
+                return (
+                    <div>
+                        {estadoLowerCase === "pagado" && (
+                            <span className="custom-badge status-green">
+                                Pagado
+                            </span>
+                        )}
+                        {estadoLowerCase === "pendiente" && (
+                            <span className="custom-badge status-pink">
+                                Pendiente
+                            </span>
+                        )}
+                        {estadoLowerCase === "vencido" && (
+                            <span className="custom-badge status-red">
+                                Vencido
+                            </span>
+                        )}
+                        {estadoLowerCase === "cancelado" && (
+                            <span className="custom-badge status-grey">
+                                Cancelado
+                            </span>
+                        )}
+                        {!["pagado", "pendiente", "vencido", "cancelado"].includes(estadoLowerCase) && (
+                            <span className="custom-badge status-light">
+                                {text || "Sin estado"}
+                            </span>
+                        )}
+                    </div>
+                );
+            }
         },
       {/*  {
             title: "",

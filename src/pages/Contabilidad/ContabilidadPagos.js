@@ -112,7 +112,8 @@ const ContabilidadPagos = () => {
   const estadosPago = [
     { value: 'pendiente', label: 'Pendiente' },
     { value: 'pagado', label: 'Pagado' },
-    { value: 'vencido', label: 'Vencido' }
+    { value: 'vencido', label: 'Vencido' },
+    { value: 'cancelado', label: 'Cancelado' }
   ];
 
   const tiposPago = [
@@ -810,13 +811,14 @@ const ContabilidadPagos = () => {
 
       console.log('Estado del contrato:', contrato.estado);
 
-      if (contrato.estado === 'inactivo') {
-        console.log('Contrato inactivo detectado - Bloqueando registro de pago');
+      if (contrato.estado === 'inactivo' || contrato.estado === 'cancelado') {
+        console.log('Contrato inactivo/cancelado detectado - Bloqueando registro de pago');
         setInactiveContractInfo({
           inquilino: `${pago.inquilino_nombre} ${pago.inquilino_apellido}`,
           contratoId: contrato.id,
           fechaInicio: contrato.fecha_inicio,
-          fechaFin: contrato.fecha_fin
+          fechaFin: contrato.fecha_fin,
+          estado: contrato.estado
         });
         setShowInactiveContractModal(true);
         return;
@@ -1945,7 +1947,7 @@ const ContabilidadPagos = () => {
             <div className="p-3">
               <div className="alert alert-danger mb-3">
                 <i className="fas fa-ban me-2"></i>
-                No se puede realizar el pago porque el contrato está inactivo.
+                No se puede realizar el pago porque el contrato está inactivo o cancelado.
               </div>
               
               {inactiveContractInfo && (
@@ -1956,6 +1958,7 @@ const ContabilidadPagos = () => {
                     <li><strong>ID del Contrato:</strong> {inactiveContractInfo.contratoId}</li>
                     <li><strong>Fecha de Inicio:</strong> {new Date(inactiveContractInfo.fechaInicio).toLocaleDateString()}</li>
                     <li><strong>Fecha de Fin:</strong> {new Date(inactiveContractInfo.fechaFin).toLocaleDateString()}</li>
+                    <li><strong>Estado:</strong> {inactiveContractInfo.estado}</li>
                   </ul>
                 </div>
               )}
