@@ -19,6 +19,8 @@ const Login = () => {
   const [contraseña, setContraseña] = useState("");
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [usuarioFocus, setUsuarioFocus] = useState(false);
+  const [contraseñaFocus, setContraseñaFocus] = useState(false);
   const navigate = useNavigate();
 
   const alternarVisibilidadContraseña = () => {
@@ -55,6 +57,58 @@ const Login = () => {
     } finally {
       setCargando(false);
     }
+  };
+
+  const floatingLabelStyle = {
+    position: 'absolute',
+    left: '12px',
+    transition: 'all 0.3s ease',
+    pointerEvents: 'none',
+    color: '#6c757d',
+    backgroundColor: '#fff',
+    padding: '0 4px',
+    fontSize: '16px',
+    fontWeight: 500
+  };
+
+  const getFloatingLabelPosition = (isFocused, hasValue) => {
+    if (isFocused || hasValue) {
+      return {
+        ...floatingLabelStyle,
+        top: '-8px',
+        fontSize: '12px',
+        color: '#007bff',
+        fontWeight: 600
+      };
+    }
+    return {
+      ...floatingLabelStyle,
+      top: '50%',
+      transform: 'translateY(-50%)'
+    };
+  };
+
+  const inputContainerStyle = {
+    position: 'relative',
+    marginBottom: '24px'
+  };
+
+  const inputStyle = {
+    borderRadius: '8px',
+    height: '44px',
+    fontSize: '16px',
+    padding: '12px',
+    border: '2px solid #e1e8ed',
+    transition: 'all 0.3s ease',
+    backgroundColor: '#fff',
+    width: '100%'
+  };
+
+  const inputFocusStyle = {
+    ...inputStyle,
+    border: '2px solid #007bff',
+    outline: 'none',
+    boxShadow: '0 0 0 0.2rem rgba(0, 123, 255, 0.25)'
   };
 
   return (
@@ -112,51 +166,62 @@ const Login = () => {
               )}
 
               <form onSubmit={handleSubmit}>
-                <div className="mb-3">
-                  <label className="form-label" style={{ fontWeight: 500 }}>
+                {/* Campo Usuario con Label Flotante */}
+                <div style={inputContainerStyle}>
+                  <label 
+                    style={getFloatingLabelPosition(usuarioFocus, usuario)}
+                  >
                     Usuario <span className="text-danger">*</span>
                   </label>
                   <input
                     type="text"
                     value={usuario}
                     onChange={(e) => setUsuario(e.target.value)}
-                    className="form-control"
+                    onFocus={() => setUsuarioFocus(true)}
+                    onBlur={() => setUsuarioFocus(false)}
                     disabled={cargando}
-                    style={{ borderRadius: 8, height: 44 }}
+                    style={usuarioFocus ? inputFocusStyle : inputStyle}
                   />
                 </div>
 
-                <div className="mb-3">
-                  <label className="form-label" style={{ fontWeight: 500 }}>
+                {/* Campo Contraseña con Label Flotante */}
+                <div style={inputContainerStyle}>
+                  <label 
+                    style={getFloatingLabelPosition(contraseñaFocus, contraseña)}
+                  >
                     Contraseña <span className="text-danger">*</span>
                   </label>
-                  <div className="position-relative">
-                    <input
-                      type={contraseñaVisible ? "text" : "password"}
-                      className="form-control"
-                      value={contraseña}
-                      onChange={(e) => setContraseña(e.target.value)}
-                      disabled={cargando}
-                      style={{
-                        borderRadius: 8,
-                        height: 44,
-                        paddingRight: 40
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-link position-absolute end-0 top-50 translate-middle-y"
-                      onClick={alternarVisibilidadContraseña}
-                      style={{
-                        cursor: "pointer",
-                        color: '#888',
-                        fontSize: 20,
-                        textDecoration: 'none'
-                      }}
-                    >
-                      {contraseñaVisible ? <FiEyeOff /> : <FiEye />}
-                    </button>
-                  </div>
+                  <input
+                    type={contraseñaVisible ? "text" : "password"}
+                    value={contraseña}
+                    onChange={(e) => setContraseña(e.target.value)}
+                    onFocus={() => setContraseñaFocus(true)}
+                    onBlur={() => setContraseñaFocus(false)}
+                    disabled={cargando}
+                    style={{
+                      ...(contraseñaFocus ? inputFocusStyle : inputStyle),
+                      paddingRight: '40px'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-link position-absolute"
+                    onClick={alternarVisibilidadContraseña}
+                    style={{
+                      cursor: "pointer",
+                      color: '#888',
+                      fontSize: 20,
+                      textDecoration: 'none',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      border: 'none',
+                      background: 'none',
+                      padding: '8px'
+                    }}
+                  >
+                    {contraseñaVisible ? <FiEyeOff /> : <FiEye />}
+                  </button>
                 </div>
 
                 <div className="d-flex justify-content-between align-items-center mb-4">

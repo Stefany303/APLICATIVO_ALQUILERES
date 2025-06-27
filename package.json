@@ -29,6 +29,7 @@
     "web-vitals": "^4.2.4",
     "xlsx": "^0.18.5"
   },
+
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
@@ -65,5 +66,10 @@
       "last 1 safari version"
     ]
   },
-  "homepage": "https://rentahab.com"
+  "homepage": "https://rentahab.com",
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
+  }
+
+
 }

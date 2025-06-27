@@ -1,25 +1,29 @@
 {
   "short_name": "Rentahab",
   "name": "Rentahab - Sistema de Gestión de Alquileres",
+  "description": "Sistema profesional para administrar propiedades, inquilinos, pagos y contratos de manera eficiente",
   "icons": [
     {
-      "src": "rentahablogo.ico",
+      "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "rentahablogo.ico",
+      "src": "favicon.ico",
       "type": "image/x-icon",
       "sizes": "192x192"
     },
     {
-      "src": "rentahablogo.ico",
+      "src": "favicon.ico",
       "type": "image/x-icon",
       "sizes": "512x512"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#007bff",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
+  "lang": "es"
 }

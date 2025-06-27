@@ -1,3 +1,10 @@
 # https://www.robotstxt.org/robotstxt.html
+# Robots.txt para Rentahab - Sistema de Gestión de Alquileres
 User-agent: *
-Disallow:
+Allow: /
+
+# Sitemap (agregar cuando esté disponible)
+# Sitemap: https://rentahab.com/sitemap.xml
+
+# Crawl-delay para evitar sobrecarga del servidor
+Crawl-delay: 1
