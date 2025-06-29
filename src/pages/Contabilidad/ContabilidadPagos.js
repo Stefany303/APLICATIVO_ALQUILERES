@@ -36,15 +36,16 @@ const ContabilidadPagos = () => {
     observaciones: ''
   });
 
+  // Estados de filtros mejorados
   const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState('dni'); // 'dni' o 'nombre'
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    // Obtener fecha actual en horario de Lima/Peru
-    const limaTime = new Date().toLocaleString("en-US", { timeZone: "America/Lima" });
-    return new Date(limaTime).getMonth(); // 0-11
-  });
+  const [selectedMonth, setSelectedMonth] = useState(null); // Por defecto mostrar todos los meses
+
+  // Estados para datos
   const [inmuebles, setInmuebles] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [todosPagos, setTodosPagos] = useState([]); // Lista completa sin filtrar
+  const [pagosFiltrados, setPagosFiltrados] = useState([]);
   const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
   const [loading2, setLoading2] = useState(false);
   const [documento, setDocumento] = useState(null);
@@ -61,45 +62,11 @@ const ContabilidadPagos = () => {
   const [comprobanteFile, setComprobanteFile] = useState(null);
   const [loadingRegistro, setLoadingRegistro] = useState(false);
   const [metodoPagoRegistro, setMetodoPagoRegistro] = useState(null);
-  const [searchText, setSearchText] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [updatedData, setUpdatedData] = useState(null);
   const [showInactiveContractModal, setShowInactiveContractModal] = useState(false);
   const [inactiveContractInfo, setInactiveContractInfo] = useState(null);
   
-  /*useEffect(() => {
-    if (!searchText.trim()) {
-      setInmueblesFiltrados(inmuebles);
-      return;
-    }
-
-    const searchLower = searchText.toLowerCase();
-    const filtered = inmuebles.filter(inmueble => 
-      (inmueble.nombre && inmueble.nombre.toLowerCase().includes(searchLower)) || 
-      (inmueble.direccion && inmueble.direccion.toLowerCase().includes(searchLower)) ||
-      (inmueble.propietario_nombre && inmueble.propietario_nombre.toLowerCase().includes(searchLower)) ||
-      (inmueble.tipo_inmueble && inmueble.tipo_inmueble.toLowerCase().includes(searchLower))
-    );
-    
-    setInmueblesFiltrados(filtered);
-  }, [searchText, inmuebles]);*/
-  const refreshData = async () => {
-    try {
-      setLoading(true);
-      const pagosData = await pagoService.obtenerPagos();
-      setPagos(Array.isArray(pagosData) ? pagosData : []);
-      message.success("Datos actualizados correctamente");
-    } catch (error) {
-     
-      message.error("Error al actualizar los datos");
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleSearch = (e) => {
-    setSearchText(e.target.value);
-  };
-
   const metodosPago = [
     { value: 'efectivo', label: 'Efectivo' },
     { value: 'transferencia', label: 'Transferencia Bancaria' },
@@ -108,6 +75,66 @@ const ContabilidadPagos = () => {
     { value: 'yape', label: 'Yape' },
     { value: 'plin', label: 'Plin' },
   ];
+
+  // Estilos comunes para todos los Select
+  const selectStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      borderColor: state.isFocused ? '#007bff !important' : '#ced4da !important',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(0,123,255,.25) !important' : 'none !important',
+      border: '1px solid #ced4da !important',
+      minHeight: '38px !important',
+      cursor: 'pointer !important',
+      opacity: '1 !important',
+      '&:hover': {
+        borderColor: '#007bff !important'
+      }
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      opacity: '1 !important'
+    }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      opacity: '1 !important'
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected ? '#007bff !important' : state.isFocused ? '#e9ecef !important' : '#ffffff !important',
+      color: state.isSelected ? '#ffffff !important' : '#1f2937 !important',
+      cursor: 'pointer !important',
+      opacity: '1 !important',
+      '&:active': {
+        backgroundColor: state.isSelected ? '#007bff !important' : '#dee2e6 !important'
+      }
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: '#1f2937 !important',
+      opacity: '1 !important'
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: '#6c757d !important',
+      opacity: '1 !important'
+    }),
+    menu: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      border: '1px solid #ced4da !important',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1) !important',
+      opacity: '1 !important',
+      zIndex: 9999
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      opacity: '1 !important'
+    })
+  };
 
   const estadosPago = [
     { value: 'pendiente', label: 'Pendiente' },
@@ -139,6 +166,39 @@ const ContabilidadPagos = () => {
     { value: 11, label: 'Diciembre' }
   ];
 
+  // Función para aplicar todos los filtros
+  const aplicarFiltros = () => {
+    let resultados = [...todosPagos];
+
+    // Filtro por mes
+    if (selectedMonth !== null) {
+      resultados = resultados.filter(pago => {
+        if (!pago.fecha_pago) return false;
+        const fechaPago = new Date(pago.fecha_pago);
+        return fechaPago.getMonth() === selectedMonth;
+      });
+    }
+
+    // Filtro por búsqueda de texto
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      resultados = resultados.filter(pago => {
+        if (searchType === 'dni') {
+          return pago.inquilino_dni && pago.inquilino_dni.toLowerCase().includes(searchLower);
+        } else {
+          const nombreCompleto = `${pago.inquilino_nombre || ''} ${pago.inquilino_apellido || ''}`.toLowerCase();
+          return nombreCompleto.includes(searchLower);
+        }
+      });
+    }
+
+    setPagosFiltrados(resultados);
+    setPagos(resultados);
+    
+    return resultados; // Devolver los resultados para evaluación inmediata
+  };
+
+  // useEffect para cargar datos iniciales
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -148,81 +208,85 @@ const ContabilidadPagos = () => {
         setInmuebles(inmueblesData);
         
         const pagosData = await pagoService.obtenerPagos();
+        const pagosArray = Array.isArray(pagosData) ? pagosData : [];
         
-        // Filtrar solo si se ha seleccionado un mes específico
-        const pagosFiltrados = Array.isArray(pagosData) ? 
-          pagosData.filter(pago => {
-            if (!pago.fecha_pago) return false;
-            if (selectedMonth === null) return true; // Mostrar todos si es null
-            const fechaPago = new Date(pago.fecha_pago);
-            return fechaPago.getMonth() === selectedMonth;
-          }) : [];
-        
-        setPagos(pagosFiltrados);
+        setTodosPagos(pagosArray);
+        // Mostrar todos los pagos por defecto (sin filtros)
+        setPagosFiltrados(pagosArray);
+        setPagos(pagosArray);
         
       } catch (error) {
         console.error('Error en la carga inicial:', error);
         setError('Error al cargar los datos iniciales');
+        setTodosPagos([]);
+        setPagosFiltrados([]);
+        setPagos([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [selectedMonth]);
+  }, []);
 
-  const buscarInquilino = async () => {
+  // Función para aplicar filtros manualmente
+  const buscarInquilino = () => {
+    setLoading2(true);
     try {
-      setLoading2(true);
+      const resultados = aplicarFiltros();
       
-      // Si el campo de búsqueda está vacío, mostrar pagos filtrados solo por mes
-      let resultados;
-      if (!searchTerm.trim()) {
-        resultados = await pagoService.obtenerPagos();
-      } else {
-        // Si hay término de búsqueda, realizar la búsqueda específica
-        if (searchType === 'dni') {
-          resultados = await pagoService.obtenerPagosPorInquilino(searchTerm, null);
-        } else {
-          resultados = await pagoService.obtenerPagosPorInquilino(null, searchTerm);
-        }
+      if (resultados.length === 0 && (searchTerm.trim() || selectedMonth !== null)) {
+        message.warning('No se encontraron pagos con los filtros aplicados');
+      } else if (resultados.length > 0 && (searchTerm.trim() || selectedMonth !== null)) {
+        message.success(`Se encontraron ${resultados.length} pago${resultados.length !== 1 ? 's' : ''} con los filtros aplicados`);
+      } else if (resultados.length > 0) {
+        message.info(`Mostrando todos los pagos (${resultados.length})`);
       }
-      
-      // Filtrar por mes seleccionado
-      const pagosFiltrados = Array.isArray(resultados) ? resultados.filter(pago => {
-        if (!pago.fecha_pago) return false;
-        const fechaPago = new Date(pago.fecha_pago);
-        return fechaPago.getMonth() === selectedMonth;
-      }) : [];
-      
-      setPagos(pagosFiltrados);
-      
-      if (pagosFiltrados.length === 0) {
-        message.info('No se encontraron pagos para este período');
-      }
-    } catch (error) {
-      console.error('Error al buscar pagos:', error);
-      message.error('Error al buscar los pagos');
-      setPagos([]);
     } finally {
       setLoading2(false);
     }
   };
 
   // Función para limpiar filtros y mostrar todos los pagos
-  const limpiarFiltros = async () => {
+  const limpiarFiltros = () => {
+    setSearchTerm('');
+    setSearchType('dni');
+    setSelectedMonth(null);
+    
+    // Mostrar todos los pagos sin filtros
+    setPagosFiltrados(todosPagos);
+    setPagos(todosPagos);
+    
+    message.success('Filtros limpiados. Mostrando todos los pagos.');
+  };
+
+  const refreshData = async () => {
     try {
-      setLoading2(true);
-      setSearchTerm('');
+      setLoading(true);
+      const pagosData = await pagoService.obtenerPagos();
+      const pagosArray = Array.isArray(pagosData) ? pagosData : [];
+      setTodosPagos(pagosArray);
       
-      const todosLosPagos = await pagoService.obtenerPagos();
-      setPagos(Array.isArray(todosLosPagos) ? todosLosPagos : []);
+      // Si no hay filtros activos, mostrar todos los datos
+      // Si hay filtros activos, mantener la vista filtrada
+      if (!searchTerm && selectedMonth === null) {
+        setPagosFiltrados(pagosArray);
+        setPagos(pagosArray);
+      } else {
+        // Reaplicar filtros con los nuevos datos
+        setTimeout(() => {
+          aplicarFiltros();
+        }, 100);
+      }
+      
+      message.success("Datos actualizados correctamente");
     } catch (error) {
-      console.error('Error al cargar los pagos:', error);
-      alert('Error al cargar los pagos');
+      message.error("Error al actualizar los datos");
+      setTodosPagos([]);
+      setPagosFiltrados([]);
       setPagos([]);
     } finally {
-      setLoading2(false);
+      setLoading(false);
     }
   };
 
@@ -661,7 +725,20 @@ const ContabilidadPagos = () => {
         setModalVisible(false);
         // Recargar los pagos
         const todosLosPagos = await pagoService.obtenerPagos();
-        setPagos(Array.isArray(todosLosPagos) ? todosLosPagos : []);
+        const pagosArray = Array.isArray(todosLosPagos) ? todosLosPagos : [];
+        setTodosPagos(pagosArray);
+        
+        // Si no hay filtros activos, mostrar todos los datos
+        if (!searchTerm && selectedMonth === null) {
+          setPagosFiltrados(pagosArray);
+          setPagos(pagosArray);
+        } else {
+          // Reaplicar filtros con los nuevos datos
+          setTimeout(() => {
+            aplicarFiltros();
+          }, 100);
+        }
+        
         setPagoSeleccionado(null);
         
       } catch (docError) {
@@ -770,20 +847,25 @@ const ContabilidadPagos = () => {
       setLoading2(true);
       
       const pagosData = await pagoService.obtenerPagos();
-      const pagosFiltrados = Array.isArray(pagosData) ? pagosData.filter(pago => {
-        if (!pago.fecha_pago) return false;
-        const fechaPago = new Date(pago.fecha_pago);
-        return fechaPago.getMonth() === selectedMonth;
-      }) : [];
+      const pagosArray = Array.isArray(pagosData) ? pagosData : [];
+      setTodosPagos(pagosArray);
       
-      setPagos(pagosFiltrados);
-      
-      if (pagosFiltrados.length === 0) {
-        message.info('No se encontraron pagos para este período');
+      // Si no hay filtros activos, mostrar todos los datos
+      if (!searchTerm && selectedMonth === null) {
+        setPagosFiltrados(pagosArray);
+        setPagos(pagosArray);
+      } else {
+        // Reaplicar filtros si hay filtros activos
+        setTimeout(() => {
+          aplicarFiltros();
+        }, 100);
       }
+      
     } catch (error) {
       console.error('Error al cargar todos los pagos:', error);
       message.error('Error al cargar los pagos');
+      setTodosPagos([]);
+      setPagosFiltrados([]);
       setPagos([]);
     } finally {
       setLoading2(false);
@@ -1188,9 +1270,16 @@ const ContabilidadPagos = () => {
                         <div className="doctor-table-blk">
                           <h3>Lista de Pagos</h3>
                           <div className="doctor-search-blk">
-                           
+                                                         <div className="top-nav-search table-search-blk">
+                               <span className="text-muted">
+                                 {loading ? 'Cargando...' : 
+                                   pagosFiltrados.length === todosPagos.length ? 
+                                   `Mostrando todos los pagos (${todosPagos.length})` :
+                                   `Mostrando ${pagosFiltrados.length} de ${todosPagos.length} pagos filtrados`
+                                 }
+                               </span>
+                             </div>
                             <div className="add-group">
-                             
                               <button
                                 className="btn btn-primary doctor-refresh ms-2"
                                 onClick={refreshData}
@@ -1207,7 +1296,6 @@ const ContabilidadPagos = () => {
                           </div>
                         </div>
                       </div>
-                      
                     </div>
                   </div>
                   <div className="row mt-4">
@@ -1235,85 +1323,94 @@ const ContabilidadPagos = () => {
                         </div>
                       </div>*/}
                       <div className="row">
-                    <div className="col-12">
-                      
-                    </div>
-                    
-                    <div className="col-12 col-md-3">
-                      <div className="form-group">
-                        <label>Mes</label>
-                        <Select
-                          options={meses}
-                          value={meses.find(m => m.value === selectedMonth)}
-                          onChange={(selected) => {
-                            setSelectedMonth(selected.value);
-                            buscarInquilino(); // Actualizar búsqueda al cambiar el mes
-                          }}
-                          placeholder="Seleccionar mes"
-                          classNamePrefix="select"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="col-12 col-md-3">
-                      <div className="form-group">
-                        <label>Buscar por</label>
-                        <Select
-                          options={[
-                            { value: 'dni', label: 'DNI' },
-                            { value: 'nombre', label: 'Nombre' }
-                          ]}
-                          value={{ value: searchType, label: searchType === 'dni' ? 'DNI' : 'Nombre' }}
-                          onChange={(selected) => setSearchType(selected.value)}
-                          placeholder="Seleccionar tipo de búsqueda"
-                          classNamePrefix="select"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="col-12 col-md-4">
-                      <div className="form-group">
-                        <label>Término de búsqueda</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          placeholder={searchType === 'dni' ? "Ingrese DNI del inquilino" : "Ingrese nombre del inquilino"}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="col-12 col-md-2">
-                      <div className="form-group">
-                        <label>&nbsp;</label>
-                        <button 
-                          type="button" 
-                          className="btn btn-primary w-100"
-                          onClick={buscarInquilino}
-                          disabled={loading2}
-                        >
-                          {loading2 ? (
-                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          ) : (
-                            <FiSearch className="me-2" />
-                          )}
-                          Buscar
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="col-12 col-md-2">
-                      <div className="form-group">
-                        <label>&nbsp;</label>
-                        <button 
-                          type="button" 
-                          className="btn btn-secondary w-100"
-                          onClick={limpiarFiltros}
-                          disabled={loading2}
-                        >
-                          Limpiar Filtros
-                        </button>
+                    <div className="col-12 mb-3">
+                      <div className="bg-light p-3 rounded">
+                        <h5 className="mb-3">
+                          <FiSearch className="me-2" />
+                          Filtros de Búsqueda
+                        </h5>
+                        <div className="row">
+                          <div className="col-12 col-md-3">
+                            <div className="form-group">
+                              <label>Mes</label>
+                              <Select
+                                options={meses}
+                                value={meses.find(m => m.value === selectedMonth)}
+                                onChange={(selected) => setSelectedMonth(selected.value)}
+                                placeholder="Seleccionar mes"
+                                isClearable={false}
+                                classNamePrefix="custom-select"
+                                styles={selectStyles}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="col-12 col-md-2">
+                            <div className="form-group">
+                              <label>Buscar por</label>
+                              <Select
+                                options={[
+                                  { value: 'dni', label: 'DNI' },
+                                  { value: 'nombre', label: 'Nombre' }
+                                ]}
+                                value={{ value: searchType, label: searchType === 'dni' ? 'DNI' : 'Nombre' }}
+                                onChange={(selected) => setSearchType(selected.value)}
+                                placeholder="Tipo"
+                                isClearable={false}
+                                classNamePrefix="custom-select"
+                                styles={selectStyles}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="col-12 col-md-4">
+                            <div className="form-group">
+                              <label>Término de búsqueda</label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    buscarInquilino();
+                                  }
+                                }}
+                                placeholder={searchType === 'dni' ? "Ingrese DNI del inquilino" : "Ingrese nombre del inquilino"}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="col-12 col-md-3">
+                            <div className="form-group">
+                              <label>&nbsp;</label>
+                              <div className="d-flex gap-2">
+                                <button 
+                                  type="button" 
+                                  className="btn btn-primary flex-fill"
+                                  onClick={buscarInquilino}
+                                  disabled={loading2}
+                                >
+                                  {loading2 ? (
+                                    <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                  ) : (
+                                    <FiSearch className="me-1" />
+                                  )}
+                                  Buscar
+                                </button>
+                                <button 
+                                  type="button" 
+                                  className="btn btn-secondary flex-fill"
+                                  onClick={limpiarFiltros}
+                                  disabled={!searchTerm && selectedMonth === null}
+                                >
+                                  <FiX className="me-1" />
+                                  Limpiar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1321,16 +1418,27 @@ const ContabilidadPagos = () => {
                       <div className="table-responsive doctor-list">
                         <Table
                           columns={columns}
-                          dataSource={Array.isArray(pagos) ? pagos : []}
+                          dataSource={pagosFiltrados}
                           rowKey="id"
                           pagination={{
-                            total: pagos.length,
+                            total: pagosFiltrados.length,
                             pageSize: 10,
                             showTotal: (total, range) =>
                               `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
-                           
+                            showSizeChanger: true,
+                            showQuickJumper: true,
+                            sizeChangerText: 'Filas por página',
+                            jumpPrevText: 'Anterior',
+                            jumpNextText: 'Siguiente'
                           }}
-                          loading={loading2}
+                          loading={loading || loading2}
+                          locale={{
+                            emptyText: todosPagos.length === 0 ? 
+                              'No hay pagos registrados en el sistema' :
+                              pagosFiltrados.length === 0 ? 
+                              'No se encontraron pagos con los filtros aplicados. Presione "Buscar" para aplicar filtros o "Limpiar" para ver todos los pagos.' :
+                              'No hay datos para mostrar'
+                          }}
                         />
                       </div>
                     </div>
@@ -1437,6 +1545,7 @@ const ContabilidadPagos = () => {
                         required
                         value={metodosPago.find(m => m.value === formData.metodoPago) || null}
                         classNamePrefix="select"
+                        styles={selectStyles}
                       />
                     </div>
                   </div>
@@ -1452,6 +1561,7 @@ const ContabilidadPagos = () => {
                         required
                         value={estadosPago.find(e => e.value === formData.estado) || null}
                         classNamePrefix="select"
+                        styles={selectStyles}
                       />
                     </div>
                   </div>
@@ -1594,6 +1704,7 @@ const ContabilidadPagos = () => {
                         required
                         value={metodosPago.find(m => m.value === formData.metodoPago) || null}
                         classNamePrefix="select"
+                        styles={selectStyles}
                       />
                     </div>
                   </div>
@@ -1609,6 +1720,7 @@ const ContabilidadPagos = () => {
                         required
                         value={estadosPago.find(e => e.value === formData.estado) || null}
                         classNamePrefix="select"
+                        styles={selectStyles}
                       />
                     </div>
                   </div>
@@ -1849,6 +1961,7 @@ const ContabilidadPagos = () => {
                         value={metodosPago.find(m => m.value === metodoPagoRegistro) || null}
                         placeholder="Seleccionar método de pago"
                         classNamePrefix="select"
+                        styles={selectStyles}
                         required
                       />
                     </div>

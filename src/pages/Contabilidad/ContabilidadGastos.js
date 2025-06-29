@@ -27,6 +27,7 @@ const ContabilidadGastos = () => {
 
   // Estados adicionales para DataTable y manejo de documentos
   const [gastos, setGastos] = useState([]);
+  const [todosGastos, setTodosGastos] = useState([]); // Lista completa sin filtrar
   const [gastoSeleccionado, setGastoSeleccionado] = useState(null);
   const [documento, setDocumento] = useState(null);
   const [documentoError, setDocumentoError] = useState(false);
@@ -44,6 +45,11 @@ const ContabilidadGastos = () => {
   const [updatedData, setUpdatedData] = useState(null);
   const [documentoExistente, setDocumentoExistente] = useState(null);
 
+  // Estados para los filtros
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [selectedInmueble, setSelectedInmueble] = useState(null);
+  const [selectedCategoria, setSelectedCategoria] = useState(null);
+
   const [inmuebles, setInmuebles] = useState([]);
 
   const categoriasGasto = [
@@ -55,6 +61,82 @@ const ContabilidadGastos = () => {
     { value: 'ADMINISTRATIVO', label: 'Gastos Administrativos' },
     { value: 'OTROS', label: 'Otros' }
   ];
+
+  const meses = [
+    { value: null, label: 'Todos los meses' },
+    { value: 0, label: 'Enero' },
+    { value: 1, label: 'Febrero' },
+    { value: 2, label: 'Marzo' },
+    { value: 3, label: 'Abril' },
+    { value: 4, label: 'Mayo' },
+    { value: 5, label: 'Junio' },
+    { value: 6, label: 'Julio' },
+    { value: 7, label: 'Agosto' },
+    { value: 8, label: 'Septiembre' },
+    { value: 9, label: 'Octubre' },
+    { value: 10, label: 'Noviembre' },
+    { value: 11, label: 'Diciembre' }
+  ];
+
+  // Estilos comunes para todos los Select
+  const selectStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      borderColor: state.isFocused ? '#007bff !important' : '#ced4da !important',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(0,123,255,.25) !important' : 'none !important',
+      border: '1px solid #ced4da !important',
+      minHeight: '38px !important',
+      cursor: 'pointer !important',
+      opacity: '1 !important',
+      '&:hover': {
+        borderColor: '#007bff !important'
+      }
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      opacity: '1 !important'
+    }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      opacity: '1 !important'
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected ? '#007bff !important' : state.isFocused ? '#e9ecef !important' : '#ffffff !important',
+      color: state.isSelected ? '#ffffff !important' : '#1f2937 !important',
+      cursor: 'pointer !important',
+      opacity: '1 !important',
+      '&:active': {
+        backgroundColor: state.isSelected ? '#007bff !important' : '#dee2e6 !important'
+      }
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: '#1f2937 !important',
+      opacity: '1 !important'
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: '#6c757d !important',
+      opacity: '1 !important'
+    }),
+    menu: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      border: '1px solid #ced4da !important',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1) !important',
+      opacity: '1 !important',
+      zIndex: 9999
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      backgroundColor: '#ffffff !important',
+      opacity: '1 !important'
+    })
+  };
 
   /* Estado de gasto no implementado en la base de datos todavía
   const estadosGasto = [
@@ -87,65 +169,103 @@ const ContabilidadGastos = () => {
     fetchData();
   }, []);
 
+  // Función para aplicar todos los filtros localmente
+  const aplicarFiltros = () => {
+    let resultados = [...todosGastos];
+
+    // Filtro por mes
+    if (selectedMonth !== null) {
+      resultados = resultados.filter(gasto => {
+        if (!gasto.fecha) return false;
+        const fechaGasto = new Date(gasto.fecha);
+        return fechaGasto.getMonth() === selectedMonth;
+      });
+    }
+
+    // Filtro por inmueble
+    if (selectedInmueble !== null) {
+      resultados = resultados.filter(gasto => {
+        return gasto.inmueble_id === selectedInmueble;
+      });
+    }
+
+    // Filtro por categoría
+    if (selectedCategoria !== null) {
+      resultados = resultados.filter(gasto => {
+        return gasto.tipo_gasto === selectedCategoria;
+      });
+    }
+
+    // Filtro por búsqueda de texto (concepto o inmueble)
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      resultados = resultados.filter(gasto => {
+        const concepto = (gasto.descripcion || '').toLowerCase();
+        const inmueble = (gasto.inmueble_nombre || '').toLowerCase();
+        return concepto.includes(searchLower) || inmueble.includes(searchLower);
+      });
+    }
+
+    setGastos(resultados);
+    return resultados;
+  };
+
   // Función para cargar todos los gastos
   const cargarTodosGastos = async () => {
     try {
       setLoading2(true);
       
       const todosLosGastos = await gastoService.obtenerGastos();
+      const gastosArray = Array.isArray(todosLosGastos) ? todosLosGastos : [];
       
-      setGastos(Array.isArray(todosLosGastos) ? todosLosGastos : []);
+      setTodosGastos(gastosArray);
+      setGastos(gastosArray);
       
       // Si hay resultados, mostrar mensaje
-      if (Array.isArray(todosLosGastos) && todosLosGastos.length > 0) {
+      if (gastosArray.length > 0) {
+        message.success(`Se cargaron ${gastosArray.length} gastos correctamente`);
       } else {
-        // console.warn("No se encontraron gastos en el sistema");
+        message.info("No se encontraron gastos en el sistema");
       }
     } catch (error) {
-      // console.error('Error al cargar todos los gastos:', error);
-      alert('Error al cargar todos los gastos');
+      console.error('Error al cargar todos los gastos:', error);
+      message.error('Error al cargar todos los gastos');
+      setTodosGastos([]);
       setGastos([]);
     } finally {
       setLoading2(false);
     }
   };
 
-  // Buscar gastos por concepto o inmueble
-  const buscarGastos = async () => {
+  // Función para aplicar filtros manualmente
+  const buscarGastos = () => {
+    setLoading2(true);
     try {
-      setLoading2(true);
+      const resultados = aplicarFiltros();
       
-      // Si el campo de búsqueda está vacío, mostrar todos los gastos
-      if (!searchTerm.trim()) {
-        await cargarTodosGastos();
-        return;
+      if (resultados.length === 0 && (searchTerm.trim() || selectedMonth !== null || selectedInmueble !== null || selectedCategoria !== null)) {
+        message.warning('No se encontraron gastos con los filtros aplicados');
+      } else if (resultados.length > 0 && (searchTerm.trim() || selectedMonth !== null || selectedInmueble !== null || selectedCategoria !== null)) {
+        message.success(`Se encontraron ${resultados.length} gasto${resultados.length !== 1 ? 's' : ''} con los filtros aplicados`);
+      } else if (resultados.length > 0) {
+        message.info(`Mostrando todos los gastos (${resultados.length})`);
       }
-      
-      // Si hay término de búsqueda, realizar la búsqueda específica
-      const resultados = await gastoService.buscarGastos(searchTerm);
-      
-      setGastos(Array.isArray(resultados) ? resultados : []);
-      
-      if (resultados.length === 0) {
-        alert('No se encontraron gastos con ese término de búsqueda');
-      }
-    } catch (error) {
-      console.error('Error al buscar gastos:', error);
-      alert('Error al buscar los gastos');
-      setGastos([]); 
     } finally {
       setLoading2(false);
     }
   };
 
-  // Función para limpiar filtros
-  const limpiarFiltros = async () => {
-    try {
-      setSearchTerm('');
-      await cargarTodosGastos();
-    } catch (error) {
-      console.error('Error al limpiar filtros:', error);
-    }
+  // Función para limpiar filtros y mostrar todos los gastos
+  const limpiarFiltros = () => {
+    setSearchTerm('');
+    setSelectedMonth(null);
+    setSelectedInmueble(null);
+    setSelectedCategoria(null);
+    
+    // Mostrar todos los gastos sin filtros
+    setGastos(todosGastos);
+    
+    message.success('Filtros limpiados. Mostrando todos los gastos.');
   };
 
   // Función para mostrar modal de nuevo gasto
@@ -279,6 +399,13 @@ const ContabilidadGastos = () => {
         
         // Recargar datos
         await cargarTodosGastos();
+        
+        // Reaplicar filtros si hay filtros activos
+        if (searchTerm || selectedMonth !== null || selectedInmueble !== null || selectedCategoria !== null) {
+          setTimeout(() => {
+            aplicarFiltros();
+          }, 100);
+        }
         
     } catch (error) {
         console.error('Error al registrar/actualizar el gasto:', error);
@@ -505,12 +632,21 @@ const ContabilidadGastos = () => {
     
     try {
       await gastoService.eliminarGasto(eliminandoGasto.id);
-      alert('Gasto eliminado correctamente');
+      message.success('Gasto eliminado correctamente');
       setModalDeleteVisible(false);
-      cargarTodosGastos();
+      
+      // Recargar datos
+      await cargarTodosGastos();
+      
+      // Reaplicar filtros si hay filtros activos
+      if (searchTerm || selectedMonth !== null || selectedInmueble !== null || selectedCategoria !== null) {
+        setTimeout(() => {
+          aplicarFiltros();
+        }, 100);
+      }
     } catch (error) {
       console.error('Error al eliminar gasto:', error);
-      alert('Error al eliminar el gasto');
+      message.error('Error al eliminar el gasto');
     }
   };
 
@@ -547,46 +683,7 @@ const ContabilidadGastos = () => {
     }));
   };
 
-  // ESTILOS CORREGIDOS PARA LOS SELECTS
-  const customStyles = {
-    menuPortal: base => ({ 
-      ...base, 
-      zIndex: 9999,
-      backgroundColor: 'white'  // Fondo sólido para evitar transparencia
-    }),
-    menu: base => ({
-      ...base,
-      backgroundColor: 'white',
-      zIndex: 9999,
-    }),
-    control: (base, state) => ({
-      ...base,
-      backgroundColor: 'white',
-      borderColor: state.isFocused ? "#2e37a4" : "rgba(46, 55, 164, 0.1)",
-      boxShadow: state.isFocused ? "0 0 0 1px #2e37a4" : "none",
-      "&:hover": {
-        borderColor: "#2e37a4",
-      },
-      borderRadius: "10px",
-      fontSize: "14px",
-      minHeight: "45px",
-    }),
-    placeholder: base => ({
-      ...base,
-      color: '#6c757d',
-    }),
-    singleValue: base => ({
-      ...base,
-      color: '#212529',
-    }),
-    dropdownIndicator: (base, state) => ({
-      ...base,
-      transform: state.selectProps.menuIsOpen ? "rotate(-180deg)" : "rotate(0)",
-      transition: "250ms",
-      width: "35px",
-      height: "35px",
-    }),
-  };
+
 
   // Definición de columnas para la tabla
   const columns = [
@@ -729,6 +826,13 @@ const ContabilidadGastos = () => {
 
       // Recargar la lista de gastos
       await cargarTodosGastos();
+      
+      // Reaplicar filtros si hay filtros activos
+      if (searchTerm || selectedMonth !== null || selectedInmueble !== null || selectedCategoria !== null) {
+        setTimeout(() => {
+          aplicarFiltros();
+        }, 100);
+      }
 
     } catch (error) {
       console.error('Error al actualizar gasto:', error);
@@ -795,82 +899,157 @@ const ContabilidadGastos = () => {
             <div className="col-sm-12">
               <div className="card card-table show-entire">
                 <div className="card-body">
-                  <div className="row">
-                    <div className="col-12">
-                      <div className="doctor-table-blk m-4">
-                        <h3>Gastos registrados</h3>
-                        <div className="doctor-search-blk">
-                          <div className="add-group">             
-                            <label>&nbsp;</label>
-                            <button 
-                              type="button" 
-                              className="btn btn-primary doctor-refresh ms-2"
-                              onClick={cargarTodosGastos}
-                              title="Actualizar datos"
-                              disabled={loading2}
-                            >
-                              {loading ? (
-                                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                    ) : (
-                                      <i className="fas fa-sync-alt"></i>
-                                    )}
-                            
-                            </button>
+                  <div className="page-table-header mb-2">
+                    <div className="row align-items-center">
+                      <div className="col">
+                        <div className="doctor-table-blk">
+                          <h3>Gastos registrados</h3>
+                          <div className="doctor-search-blk">
+                            <div className="top-nav-search table-search-blk">
+                              <span className="text-muted">
+                                {loading2 ? 'Cargando...' : 
+                                  gastos.length === todosGastos.length ? 
+                                  `Mostrando todos los gastos (${todosGastos.length})` :
+                                  `Mostrando ${gastos.length} de ${todosGastos.length} gastos filtrados`
+                                }
+                              </span>
+                            </div>
+                            <div className="add-group">
+                              <button
+                                className="btn btn-primary doctor-refresh ms-2"
+                                onClick={cargarTodosGastos}
+                                title="Actualizar datos"
+                                disabled={loading2}
+                              >
+                                {loading2 ? (
+                                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                ) : (
+                                  <i className="fas fa-sync-alt"></i>
+                                )}
+                              </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-primary ms-2"
+                                onClick={mostrarModalNuevoGasto}
+                              >
+                                <FiPlusCircle className="me-2" /> Nuevo Gasto
+                              </button>
+                            </div>
                           </div>
-                      </div>
-                        <button 
-                          type="button" 
-                          className="btn btn-primary position-absolute top-0 end-0 m-4"
-                          onClick={mostrarModalNuevoGasto}
-                        >
-                          <FiPlusCircle className="me-2" /> Nuevo Gasto
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="col-12 col-md-6">
-                      <div className="form-group">
-                        <label>Buscar gastos</label>
-                        <div className="input-group">
-                          <input
-                            type="text"
-                            className="form-control"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Buscar por concepto o inmueble"
-                          />
-                          <button 
-                            type="button" 
-                            className="btn btn-primary"
-                            onClick={buscarGastos}
-                            disabled={loading2}
-                          >
-                            {loading2 ? (
-                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            ) : (
-                              <FiSearch className="me-2" />
-                            )}
-                            Buscar
-                          </button>
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="col-12 col-md-4">
-                      <div className="form-group">
-                        <label>&nbsp;</label>
-                        <button 
-                          type="button" 
-                          className="btn btn-secondary w-100"
-                          onClick={limpiarFiltros}
-                          disabled={loading2}
-                        >
-                          Limpiar Filtros
-                        </button>
+                  {/* Sección de filtros */}
+                  <div className="row mt-4">
+                    <div className="col-12">
+                      <div className="bg-light p-3 rounded">
+                        <h5 className="mb-3">
+                          <FiSearch className="me-2" />
+                          Filtros de Búsqueda
+                        </h5>
+                        <div className="row">
+                          <div className="col-12 col-md-3">
+                            <div className="form-group">
+                              <label>Mes</label>
+                              <Select
+                                options={meses}
+                                value={meses.find(m => m.value === selectedMonth)}
+                                onChange={(selected) => setSelectedMonth(selected.value)}
+                                placeholder="Seleccionar mes"
+                                isClearable={false}
+                                classNamePrefix="custom-select"
+                                styles={selectStyles}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="col-12 col-md-3">
+                            <div className="form-group">
+                              <label>Inmueble</label>
+                              <Select
+                                options={[
+                                  { value: null, label: 'Todos los inmuebles' },
+                                  ...inmuebles
+                                ]}
+                                value={inmuebles.find(i => i.value === selectedInmueble) || { value: null, label: 'Todos los inmuebles' }}
+                                onChange={(selected) => setSelectedInmueble(selected.value)}
+                                placeholder="Seleccionar inmueble"
+                                isClearable={false}
+                                classNamePrefix="custom-select"
+                                styles={selectStyles}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="col-12 col-md-3">
+                            <div className="form-group">
+                              <label>Categoría</label>
+                              <Select
+                                options={[
+                                  { value: null, label: 'Todas las categorías' },
+                                  ...categoriasGasto
+                                ]}
+                                value={categoriasGasto.find(c => c.value === selectedCategoria) || { value: null, label: 'Todas las categorías' }}
+                                onChange={(selected) => setSelectedCategoria(selected.value)}
+                                placeholder="Seleccionar categoría"
+                                isClearable={false}
+                                classNamePrefix="custom-select"
+                                styles={selectStyles}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="col-12 col-md-3">
+                            <div className="form-group">
+                              <label>Término de búsqueda</label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    buscarGastos();
+                                  }
+                                }}
+                                placeholder="Buscar por concepto o inmueble"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="row mt-3">
+                          <div className="col-12">
+                            <div className="d-flex gap-2">
+                              <button 
+                                type="button" 
+                                className="btn btn-primary"
+                                onClick={buscarGastos}
+                                disabled={loading2}
+                              >
+                                {loading2 ? (
+                                  <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                ) : (
+                                  <FiSearch className="me-1" />
+                                )}
+                                Aplicar Filtros
+                              </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary"
+                                onClick={limpiarFiltros}
+                                disabled={!searchTerm && selectedMonth === null && selectedInmueble === null && selectedCategoria === null}
+                              >
+                                <FiX className="me-1" />
+                                Limpiar Filtros
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    
-                    
                   </div>
                   
                   {/* DataTable de gastos */}
@@ -932,7 +1111,7 @@ const ContabilidadGastos = () => {
                   name="inmuebleId"
                   options={inmuebles}
                   onChange={handleSelectChange}
-                  styles={customStyles}
+                  styles={selectStyles}
                   placeholder="Seleccionar inmueble"
                   value={inmuebles.find(i => i.value === formData.inmuebleId) || null}
                   required
@@ -1011,7 +1190,7 @@ const ContabilidadGastos = () => {
                   name="categoria"
                   options={categoriasGasto}
                   onChange={handleSelectChange}
-                  styles={customStyles}
+                  styles={selectStyles}
                   placeholder="Seleccionar categoría"
                   value={categoriasGasto.find(c => c.value === formData.categoria) || null}
                   required

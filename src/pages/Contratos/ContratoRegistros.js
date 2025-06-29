@@ -37,6 +37,7 @@ const ContratoRegistrosContent = () => {
   const [filteredContratos, setFilteredContratos] = useState([]);
   const [inmuebles, setInmuebles] = useState([]);
   const [pisos, setPisos] = useState([]);
+  const [espacios, setEspacios] = useState([]); // Para obtener relación espacio-piso
   
   // Estados para filtros
   const [selectedInmueble, setSelectedInmueble] = useState(null);
@@ -113,13 +114,15 @@ const ContratoRegistrosContent = () => {
       setLoading(true);
       setError(null);
       try {
-        const [contratosData, inmueblesData] = await Promise.all([
+        const [contratosData, inmueblesData, espaciosData] = await Promise.all([
           contratoService.obtenerContratosDetalles(),
           inmuebleService.obtenerInmuebles(),
+          espacioService.obtenerEspacios(), // Obtener todos los espacios para la relación con pisos
         ]);
         setContratos(Array.isArray(contratosData) ? contratosData : []);
         setFilteredContratos(Array.isArray(contratosData) ? contratosData : []);
         setInmuebles(inmueblesData.map(item => ({ value: item.id, label: item.nombre })));
+        setEspacios(Array.isArray(espaciosData) ? espaciosData : []); // Guardar espacios para filtros
       } catch (err) {
         console.error("Error detallado al cargar datos:", err);
         setError(`Error al cargar los datos: ${err.message || 'Error desconocido'}`);
@@ -142,7 +145,34 @@ const ContratoRegistrosContent = () => {
     const fetchPisos = async () => {
       try {
         const pisosData = await pisoService.obtenerPorInmueble(selectedInmueble);
-        setPisos(pisosData.map(item => ({ value: item.id, label: item.nombre_piso })));
+        console.log('Datos de pisos recibidos del backend:', pisosData);
+        
+        // Solo mostrar pisos que tienen espacios con contratos activos
+        const pisosConContratos = pisosData.filter(piso => {
+          // Verificar si hay espacios en este piso
+          const espaciosEnPiso = espacios.filter(espacio => 
+            espacio.piso_id && espacio.piso_id.toString() === piso.id.toString()
+          );
+          
+          // Verificar si hay contratos en alguno de esos espacios
+          const hayContratos = espaciosEnPiso.some(espacio => 
+            contratos.some(contrato => 
+              contrato.espacio_id && contrato.espacio_id.toString() === espacio.id.toString()
+            )
+          );
+          
+          console.log(`Piso ${piso.id} (${piso.nombre || piso.nombre_piso}): espacios=${espaciosEnPiso.length}, contratos=${hayContratos}`);
+          return hayContratos;
+        });
+        
+        console.log('Pisos con contratos:', pisosConContratos);
+        
+        const pisosMapeados = pisosConContratos.map(item => ({ 
+          value: item.id, 
+          label: item.nombre || item.nombre_piso || `Piso ${item.id}` 
+        }));
+        console.log('Pisos mapeados:', pisosMapeados);
+        setPisos(pisosMapeados);
       } catch (err) {
         console.error("Error detallado al cargar pisos:", err);
         setPisos([]);
@@ -151,7 +181,7 @@ const ContratoRegistrosContent = () => {
     };
     
     fetchPisos();
-  }, [selectedInmueble]);
+  }, [selectedInmueble, espacios, contratos]);
 
   // Aplicar filtros
   useEffect(() => {
@@ -166,10 +196,19 @@ const ContratoRegistrosContent = () => {
       );
     }
     
-    // Filtrar por piso
-    if (selectedPiso) {
+    // Filtrar por piso - Usando la relación espacio-piso
+    if (selectedPiso && espacios.length > 0) {
+      // Obtener todos los espacios que pertenecen al piso seleccionado
+      const espaciosDelPiso = espacios.filter(espacio => 
+        espacio.piso_id && espacio.piso_id.toString() === selectedPiso.toString()
+      );
+      
+      // Obtener los IDs de esos espacios
+      const idsEspaciosDelPiso = espaciosDelPiso.map(espacio => espacio.id);
+      
+      // Filtrar contratos que tengan un espacio de este piso
       filtered = filtered.filter(contrato => 
-        contrato.piso_id && contrato.piso_id.toString() === selectedPiso.toString()
+        contrato.espacio_id && idsEspaciosDelPiso.includes(contrato.espacio_id)
       );
     }
     
@@ -193,7 +232,7 @@ const ContratoRegistrosContent = () => {
     }
     
     setFilteredContratos(filtered);
-  }, [contratos, selectedInmueble, selectedPiso, selectedEstado, searchText]);
+  }, [contratos, selectedInmueble, selectedPiso, selectedEstado, searchText, espacios]);
 
   // Verificar pagos cuando cambien los contratos filtrados
   useEffect(() => {
@@ -205,6 +244,9 @@ const ContratoRegistrosContent = () => {
   const handleInmuebleChange = (value) => {
     setSelectedInmueble(value);
     setSelectedPiso(null); // Reiniciar piso al cambiar inmueble
+    if (!value) {
+      setPisos([]); // Limpiar pisos si no hay inmueble seleccionado
+    }
   };
 
   const handlePisoChange = (value) => {
@@ -501,6 +543,7 @@ const ContratoRegistrosContent = () => {
     setSelectedPiso(null);
     setSelectedEstado(null);
     setSearchText("");
+    setPisos([]); // Limpiar también los pisos disponibles
   };
 
   // Función para verificar si todos los pagos de un contrato están pagados
@@ -1377,13 +1420,81 @@ const ContratoRegistrosContent = () => {
                                 <ReactSelect
                                   placeholder="Seleccionar inmueble"
                                   isClearable
-                                  value={selectedInmueble ? { value: selectedInmueble, label: inmuebles.find(i => i.value === selectedInmueble)?.label } : null}
+                                  value={selectedInmueble ? inmuebles.find(i => i.value === selectedInmueble) : null}
                                   onChange={(option) => handleInmuebleChange(option?.value)}
-                                  options={inmuebles.map(inmueble => ({
-                                    value: inmueble.value,
-                                    label: inmueble.label
-                                  }))}
+                                  options={inmuebles}
                                   classNamePrefix="select"
+                                  noOptionsMessage={() => "No hay inmuebles disponibles"}
+                                  styles={{
+                                    control: (provided) => ({
+                                      ...provided,
+                                      backgroundColor: 'white',
+                                      borderColor: '#e2e8f0',
+                                      borderWidth: '1px',
+                                      borderRadius: '8px',
+                                      minHeight: '45px',
+                                      cursor: 'pointer',
+                                      boxShadow: 'none',
+                                      '&:hover': {
+                                        borderColor: '#3b82f6'
+                                      }
+                                    }),
+                                    placeholder: (provided) => ({
+                                      ...provided,
+                                      color: '#6b7280',
+                                      fontSize: '14px'
+                                    }),
+                                    singleValue: (provided) => ({
+                                      ...provided,
+                                      color: '#1f2937',
+                                      fontSize: '14px'
+                                    }),
+                                    input: (provided) => ({
+                                      ...provided,
+                                      color: '#1f2937',
+                                      fontSize: '14px'
+                                    }),
+                                    valueContainer: (provided) => ({
+                                      ...provided,
+                                      padding: '8px 12px'
+                                    }),
+                                    indicatorSeparator: () => ({
+                                      display: 'none'
+                                    }),
+                                    dropdownIndicator: (provided) => ({
+                                      ...provided,
+                                      color: '#6b7280',
+                                      '&:hover': {
+                                        color: '#374151'
+                                      }
+                                    }),
+                                    clearIndicator: (provided) => ({
+                                      ...provided,
+                                      color: '#6b7280',
+                                      '&:hover': {
+                                        color: '#374151'
+                                      }
+                                    }),
+                                    menu: (provided) => ({
+                                      ...provided,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                                      border: '1px solid #e5e7eb',
+                                      zIndex: 9999
+                                    }),
+                                    option: (provided, state) => ({
+                                      ...provided,
+                                      backgroundColor: state.isSelected 
+                                        ? '#3b82f6' 
+                                        : state.isFocused 
+                                        ? '#eff6ff' 
+                                        : 'white',
+                                      color: state.isSelected ? 'white' : '#1f2937',
+                                      cursor: 'pointer',
+                                      fontSize: '14px',
+                                      padding: '10px 12px'
+                                    })
+                                  }}
                                 />
                               </div>
                             </div>
@@ -1391,16 +1502,84 @@ const ContratoRegistrosContent = () => {
                               <div className="form-group local-forms">
                                 <label>Piso</label>
                                 <ReactSelect
-                                  placeholder="Seleccionar piso"
+                                  placeholder={!selectedInmueble ? "Primero selecciona un inmueble" : "Seleccionar piso"}
                                   isClearable
-                                  value={selectedPiso ? { value: selectedPiso, label: pisos.find(p => p.value === selectedPiso)?.label } : null}
+                                  value={selectedPiso ? pisos.find(p => p.value === selectedPiso) : null}
                                   onChange={(option) => handlePisoChange(option?.value)}
-                                  options={pisos.map(piso => ({
-                                    value: piso.value,
-                                    label: piso.label
-                                  }))}
+                                  options={pisos}
                                   isDisabled={!selectedInmueble}
                                   classNamePrefix="select"
+                                  noOptionsMessage={() => selectedInmueble ? "No hay pisos con contratos" : "Primero selecciona un inmueble"}
+                                  styles={{
+                                    control: (provided, state) => ({
+                                      ...provided,
+                                      backgroundColor: state.isDisabled ? '#f5f5f5' : 'white',
+                                      borderColor: state.isDisabled ? '#d1d5db' : '#e2e8f0',
+                                      borderWidth: '1px',
+                                      borderRadius: '8px',
+                                      minHeight: '45px',
+                                      cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                                      boxShadow: 'none',
+                                      '&:hover': {
+                                        borderColor: state.isDisabled ? '#d1d5db' : '#3b82f6'
+                                      }
+                                    }),
+                                    placeholder: (provided, state) => ({
+                                      ...provided,
+                                      color: state.isDisabled ? '#9ca3af' : '#6b7280',
+                                      fontSize: '14px'
+                                    }),
+                                    singleValue: (provided, state) => ({
+                                      ...provided,
+                                      color: state.isDisabled ? '#6b7280' : '#1f2937',
+                                      fontSize: '14px'
+                                    }),
+                                    input: (provided) => ({
+                                      ...provided,
+                                      color: '#1f2937',
+                                      fontSize: '14px'
+                                    }),
+                                    valueContainer: (provided) => ({
+                                      ...provided,
+                                      padding: '8px 12px'
+                                    }),
+                                    indicatorSeparator: () => ({
+                                      display: 'none'
+                                    }),
+                                    dropdownIndicator: (provided, state) => ({
+                                      ...provided,
+                                      color: state.isDisabled ? '#9ca3af' : '#6b7280',
+                                      '&:hover': {
+                                        color: state.isDisabled ? '#9ca3af' : '#374151'
+                                      }
+                                    }),
+                                    clearIndicator: (provided, state) => ({
+                                      ...provided,
+                                      color: state.isDisabled ? '#9ca3af' : '#6b7280',
+                                      '&:hover': {
+                                        color: state.isDisabled ? '#9ca3af' : '#374151'
+                                      }
+                                    }),
+                                    menu: (provided) => ({
+                                      ...provided,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                                      border: '1px solid #e5e7eb',
+                                      zIndex: 9999
+                                    }),
+                                    option: (provided, state) => ({
+                                      ...provided,
+                                      backgroundColor: state.isSelected 
+                                        ? '#3b82f6' 
+                                        : state.isFocused 
+                                        ? '#eff6ff' 
+                                        : 'white',
+                                      color: state.isSelected ? 'white' : '#1f2937',
+                                      cursor: 'pointer',
+                                      fontSize: '14px',
+                                      padding: '10px 12px'
+                                    })
+                                  }}
                                 />
                               </div>
                             </div>
@@ -1419,16 +1598,96 @@ const ContratoRegistrosContent = () => {
                                     { value: 'cancelado', label: 'Cancelado' }
                                   ]}
                                   classNamePrefix="select"
+                                  noOptionsMessage={() => "No hay estados disponibles"}
+                                  styles={{
+                                    control: (provided) => ({
+                                      ...provided,
+                                      backgroundColor: 'white',
+                                      borderColor: '#e2e8f0',
+                                      borderWidth: '1px',
+                                      borderRadius: '8px',
+                                      minHeight: '45px',
+                                      cursor: 'pointer',
+                                      boxShadow: 'none',
+                                      '&:hover': {
+                                        borderColor: '#3b82f6'
+                                      }
+                                    }),
+                                    placeholder: (provided) => ({
+                                      ...provided,
+                                      color: '#6b7280',
+                                      fontSize: '14px'
+                                    }),
+                                    singleValue: (provided) => ({
+                                      ...provided,
+                                      color: '#1f2937',
+                                      fontSize: '14px'
+                                    }),
+                                    input: (provided) => ({
+                                      ...provided,
+                                      color: '#1f2937',
+                                      fontSize: '14px'
+                                    }),
+                                    valueContainer: (provided) => ({
+                                      ...provided,
+                                      padding: '8px 12px'
+                                    }),
+                                    indicatorSeparator: () => ({
+                                      display: 'none'
+                                    }),
+                                    dropdownIndicator: (provided) => ({
+                                      ...provided,
+                                      color: '#6b7280',
+                                      '&:hover': {
+                                        color: '#374151'
+                                      }
+                                    }),
+                                    clearIndicator: (provided) => ({
+                                      ...provided,
+                                      color: '#6b7280',
+                                      '&:hover': {
+                                        color: '#374151'
+                                      }
+                                    }),
+                                    menu: (provided) => ({
+                                      ...provided,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                                      border: '1px solid #e5e7eb',
+                                      zIndex: 9999
+                                    }),
+                                    option: (provided, state) => ({
+                                      ...provided,
+                                      backgroundColor: state.isSelected 
+                                        ? '#3b82f6' 
+                                        : state.isFocused 
+                                        ? '#eff6ff' 
+                                        : 'white',
+                                      color: state.isSelected ? 'white' : '#1f2937',
+                                      cursor: 'pointer',
+                                      fontSize: '14px',
+                                      padding: '10px 12px'
+                                    })
+                                  }}
                                 />
                               </div>
                             </div>
                           </div>
                           <div className="row">
-                            <div className="col-12 d-flex justify-content-end">
+                            <div className="col-12 d-flex justify-content-between align-items-center">
+                              <div className="text-muted">
+                                <small>
+                                  Mostrando {filteredContratos.length} de {contratos.length} contratos
+                                  {(selectedInmueble || selectedPiso || selectedEstado || searchText) && 
+                                    <span className="text-primary"> (filtros aplicados)</span>
+                                  }
+                                </small>
+                              </div>
                               <button 
                                 type="button" 
-                                className="btn btn-secondary me-2"
+                                className="btn btn-secondary"
                                 onClick={handleLimpiarFiltros}
+                                disabled={!selectedInmueble && !selectedPiso && !selectedEstado && !searchText}
                               >
                                 <i className="fas fa-undo me-1"></i> Limpiar filtros
                               </button>
@@ -2118,7 +2377,7 @@ const ContratoRegistrosContent = () => {
         )}
       </Modal>
       
-      {/* Estilos adicionales para documentos */}
+      {/* Estilos adicionales para documentos y selects */}
       <style>{`
         .document-container {
           background-color: #f8f9fa;
@@ -2151,6 +2410,22 @@ const ContratoRegistrosContent = () => {
           margin-top: 20px;
           padding-top: 20px;
           border-top: 1px solid #eee;
+        }
+
+        /* Estilos adicionales para ReactSelect - Solo lo esencial */
+        .select__control {
+          box-shadow: none !important;
+          border-radius: 8px !important;
+        }
+
+        .select__control:focus,
+        .select__control:focus-within {
+          box-shadow: none !important;
+          border-color: #3b82f6 !important;
+        }
+
+        .select__menu {
+          z-index: 9999 !important;
         }
       `}</style>
     </>
